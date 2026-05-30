@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 239 84% 60%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 239 84% 60%;
+    --radius: 0.5rem;
+
+    --brand-from: 239 84% 60%;
+    --brand-to: 262 83% 58%;
+    --brand-tint: 226 100% 97%;
+    --brand-soft: 226 92% 93%;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 22%;
+    --input: 217.2 32.6% 22%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Scrollbar global — brand-tinted, fino, rounded.
+     Firefox usa scrollbar-* nativos; WebKit/Chromium usa ::-webkit-scrollbar. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--brand-from) / 0.35) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--brand-from) / 0.3);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+    transition: background 150ms ease;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--brand-from) / 0.55);
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--brand-from) / 0.75);
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .dark * {
+    scrollbar-color: hsl(var(--brand-from) / 0.45) transparent;
+  }
+  .dark *::-webkit-scrollbar-thumb {
+    background: hsl(var(--brand-from) / 0.4);
+    background-clip: content-box;
+  }
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--brand-from) / 0.65);
+    background-clip: content-box;
+  }
+  .dark *::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--brand-from) / 0.85);
+    background-clip: content-box;
+  }
+}

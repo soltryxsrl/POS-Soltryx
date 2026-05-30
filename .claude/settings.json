@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(railway whoami *)",
+      "Bash(vercel whoami *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(pnpm build *)",
+      "Bash(railway link *)",
+      "Bash(railway delete *)"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: t1et_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-t1et_pos}
+      POSTGRES_USER: ${DB_USER:-t1et_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-12345678}
+      TZ: America/Santo_Domingo
+      PGTZ: America/Santo_Domingo
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - t1et_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-t1et_app} -d ${DB_NAME:-t1et_pos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  t1et_pg_data:
+    name: t1et_pg_data
