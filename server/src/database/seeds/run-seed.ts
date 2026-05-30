@@ -22,6 +22,11 @@ async function run(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log('[seed] DataSource initialized');
 
+  // Aplica todas las migraciones pendientes antes de sembrar.
+  const applied = await AppDataSource.runMigrations();
+  // eslint-disable-next-line no-console
+  console.log(`[seed] ${applied.length} migration(s) applied`);
+
   await AppDataSource.transaction(async (m) => {
     const roles = [
       { code: 'ADMIN', name: 'Administrador', description: 'Acceso total al sistema' },
