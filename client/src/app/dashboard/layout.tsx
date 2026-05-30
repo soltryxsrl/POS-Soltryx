@@ -218,14 +218,14 @@ function Sidebar({
         <Link
           href="/dashboard"
           className="flex items-center gap-2.5 min-w-0"
-          title="T1ET POS"
+          title="Soltryx POS"
         >
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-from to-brand-to text-sm font-bold text-white shadow-lg shadow-brand-from/30">
-            T1
+            SX
           </span>
           {!collapsed && (
             <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-              T1ET POS
+              Soltryx POS
             </span>
           )}
         </Link>

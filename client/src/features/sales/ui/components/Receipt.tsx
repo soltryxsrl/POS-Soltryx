@@ -12,7 +12,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 // Config del negocio — TODO: mover a settings/configuración del comercio.
 const BUSINESS = {
-  name: 'T1ET POS',
+  name: 'Soltryx POS',
   legalName: '',
   rnc: '',
   address: '',

@@ -14,7 +14,25 @@
       "Bash(echo \"erase exit: $?\")",
       "Bash(git credential *)",
       "Bash(echo \"reject exit: $?\")",
-      "Bash(GIT_TERMINAL_PROMPT=1 git -c credential.interactive=true -c credential.guiPrompt=true push origin main)"
+      "Bash(GIT_TERMINAL_PROMPT=1 git -c credential.interactive=true -c credential.guiPrompt=true push origin main)",
+      "Read(//c/Users/Frand/Documents/**)",
+      "Read(//c/Users/Frand/Documents/GitHub/**)",
+      "Bash(git ls-tree *)",
+      "Bash(vercel env *)",
+      "Bash(vercel link *)",
+      "Bash(vercel --prod --yes)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} en %{time_total}s\\\\n\" --max-time 90 https://t1et-server.onrender.com/health)",
+      "Bash(curl -s -i --max-time 60 -X OPTIONS https://t1et-server.onrender.com/api/auth/login -H \"Origin: https://pos-soltryx.vercel.app\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(curl -s -i --max-time 60 -X POST https://t1et-server.onrender.com/api/auth/login -H \"Origin: https://pos-soltryx.vercel.app\" -H \"Content-Type: application/json\" -d '{\"emailOrUsername\":\"admin\",\"password\":\"Admin123!\"}')",
+      "Bash(curl -s -i --max-time 60 -X POST https://t1et-server.onrender.com/api/auth/refresh -H \"Origin: https://pos-soltryx.vercel.app\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s -i --max-time 60 -X POST https://t1et-server.onrender.com/api/auth/refresh -H \"Origin: https://pos-soltryx-uwtdkqmr2-soltryx-s-projects.vercel.app\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s -i --max-time 60 -X OPTIONS https://t1et-server.onrender.com/api/auth/refresh -H \"Origin: https://pos-soltryx.vercel.app\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(echo \"=== GitHub Desktop: repos conocidos \\(logs/config\\) ===\"; ls -la \"/c/Users/Frand/AppData/Roaming/GitHub Desktop/\" 2>&1 | head -20)",
+      "Read(//c/Users/Frand/AppData/Roaming/GitHub Desktop//**)",
+      "Bash(grep -aroh -E \"[A-Za-z]:\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\?[^\\\\\"'<>|?*\\\\r\\\\n]*POS[^\\\\\"'<>|?*\\\\r\\\\n]*\" IndexedDB \"Local Storage\")",
+      "Bash(grep -aroh -E \"[A-Za-z]:[\\\\\\\\\\\\\\\\/][^\\\\\"'<>|?*\\\\r\\\\n]{0,80}\\([Gg]ithub|GitHub\\)[^\\\\\"'<>|?*\\\\r\\\\n]{0,60}\" IndexedDB)",
+      "Read(//c/Users/Frand/**)",
+      "Bash(xargs grep -l \"t1et-client\")"
     ]
   }
 }

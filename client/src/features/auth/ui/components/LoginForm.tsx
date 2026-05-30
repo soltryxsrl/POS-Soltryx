@@ -36,7 +36,7 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-6 shadow-xl shadow-brand-from/10">
-      <h1 className="text-center text-2xl font-semibold tracking-tight">T1ET POS</h1>
+      <h1 className="text-center text-2xl font-semibold tracking-tight">Soltryx POS</h1>
 
       <FormField label="Usuario o email" required htmlFor="emailOrUsername">
         <Input
