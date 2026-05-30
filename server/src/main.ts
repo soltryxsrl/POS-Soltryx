@@ -18,11 +18,26 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.use(cookieParser());
 
-  // WEB_ORIGIN puede ser una lista separada por comas (varios previews de Vercel).
+  // CORS: orígenes exactos (WEB_ORIGIN, lista por comas) + patrones de Vercel
+  // del proyecto, para que cada deploy/preview con hash funcione sin reconfigurar.
   const webOrigin = config.get('WEB_ORIGIN', { infer: true });
-  const origins = webOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+  const exactOrigins = new Set(
+    webOrigin.split(',').map((o) => o.trim()).filter(Boolean),
+  );
+  // Cualquier subdominio Vercel del proyecto: pos-soltryx*.vercel.app y
+  // los alias con scope del equipo (...-soltryx-s-projects.vercel.app).
+  const vercelPatterns = [
+    /^https:\/\/pos-soltryx[a-z0-9-]*\.vercel\.app$/,
+    /^https:\/\/[a-z0-9-]+-soltryx-s-projects\.vercel\.app$/,
+  ];
   app.enableCors({
-    origin: origins.length === 1 ? origins[0] : origins,
+    origin: (origin, cb) => {
+      // Sin Origin (curl, server-to-server, same-origin) → permitir.
+      if (!origin) return cb(null, true);
+      if (exactOrigins.has(origin)) return cb(null, true);
+      if (vercelPatterns.some((re) => re.test(origin))) return cb(null, true);
+      return cb(null, false); // no permitido: sin ACAO, el navegador lo bloquea
+    },
     credentials: true,
   });
 
