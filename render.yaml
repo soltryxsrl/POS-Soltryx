@@ -51,6 +51,7 @@ services:
       # Vacío = sin atributo Domain (necesario cross-site con Vercel).
       - key: COOKIE_DOMAIN
         value: ""
-      # Se actualiza con la URL real de Vercel tras desplegar el client.
+      # Orígenes permitidos (CORS). Lista separada por comas: alias estable de
+      # Vercel + alias con scope del equipo, por si se abre cualquiera de los dos.
       - key: WEB_ORIGIN
-        value: https://CHANGEME.vercel.app
+        value: https://pos-soltryx.vercel.app,https://pos-soltryx-soltryx-s-projects.vercel.app
