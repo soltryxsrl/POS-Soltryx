@@ -2,7 +2,6 @@
 
 import { useState, type KeyboardEvent } from 'react';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
-import { Input } from '@/shared/ui/controls/Input';
 import { useProducts } from '@/features/products/application/hooks/use-products';
 import type { Product } from '@/features/products/domain/types';
 
@@ -30,13 +29,13 @@ export function ProductSearch({ onPick }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <Input
+        <input
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Busca por nombre, SKU o código de barras..."
-          className="text-base"
+          className="w-full rounded-md border border-input bg-background px-4 py-3 text-base shadow-sm outline-none focus:ring-2 focus:ring-ring"
         />
         <p className="mt-1 text-xs text-muted-foreground">
           Enter para agregar el primer resultado.

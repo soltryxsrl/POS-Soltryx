@@ -2,15 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
-import { Fab } from '@/shared/ui/controls/Fab';
-import { Input } from '@/shared/ui/controls/Input';
-import { Switch } from '@/shared/ui/controls/Switch';
 import { useProducts, useRemoveProduct } from '../../application/hooks/use-products';
 import { AdjustStockDialog } from '@/features/inventory/ui/components/AdjustStockDialog';
-import { ProductFormDialog } from './ProductFormDialog';
 
 export function ProductsTable() {
   const [q, setQ] = useState('');
@@ -18,24 +13,32 @@ export function ProductsTable() {
   const products = useProducts({ q: q || undefined, lowStock: onlyLow || undefined, limit: 100 });
   const remove = useRemoveProduct();
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<
-    { mode: 'create' } | { mode: 'edit'; id: string } | null
-  >(null);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Input
+        <input
           placeholder="Buscar por nombre, SKU o barcode..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="w-72"
+          className="w-72 rounded-md border border-input bg-background px-3 py-2 text-sm"
         />
-        <Switch
-          checked={onlyLow}
-          onChange={setOnlyLow}
-          label="Solo stock bajo"
-        />
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={onlyLow}
+            onChange={(e) => setOnlyLow(e.target.checked)}
+          />
+          Solo stock bajo
+        </label>
+        <div className="ml-auto">
+          <Link
+            href="/dashboard/products/new"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+          >
+            + Nuevo producto
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -100,39 +103,29 @@ export function ProductsTable() {
                       {p.isActive ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setAdjustingId(p.id)}
-                        title="Ajustar stock"
-                        aria-label="Ajustar stock"
-                        className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                      >
-                        <SlidersHorizontal className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormState({ mode: 'edit', id: p.id })}
-                        title="Editar"
-                        aria-label="Editar"
-                        className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`¿Eliminar "${p.name}"?`)) remove.mutate(p.id);
-                        }}
-                        title="Eliminar"
-                        aria-label="Eliminar"
-                        disabled={remove.isPending}
-                        className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  <td className="px-4 py-2 text-right space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdjustingId(p.id)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Ajustar stock
+                    </button>
+                    <Link
+                      href={`/dashboard/products/${p.id}`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Editar
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`¿Eliminar "${p.name}"?`)) remove.mutate(p.id);
+                      }}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               );
@@ -152,18 +145,6 @@ export function ProductsTable() {
           onClose={() => setAdjustingId(null)}
         />
       )}
-
-      {formState && (
-        <ProductFormDialog
-          productId={formState.mode === 'edit' ? formState.id : null}
-          onClose={() => setFormState(null)}
-        />
-      )}
-
-      <Fab
-        label="Nuevo producto"
-        onClick={() => setFormState({ mode: 'create' })}
-      />
     </div>
   );
 }

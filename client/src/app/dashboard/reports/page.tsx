@@ -4,29 +4,39 @@ import { useState } from 'react';
 import { DailySummaryCards } from '@/features/reports/ui/components/DailySummaryCards';
 import { LowStockTable } from '@/features/reports/ui/components/LowStockTable';
 import { TopProductsTable } from '@/features/reports/ui/components/TopProductsTable';
-import { localDateISO, startOfMonthLocalISO } from '@/shared/lib/date';
-import { Input } from '@/shared/ui/controls/Input';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function startOfMonthIso(): string {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
 
 export default function ReportsPage() {
-  const [date, setDate] = useState(localDateISO());
-  const [from, setFrom] = useState(startOfMonthLocalISO());
-  const [to, setTo] = useState(localDateISO());
+  const [date, setDate] = useState(todayIso());
+  const [from, setFrom] = useState(startOfMonthIso());
+  const [to, setTo] = useState(todayIso());
 
   return (
     <div className="space-y-8">
-      <SectionHeader title="Reportes" />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Reportes</h1>
+        <p className="text-sm text-muted-foreground">
+          Visión rápida de ventas, productos e inventario.
+        </p>
+      </div>
 
       <section className="space-y-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-medium">Día</h2>
-          <div className="w-44">
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          />
         </div>
         <DailySummaryCards date={date} />
       </section>
@@ -36,21 +46,19 @@ export default function ReportsPage() {
           <h2 className="text-lg font-medium">Rango</h2>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Desde</span>
-            <div className="w-44">
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-1.5"
+            />
             <span className="text-muted-foreground">Hasta</span>
-            <div className="w-44">
-              <Input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-1.5"
+            />
           </div>
         </div>
 

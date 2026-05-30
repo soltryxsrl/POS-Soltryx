@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
-import { Fab } from '@/shared/ui/controls/Fab';
 import {
   useActiveSessionMine,
   useCashRegisters,
@@ -36,15 +35,25 @@ export function ActiveSessionCard() {
 
   if (!active.data) {
     return (
-      <>
-        <Fab label="Abrir caja" onClick={() => setShowOpen(true)} />
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-lg font-semibold">No tienes caja abierta</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Para registrar ventas necesitas abrir una sesión de caja primero.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowOpen(true)}
+          className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+        >
+          Abrir caja
+        </button>
         {showOpen && (
           <OpenCashDialog
             onClose={() => setShowOpen(false)}
             defaultCashRegisterId={registers.data?.[0]?.id}
           />
         )}
-      </>
+      </div>
     );
   }
 

@@ -3,12 +3,6 @@
 import { useState, type FormEvent } from 'react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
-import { Button } from '@/shared/ui/controls/Button';
-import { FormField } from '@/shared/ui/controls/FormField';
-import { FormFooter } from '@/shared/ui/controls/FormFooter';
-import { Input } from '@/shared/ui/controls/Input';
-import { Textarea } from '@/shared/ui/controls/Textarea';
-import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import {
   useCloseCashSession,
   useSessionSummary,
@@ -45,82 +39,99 @@ export function CloseCashDialog({ sessionId, onClose, onClosed }: Props) {
   const diff = !isNaN(counted) ? counted - expectedNum : null;
 
   return (
-    <MaintenanceShell open onClose={onClose} title="Cerrar caja" size="lg">
-      {summary.data && (
-        <dl className="space-y-1 rounded-xl border border-border bg-muted/40 p-4 text-sm">
-          <SummaryRow label="Monto inicial" value={formatMoney(summary.data.openingAmount)} />
-          <SummaryRow label="Ventas efectivo" value={`+${formatMoney(summary.data.cashSales)}`} />
-          <SummaryRow label="Devoluciones" value={`-${formatMoney(summary.data.cashRefunds)}`} />
-          <SummaryRow
-            label="Efectivo esperado"
-            value={formatMoney(summary.data.expectedAmount)}
-            strong
-          />
-          <SummaryRow
-            label="No-efectivo (informativo)"
-            value={formatMoney(summary.data.nonCashSales)}
-            muted
-          />
-        </dl>
-      )}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg border bg-card p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold">Cerrar caja</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cuenta el efectivo físico y compara con el esperado.
+        </p>
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-4">
-        <FormField
-          label="Efectivo contado físicamente"
-          required
-          hint={
-            diff !== null && expected ? (
-              <span
-                className={
+        {summary.data && (
+          <dl className="mt-4 space-y-1 rounded-md border bg-muted/40 p-4 text-sm">
+            <SummaryRow label="Monto inicial" value={formatMoney(summary.data.openingAmount)} />
+            <SummaryRow label="Ventas efectivo" value={`+${formatMoney(summary.data.cashSales)}`} />
+            <SummaryRow label="Devoluciones" value={`-${formatMoney(summary.data.cashRefunds)}`} />
+            <SummaryRow
+              label="Efectivo esperado"
+              value={formatMoney(summary.data.expectedAmount)}
+              strong
+            />
+            <SummaryRow
+              label="No-efectivo (informativo)"
+              value={formatMoney(summary.data.nonCashSales)}
+              muted
+            />
+          </dl>
+        )}
+
+        <form onSubmit={onSubmit} className="mt-4 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Efectivo contado físicamente</label>
+            <input
+              required
+              autoFocus
+              value={countedAmount}
+              onChange={(e) => setCountedAmount(e.target.value)}
+              pattern="^\d+(\.\d{1,2})?$"
+              inputMode="decimal"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+            {diff !== null && expected && (
+              <p
+                className={`text-xs ${
                   diff === 0
-                    ? 'text-emerald-600'
+                    ? 'text-green-700'
                     : diff > 0
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                }
+                      ? 'text-amber-700'
+                      : 'text-destructive'
+                }`}
               >
                 Diferencia previa: {diff >= 0 ? '+' : ''}
                 {formatMoney(diff)}
-              </span>
-            ) : undefined
-          }
-        >
-          <Input
-            required
-            autoFocus
-            value={countedAmount}
-            onChange={(e) => setCountedAmount(e.target.value)}
-            pattern="^\d+(\.\d{1,2})?$"
-            inputMode="decimal"
-          />
-        </FormField>
+              </p>
+            )}
+          </div>
 
-        <FormField label="Notas">
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={1000}
-            placeholder="Ej: faltó cambio, sobraron propinas..."
-            className="min-h-[80px]"
-          />
-        </FormField>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Notas (opcional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={1000}
+              placeholder="Ej: faltó cambio, sobraron propinas..."
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px]"
+            />
+          </div>
 
-        {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-            {error}
-          </p>
-        )}
+          {error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          )}
 
-        <FormFooter>
-          <Button variant="outline" onClick={onClose} disabled={closeMut.isPending}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={closeMut.isPending}>
-            {closeMut.isPending ? 'Cerrando...' : 'Cerrar caja'}
-          </Button>
-        </FormFooter>
-      </form>
-    </MaintenanceShell>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border px-4 py-2 text-sm transition hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={closeMut.isPending}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+            >
+              {closeMut.isPending ? 'Cerrando...' : 'Cerrar caja'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

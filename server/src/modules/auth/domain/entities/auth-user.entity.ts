@@ -11,7 +11,6 @@ export interface AuthUser {
   readonly passwordHash: string;
   readonly isActive: boolean;
   readonly roles: ReadonlyArray<string>; // códigos de rol (ADMIN, MANAGER, CASHIER)
-  readonly permissions: ReadonlyArray<string>; // permisos efectivos (unión de roles)
 }
 
 /**
@@ -23,7 +22,6 @@ export interface AuthUserPublic {
   username: string;
   fullName: string;
   roles: string[];
-  permissions: string[];
 }
 
 export function toPublic(user: AuthUser): AuthUserPublic {
@@ -33,6 +31,5 @@ export function toPublic(user: AuthUser): AuthUserPublic {
     username: user.username,
     fullName: user.fullName,
     roles: [...user.roles],
-    permissions: [...user.permissions],
   };
 }

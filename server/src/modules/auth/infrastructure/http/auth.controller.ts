@@ -116,33 +116,24 @@ export class AuthController {
     return { user: toPublic(user) };
   }
 
-  /**
-   * Opciones base de la cookie de refresh. `domain` solo se incluye si está
-   * configurado (en cross-site Vercel↔Railway debe ir vacío). `sameSite: 'none'`
-   * + `secure: true` es lo que permite enviar la cookie entre dominios distintos.
-   */
-  private cookieOptions(): {
-    httpOnly: true;
-    secure: boolean;
-    sameSite: 'lax' | 'strict' | 'none';
-    path: string;
-    domain?: string;
-  } {
-    const domain = this.config.get('COOKIE_DOMAIN', { infer: true });
-    return {
+  private setRefreshCookie(res: Response, token: string, expiresAt: Date): void {
+    res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       secure: this.config.get('COOKIE_SECURE', { infer: true }),
-      sameSite: this.config.get('COOKIE_SAMESITE', { infer: true }),
+      sameSite: 'lax',
+      domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
       path: '/api/auth',
-      ...(domain ? { domain } : {}),
-    };
-  }
-
-  private setRefreshCookie(res: Response, token: string, expiresAt: Date): void {
-    res.cookie(REFRESH_COOKIE, token, { ...this.cookieOptions(), expires: expiresAt });
+      expires: expiresAt,
+    });
   }
 
   private clearRefreshCookie(res: Response): void {
-    res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
+    res.clearCookie(REFRESH_COOKIE, {
+      httpOnly: true,
+      secure: this.config.get('COOKIE_SECURE', { infer: true }),
+      sameSite: 'lax',
+      domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
+      path: '/api/auth',
+    });
   }
 }

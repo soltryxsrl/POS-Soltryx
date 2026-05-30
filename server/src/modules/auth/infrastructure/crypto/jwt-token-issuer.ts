@@ -52,17 +52,11 @@ export class JwtTokenIssuer implements TokenIssuer {
     sub: string;
     username: string;
     roles: string[];
-    permissions: string[];
   }): Promise<IssuedTokens> {
     const refreshTokenId = randomUUID();
 
     const accessToken = await this.jwt.signAsync(
-      {
-        sub: payload.sub,
-        username: payload.username,
-        roles: payload.roles,
-        permissions: payload.permissions,
-      },
+      { sub: payload.sub, username: payload.username, roles: payload.roles },
       { secret: this.accessSecret, expiresIn: this.accessExpiresInSec },
     );
 

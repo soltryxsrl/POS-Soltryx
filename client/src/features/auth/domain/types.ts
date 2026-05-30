@@ -4,7 +4,6 @@ export interface AuthUser {
   username: string;
   fullName: string;
   roles: string[];
-  permissions: string[];
 }
 
 export interface AuthSession {

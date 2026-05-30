@@ -5,12 +5,6 @@ import { useRouter } from 'next/navigation';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { PaymentMethod } from '@/shared/types/enums';
-import { Button } from '@/shared/ui/controls/Button';
-import { FormField } from '@/shared/ui/controls/FormField';
-import { FormFooter } from '@/shared/ui/controls/FormFooter';
-import { Input } from '@/shared/ui/controls/Input';
-import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
-import { cn } from '@/shared/lib/cn';
 import { computeCartTotals } from '../../application/math/totals';
 import { useCartStore } from '../../application/stores/cart.store';
 import { useCreateSale } from '../../application/hooks/use-sales';
@@ -27,6 +21,10 @@ const METHOD_LABEL: Record<string, string> = {
   OTHER: 'Otro',
 };
 
+/**
+ * Modal de cobro: elige método y monto. Permite mezclar (Fase futura),
+ * pero para MVP soportamos un solo método por venta.
+ */
 export function PaymentModal({ cashSessionId, onClose }: Props) {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
@@ -61,6 +59,8 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
         payments: [
           {
             method: method as keyof typeof PaymentMethod,
+            // En CASH guardamos el total exacto en `amount`; el cambio es físico.
+            // En no-CASH, `amount` = total (tarjeta no da vuelto).
             amount: method === PaymentMethod.CASH ? totals.total : totals.total,
             reference: reference || undefined,
           },
@@ -75,83 +75,93 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
   };
 
   return (
-    <MaintenanceShell open onClose={onClose} title="Cobrar venta" size="lg">
-      <div className="rounded-2xl border border-border bg-gradient-to-br from-brand-tint via-card to-brand-soft p-4">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Total a cobrar
-        </div>
-        <div className="mt-1 text-3xl font-bold text-foreground">
-          {formatMoney(totals.total)}
-        </div>
-      </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg border bg-card p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold">Cobrar venta</h2>
+        <p className="mt-1 text-2xl font-bold">{formatMoney(totals.total)}</p>
 
-      <form onSubmit={onSubmit} className="mt-5 space-y-4">
-        <FormField label="Método de pago">
-          <div className="grid grid-cols-4 gap-2">
-            {Object.values(PaymentMethod).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMethod(m)}
-                className={cn(
-                  'rounded-xl border-2 px-3 py-2 text-sm font-medium transition',
-                  method === m
-                    ? 'border-brand-from bg-brand-tint text-brand-from'
-                    : 'border-border bg-background hover:border-foreground/20',
-                )}
-              >
-                {METHOD_LABEL[m] ?? m}
-              </button>
-            ))}
+        <form onSubmit={onSubmit} className="mt-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Método de pago</label>
+            <div className="grid grid-cols-4 gap-2">
+              {Object.values(PaymentMethod).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMethod(m)}
+                  className={`rounded-md border px-3 py-2 text-sm transition ${
+                    method === m
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {METHOD_LABEL[m] ?? m}
+                </button>
+              ))}
+            </div>
           </div>
-        </FormField>
 
-        <FormField
-          label={method === PaymentMethod.CASH ? 'Efectivo recibido' : 'Monto'}
-          required
-        >
-          <Input
-            autoFocus
-            value={tendered}
-            onChange={(e) => setTendered(e.target.value)}
-            pattern="^\d+(\.\d{1,2})?$"
-            inputMode="decimal"
-            className="text-lg font-medium"
-          />
-        </FormField>
-
-        {method === PaymentMethod.CASH && change > 0 && (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-            Vuelto a entregar: <strong>{formatMoney(change)}</strong>
-          </p>
-        )}
-
-        {method !== PaymentMethod.CASH && (
-          <FormField label="Referencia">
-            <Input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              maxLength={120}
-              placeholder="Últimos 4 dígitos, voucher, etc."
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              {method === PaymentMethod.CASH ? 'Efectivo recibido' : 'Monto'}
+            </label>
+            <input
+              autoFocus
+              value={tendered}
+              onChange={(e) => setTendered(e.target.value)}
+              pattern="^\d+(\.\d{1,2})?$"
+              inputMode="decimal"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-lg font-medium"
             />
-          </FormField>
-        )}
+          </div>
 
-        {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-            {error}
-          </p>
-        )}
+          {method === PaymentMethod.CASH && change > 0 && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Vuelto a entregar: <strong>{formatMoney(change)}</strong>
+            </p>
+          )}
 
-        <FormFooter>
-          <Button variant="outline" onClick={onClose} disabled={createSale.isPending}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={createSale.isPending}>
-            {createSale.isPending ? 'Procesando...' : 'Confirmar venta'}
-          </Button>
-        </FormFooter>
-      </form>
-    </MaintenanceShell>
+          {method !== PaymentMethod.CASH && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Referencia (opcional)</label>
+              <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                maxLength={120}
+                placeholder="Últimos 4 dígitos, voucher, etc."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+
+          {error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border px-4 py-2 text-sm transition hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={createSale.isPending}
+              className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+            >
+              {createSale.isPending ? 'Procesando...' : 'Confirmar venta'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

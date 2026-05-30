@@ -8,14 +8,3 @@ Thumbs.db
 
 # Local-only
 *.local
-
-# Dependencies & build (defensa extra; client/ y server/ ya tienen lo suyo)
-node_modules/
-dist/
-*.tsbuildinfo
-
-# Secrets / env
-.env
-.env.*
-!.env.example
-!.env.local.example

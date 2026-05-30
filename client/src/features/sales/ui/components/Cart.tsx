@@ -72,7 +72,7 @@ export function Cart({ onCheckout }: Props) {
                   step={1}
                   value={it.quantity}
                   onChange={(e) => setQuantity(it.productId, Number(e.target.value) || 0)}
-                  className="w-16 rounded-lg border border-border/60 bg-background/60 px-2 py-1 text-center text-sm shadow-sm transition-all outline-none hover:border-border hover:bg-background focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20 focus:bg-background"
+                  className="w-16 rounded-md border border-input bg-background px-2 py-1 text-center text-sm"
                 />
                 <button
                   type="button"
@@ -90,7 +90,7 @@ export function Cart({ onCheckout }: Props) {
                   onChange={(e) => setDiscount(it.productId, e.target.value)}
                   pattern="^\d+(\.\d{1,2})?$"
                   inputMode="decimal"
-                  className="w-24 rounded-lg border border-border/60 bg-background/60 px-2 py-1 text-sm shadow-sm transition-all outline-none hover:border-border hover:bg-background focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20 focus:bg-background"
+                  className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm"
                 />
               </div>
             </div>

@@ -2,13 +2,6 @@
 
 import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '@/shared/lib/error-message';
-import { Button } from '@/shared/ui/controls/Button';
-import { FormField } from '@/shared/ui/controls/FormField';
-import { FormFooter } from '@/shared/ui/controls/FormFooter';
-import { Input } from '@/shared/ui/controls/Input';
-import { Select } from '@/shared/ui/controls/Select';
-import { Textarea } from '@/shared/ui/controls/Textarea';
-import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { useCashRegisters, useOpenCashSession } from '../../application/hooks/use-cash';
 
 interface Props {
@@ -42,56 +35,81 @@ export function OpenCashDialog({ onClose, onOpened, defaultCashRegisterId }: Pro
   };
 
   return (
-    <MaintenanceShell open onClose={onClose} title="Abrir caja" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <FormField label="Caja registradora" required>
-          <Select
-            required
-            value={cashRegisterId}
-            onChange={(e) => setCashRegisterId(e.target.value)}
-          >
-            <option value="">Seleccione</option>
-            {registers.data?.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.code} · {r.name}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border bg-card p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold">Abrir caja</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Registra el monto inicial en efectivo dentro del cajón.
+        </p>
 
-        <FormField label="Monto inicial (efectivo en caja)" required>
-          <Input
-            required
-            value={openingAmount}
-            onChange={(e) => setOpeningAmount(e.target.value)}
-            pattern="^\d+(\.\d{1,2})?$"
-            inputMode="decimal"
-          />
-        </FormField>
+        <form onSubmit={onSubmit} className="mt-4 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Caja registradora</label>
+            <select
+              required
+              value={cashRegisterId}
+              onChange={(e) => setCashRegisterId(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">— Selecciona —</option>
+              {registers.data?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} · {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <FormField label="Notas">
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={1000}
-          />
-        </FormField>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Monto inicial (efectivo en caja)</label>
+            <input
+              required
+              value={openingAmount}
+              onChange={(e) => setOpeningAmount(e.target.value)}
+              pattern="^\d+(\.\d{1,2})?$"
+              inputMode="decimal"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
 
-        {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-            {error}
-          </p>
-        )}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Notas (opcional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={1000}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px]"
+            />
+          </div>
 
-        <FormFooter>
-          <Button variant="outline" onClick={onClose} disabled={openSession.isPending}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={openSession.isPending}>
-            {openSession.isPending ? 'Abriendo...' : 'Abrir caja'}
-          </Button>
-        </FormFooter>
-      </form>
-    </MaintenanceShell>
+          {error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border px-4 py-2 text-sm transition hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={openSession.isPending}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+            >
+              {openSession.isPending ? 'Abriendo...' : 'Abrir caja'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

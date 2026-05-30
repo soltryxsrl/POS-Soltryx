@@ -46,7 +46,6 @@ export class LoginUseCase {
       sub: user.id,
       username: user.username,
       roles: [...user.roles],
-      permissions: [...user.permissions],
     });
 
     await this.refreshRepo.save({

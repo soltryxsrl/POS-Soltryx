@@ -11,18 +11,11 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
   const config = app.get(ConfigService<AppEnv, true>);
 
-  // Detrás del proxy de Railway/Vercel: confía en X-Forwarded-* para que
-  // `req.ip` y la detección de HTTPS (cookies secure) funcionen bien.
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
-
   app.use(helmet());
   app.use(cookieParser());
 
-  // WEB_ORIGIN puede ser una lista separada por comas (varios previews de Vercel).
-  const webOrigin = config.get('WEB_ORIGIN', { infer: true });
-  const origins = webOrigin.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: origins.length === 1 ? origins[0] : origins,
+    origin: config.get('WEB_ORIGIN', { infer: true }),
     credentials: true,
   });
 
@@ -37,8 +30,7 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api', { exclude: ['health'] });
 
-  // Railway/Render inyectan PORT — tiene prioridad sobre API_PORT.
-  const port = process.env.PORT ? Number(process.env.PORT) : config.get('API_PORT', { infer: true });
+  const port = config.get('API_PORT', { infer: true });
   const host = config.get('API_HOST', { infer: true });
   await app.listen(port, host);
 

@@ -9,10 +9,8 @@ import { CashSessionsModule } from './modules/cash-sessions/cash-sessions.module
 import { CategoriesModule } from './modules/categories/categories.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProductsModule } from './modules/products/products.module';
-import { RbacModule } from './modules/rbac/rbac.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SalesModule } from './modules/sales/sales.module';
-import { UsersModule } from './modules/users/users.module';
 import { PersistenceModule } from './common/persistence/persistence.module';
 
 @Module({
@@ -26,8 +24,6 @@ import { PersistenceModule } from './common/persistence/persistence.module';
     PersistenceModule,
     HealthModule,
     AuthModule,
-    UsersModule,
-    RbacModule,
     CategoriesModule,
     InventoryModule,
     ProductsModule,

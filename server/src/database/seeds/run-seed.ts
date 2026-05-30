@@ -1,32 +1,20 @@
 import 'reflect-metadata';
 import bcrypt from 'bcryptjs';
 import { AppDataSource } from '../data-source';
-import {
-  ALL_PERMISSIONS,
-  DEFAULT_ROLE_PERMISSIONS,
-} from '../../modules/auth/domain/permissions.catalog';
 
 /**
- * Seed base:
- *   - 3 roles (ADMIN, MANAGER, CASHIER)
- *   - Catálogo completo de permisos (idempotente)
- *   - Asignación de permisos a roles (ADMIN → todos, otros → catálogo por defecto)
- *   - Usuario admin (admin@t1et.local / Admin123!)
- *   - 1 categoría "General" y 1 caja "Caja 1"
+ * Seed mínimo para Fase 1:
+ *   - 3 roles base (ADMIN, MANAGER, CASHIER)
+ *   - 1 usuario admin (admin@t1et.local / Admin123!)
+ *   - 1 categoría por defecto ("General")
+ *   - 1 caja registradora ("Caja 1")
  *
- * Idempotente: re-ejecutar no duplica nada. Re-aplica también las
- * asignaciones de permisos por si se agregaron al catálogo.
+ * Idempotente: si los registros ya existen, no los duplica.
  */
 async function run(): Promise<void> {
   await AppDataSource.initialize();
   // eslint-disable-next-line no-console
   console.log('[seed] DataSource initialized');
-
-  // Aplica migraciones pendientes antes de sembrar (en deploy este script
-  // corre antes que el API, así que las tablas pueden no existir todavía).
-  const applied = await AppDataSource.runMigrations();
-  // eslint-disable-next-line no-console
-  console.log(`[seed] ${applied.length} migration(s) applied`);
 
   await AppDataSource.transaction(async (m) => {
     const roles = [
@@ -43,43 +31,6 @@ async function run(): Promise<void> {
     }
     // eslint-disable-next-line no-console
     console.log('[seed] roles ensured');
-
-    for (const p of ALL_PERMISSIONS) {
-      await m.query(
-        `INSERT INTO permissions (code, name, module, description)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (code) DO UPDATE
-         SET name = EXCLUDED.name, module = EXCLUDED.module, description = EXCLUDED.description`,
-        [p.code, p.name, p.module, p.description ?? null],
-      );
-    }
-    // eslint-disable-next-line no-console
-    console.log(`[seed] ${ALL_PERMISSIONS.length} permissions ensured`);
-
-    // ADMIN: todos los permisos
-    await m.query(`
-      INSERT INTO role_permissions (role_id, permission_id)
-      SELECT r.id, p.id
-      FROM roles r
-      CROSS JOIN permissions p
-      WHERE r.code = 'ADMIN'
-      ON CONFLICT DO NOTHING
-    `);
-
-    // Otros roles: catálogo por defecto
-    for (const [roleCode, codes] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
-      if (codes.length === 0) continue;
-      await m.query(
-        `INSERT INTO role_permissions (role_id, permission_id)
-         SELECT r.id, p.id
-         FROM roles r, permissions p
-         WHERE r.code = $1 AND p.code = ANY($2::varchar[])
-         ON CONFLICT DO NOTHING`,
-        [roleCode, codes],
-      );
-    }
-    // eslint-disable-next-line no-console
-    console.log('[seed] role-permissions assigned');
 
     const passwordHash = await bcrypt.hash('Admin123!', 10);
     await m.query(

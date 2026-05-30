@@ -4,7 +4,6 @@ export interface CurrentUserPayload {
   id: string;
   username: string;
   roles: string[];
-  permissions: string[];
 }
 
 /**

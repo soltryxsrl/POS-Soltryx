@@ -1,14 +1,17 @@
 'use client';
 
 import { ActiveSessionCard } from '@/features/cash/ui/components/ActiveSessionCard';
-import { CashStatusPill } from '@/features/cash/ui/components/CashStatusPill';
 import { SessionsTable } from '@/features/cash/ui/components/SessionsTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function CashPage() {
   return (
     <div className="space-y-8">
-      <SectionHeader title="Caja" actions={<CashStatusPill />} />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Caja</h1>
+        <p className="text-sm text-muted-foreground">
+          Abre y cierra tu caja. Solo se puede tener una sesión abierta por caja registradora.
+        </p>
+      </div>
 
       <ActiveSessionCard />
 
