@@ -43,4 +43,11 @@ export const authApiHttp: AuthApi = {
   me(): Promise<{ user: AuthUser }> {
     return http<{ user: AuthUser }>('/auth/me');
   },
+
+  changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return http<void>('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    });
+  },
 };

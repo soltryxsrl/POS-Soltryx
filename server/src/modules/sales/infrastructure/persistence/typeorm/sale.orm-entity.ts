@@ -46,6 +46,31 @@ export class SaleOrmEntity {
   discountTotal!: string;
 
   @Column({
+    name: 'order_discount',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericString,
+  })
+  orderDiscount!: string;
+
+  @Column({
+    name: 'tip_total',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericString,
+  })
+  tipTotal!: string;
+
+  /** UUID público para compartir recibo sin login (URL `/r/{token}`). */
+  @Index({ unique: true })
+  @Column({ name: 'public_token', type: 'uuid' })
+  publicToken!: string;
+
+  @Column({
     name: 'tax_total',
     type: 'numeric',
     precision: 12,
@@ -57,6 +82,10 @@ export class SaleOrmEntity {
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0, transformer: numericString })
   total!: string;
+
+  /** Snapshot del modo de precio al cobrar: true = los montos ya incluían ITBIS. */
+  @Column({ name: 'price_includes_tax', type: 'boolean', default: false })
+  priceIncludesTax!: boolean;
 
   @Column({ type: 'varchar', length: 16, default: 'COMPLETED' })
   status!: string;
@@ -84,6 +113,19 @@ export class SaleOrmEntity {
 
   @Column({ name: 'cancel_reason', type: 'varchar', length: 255, nullable: true })
   cancelReason!: string | null;
+
+  /** Manager que autorizó un descuento sobre el umbral. Null si no aplicó. */
+  @Column({ name: 'discount_authorized_by_id', type: 'uuid', nullable: true })
+  discountAuthorizedById!: string | null;
+
+  /** Nombre del autorizador al momento de la venta (para evitar lookups). */
+  @Column({
+    name: 'discount_authorized_by_snapshot',
+    type: 'varchar',
+    length: 180,
+    nullable: true,
+  })
+  discountAuthorizedBySnapshot!: string | null;
 
   @OneToMany(() => SaleItemOrmEntity, (i) => i.sale, { cascade: false })
   items!: SaleItemOrmEntity[];

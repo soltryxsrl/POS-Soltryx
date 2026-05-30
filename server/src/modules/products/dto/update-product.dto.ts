@@ -3,10 +3,12 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
@@ -39,6 +41,13 @@ export class UpdateProductDto {
   description?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+  imageUrl?: string | null;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string | null;
 
@@ -57,6 +66,15 @@ export class UpdateProductDto {
   @Matches(MONEY)
   taxRate?: string;
 
+  /**
+   * Código del tipo de ITBIS (catálogo tax_types). Si se provee, el servidor
+   * deriva `taxRate` de la tasa del tipo.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  taxTypeCode?: string | null;
+
   @IsOptional()
   @IsNumberString()
   @Matches(QTY)
@@ -65,4 +83,16 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isKit?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasVariants?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  soldByWeight?: boolean;
 }

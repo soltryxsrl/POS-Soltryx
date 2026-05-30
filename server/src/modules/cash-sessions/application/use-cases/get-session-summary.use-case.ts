@@ -17,6 +17,8 @@ export interface CashSessionSummary {
   cashSales: string;
   cashRefunds: string;
   nonCashSales: string;
+  paidIns: string;
+  paidOuts: string;
   expectedAmount: string;
   countedAmount: string | null;
   difference: string | null;
@@ -35,8 +37,10 @@ export class GetSessionSummaryUseCase {
     const session = await this.sessions.findById(sessionId);
     if (!session) throw new CashSessionNotFoundError(sessionId);
 
-    const { cashSales, cashRefunds, nonCashSales } = await this.totals.forSession(session.id);
-    const expected = subMoney(addMoney(session.openingAmount, cashSales), cashRefunds);
+    const { cashSales, cashRefunds, nonCashSales, paidIns, paidOuts } =
+      await this.totals.forSession(session.id);
+    const afterSales = subMoney(addMoney(session.openingAmount, cashSales), cashRefunds);
+    const expected = subMoney(addMoney(afterSales, paidIns), paidOuts);
 
     return {
       session,
@@ -44,6 +48,8 @@ export class GetSessionSummaryUseCase {
       cashSales,
       cashRefunds,
       nonCashSales,
+      paidIns,
+      paidOuts,
       expectedAmount: session.expectedAmount ?? expected,
       countedAmount: session.countedAmount,
       difference: session.difference,

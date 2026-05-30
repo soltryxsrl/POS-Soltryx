@@ -1,11 +1,22 @@
-import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { PaginationSortQuery } from '../../../../../common/dto/pagination-sort.query';
+import { PaymentMethod } from '../../../domain/value-objects/payment-method';
 import { SaleStatus } from '../../../domain/value-objects/sale-status';
 
-export class ListSalesQuery {
+export class ListSalesQuery extends PaginationSortQuery {
+  /** Búsqueda por número de venta/recibo. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  q?: string;
+
   @IsOptional()
   @IsEnum(SaleStatus)
   status?: SaleStatus;
+
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsUUID()
@@ -22,17 +33,4 @@ export class ListSalesQuery {
   @IsOptional()
   @IsDateString()
   to?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 50;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number = 0;
 }

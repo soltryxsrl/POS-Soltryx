@@ -15,11 +15,21 @@ export interface InsertSaleInput {
   cashSessionId: string;
   subtotal: string;
   discountTotal: string;
+  orderDiscount: string;
   taxTotal: string;
+  tipTotal: string;
   total: string;
+  /** Snapshot del modo de precio vigente al cobrar. */
+  priceIncludesTax: boolean;
   notes: string | null;
+  /** Si la venta requirió override de descuento, id del manager que autorizó. */
+  discountAuthorizedById: string | null;
+  /** Snapshot del nombre del autorizador al momento de la venta. */
+  discountAuthorizedBySnapshot: string | null;
   items: Array<{
-    productId: string;
+    productId: string | null;
+    variantId?: string | null;
+    variantNameSnapshot?: string | null;
     productNameSnapshot: string;
     productSkuSnapshot: string;
     quantity: string;
@@ -28,10 +38,24 @@ export interface InsertSaleInput {
     taxRate: string;
     taxTotal: string;
     total: string;
+    /** Receta del kit al momento de la venta (null si no era kit). */
+    kitComponentsSnapshot?: Array<{
+      componentProductId: string;
+      quantity: string;
+    }> | null;
+    /** Nota libre de la línea (modificador, instrucción). */
+    notes?: string | null;
   }>;
   payments: Array<{
     method: PaymentMethod;
+    /** Monto en MONEDA BASE (DOP). */
     amount: string;
+    /** Moneda original entregada. Default 'DOP'. */
+    currencyCode?: string;
+    /** Si moneda != base: monto original en esa moneda. */
+    foreignAmount?: string | null;
+    /** Tasa usada. */
+    exchangeRate?: string | null;
     reference: string | null;
   }>;
 }
@@ -42,14 +66,20 @@ export interface CancelSalePatch {
   cancelReason: string;
 }
 
+export type SaleSortColumn = 'createdAt' | 'total' | 'saleNumber';
+
 export interface ListSalesFilter {
+  q?: string;
   status?: SaleStatus;
+  paymentMethod?: PaymentMethod;
   cashSessionId?: string;
   userId?: string;
   from?: Date;
   to?: Date;
   limit?: number;
   offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface ListSalesResult {

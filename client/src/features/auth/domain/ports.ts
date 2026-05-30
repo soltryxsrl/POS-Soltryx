@@ -14,4 +14,6 @@ export interface AuthApi {
   /** Idempotente — no falla si no hay sesión. */
   logout(): Promise<void>;
   me(): Promise<{ user: AuthUser }>;
+  /** Self-service: el usuario actual cambia su propia contraseña. */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }

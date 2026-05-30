@@ -36,6 +36,7 @@ export class InventoryController {
     try {
       return await this.adjust.execute({
         productId: body.productId,
+        variantId: body.variantId,
         quantity: body.quantity,
         reason: body.reason,
         userId: user.id,
@@ -52,8 +53,13 @@ export class InventoryController {
   listMovements(@Query() q: ListMovementsQuery) {
     return this.history.execute({
       productId: q.productId,
+      type: q.type,
+      from: q.from ? new Date(q.from) : undefined,
+      to: q.to ? new Date(q.to) : undefined,
       limit: q.limit,
       offset: q.offset,
+      sort: q.sort,
+      sortDir: q.sortDir,
     });
   }
 }

@@ -2,17 +2,12 @@
 
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { usePaymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
 import { useDailySales } from '../../application/hooks/use-reports';
 import { StatCard } from './StatCard';
 
-const METHOD_LABEL: Record<string, string> = {
-  CASH: 'Efectivo',
-  CARD: 'Tarjeta',
-  TRANSFER: 'Transferencia',
-  OTHER: 'Otro',
-};
-
 export function DailySummaryCards({ date }: { date: string }) {
+  const labelOf = usePaymentMethodLabel();
   const summary = useDailySales(date);
 
   if (summary.isLoading) {
@@ -51,7 +46,7 @@ export function DailySummaryCards({ date }: { date: string }) {
               )}
               {d.byMethod.map((m) => (
                 <tr key={m.method} className="border-b last:border-0">
-                  <td className="px-4 py-2">{METHOD_LABEL[m.method] ?? m.method}</td>
+                  <td className="px-4 py-2">{labelOf(m.method)}</td>
                   <td className="px-4 py-2 text-right text-xs text-muted-foreground">
                     {m.count} pago(s)
                   </td>

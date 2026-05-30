@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../../common/persistence/unit-of-work.port';
-import type { CashSession } from '../../domain/entities/cash-session.entity';
+import type {
+  CashSession,
+  DenominationCounts,
+} from '../../domain/entities/cash-session.entity';
 import {
   CashSessionAlreadyClosedError,
   CashSessionNotFoundError,
@@ -15,11 +18,15 @@ import {
   type CashSessionRepository,
 } from '../../domain/ports/cash-session.repository.port';
 import { CashSessionStatus } from '../../domain/value-objects/cash-session-status';
+import { sumDenominations } from '../math/denominations';
 import { addMoney, subMoney } from '../math/money';
 
 export interface CloseCashSessionInput {
   sessionId: string;
   countedAmount: string;
+  closingDenominations?: DenominationCounts | null;
+  /** Mapa methodCode → monto declarado. Opcional. */
+  closingDeclaredByMethod?: Record<string, string> | null;
   notes?: string | null;
   closedById: string;
 }
@@ -37,14 +44,27 @@ export class CloseCashSessionUseCase {
   async execute(input: CloseCashSessionInput): Promise<CashSession> {
     this.assertAmount(input.countedAmount);
 
+    if (input.closingDenominations) {
+      const sum = sumDenominations(input.closingDenominations);
+      if (sum !== input.countedAmount) {
+        throw new InvalidCashAmountError(
+          `El conteo por denominación suma ${sum} pero countedAmount es ${input.countedAmount}`,
+        );
+      }
+    }
+
     const session = await this.sessions.findById(input.sessionId);
     if (!session) throw new CashSessionNotFoundError(input.sessionId);
     if (session.status !== CashSessionStatus.OPEN) {
       throw new CashSessionAlreadyClosedError(session.id);
     }
 
-    const { cashSales, cashRefunds } = await this.totals.forSession(session.id);
-    const expected = subMoney(addMoney(session.openingAmount, cashSales), cashRefunds);
+    const { cashSales, cashRefunds, paidIns, paidOuts } = await this.totals.forSession(
+      session.id,
+    );
+    // expected = opening + cashSales − cashRefunds + paidIns − paidOuts
+    const afterSales = subMoney(addMoney(session.openingAmount, cashSales), cashRefunds);
+    const expected = subMoney(addMoney(afterSales, paidIns), paidOuts);
     const difference = subMoney(input.countedAmount, expected);
 
     return this.uow.run((ctx) =>
@@ -53,6 +73,8 @@ export class CloseCashSessionUseCase {
         closedAt: new Date(),
         expectedAmount: expected,
         countedAmount: input.countedAmount,
+        closingDenominations: input.closingDenominations ?? null,
+        closingDeclaredByMethod: input.closingDeclaredByMethod ?? null,
         difference,
         notes: input.notes ?? session.notes,
       }),

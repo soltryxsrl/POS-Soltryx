@@ -1,14 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Lock, Pencil, Trash2 } from 'lucide-react';
 import { Can } from '@/features/auth/ui/components/Can';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
 import {
+  DataTable,
+  useClientSort,
+  type DataTableColumn,
+} from '@/shared/ui/data-table';
+import {
   useAdminRoles,
   useRemoveAdminRole,
 } from '../../application/hooks/use-admin-roles';
+import type { AdminRole } from '../../domain/types';
 import { RoleFormDialog } from './RoleFormDialog';
 
 const SYSTEM_ROLE_CODES = new Set(['ADMIN']);
@@ -20,6 +26,12 @@ export function RolesTable() {
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
 
+  const sort = useClientSort<AdminRole>(roles.data, 'name', 'asc', (r, k) => {
+    if (k === 'permissions') return r.permissions.length;
+    if (k === 'userCount') return r.userCount ?? 0;
+    return (r as unknown as Record<string, unknown>)[k];
+  });
+
   const handleRemove = async (id: string, name: string) => {
     if (!confirm(`¿Eliminar el rol "${name}"?`)) return;
     try {
@@ -29,95 +41,105 @@ export function RolesTable() {
     }
   };
 
+  const columns = useMemo<DataTableColumn<AdminRole>[]>(
+    () => [
+      {
+        key: 'name',
+        header: 'Nombre',
+        sortable: true,
+        render: (r) => {
+          const isSystem = SYSTEM_ROLE_CODES.has(r.code);
+          return (
+            <div className="flex items-center gap-1.5 font-medium">
+              <span>{r.name}</span>
+              {isSystem && (
+                <span title="Rol del sistema">
+                  <Lock className="h-3 w-3 text-amber-500" />
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'description',
+        header: 'Descripción',
+        render: (r) => <span className="text-muted-foreground">{r.description ?? '—'}</span>,
+      },
+      {
+        key: 'permissions',
+        header: 'Permisos',
+        sortable: true,
+        align: 'right',
+        render: (r) => (
+          <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-medium text-brand-from">
+            {r.permissions.length}
+          </span>
+        ),
+      },
+      {
+        key: 'userCount',
+        header: 'Usuarios',
+        sortable: true,
+        align: 'right',
+        render: (r) => <span className="text-muted-foreground">{r.userCount ?? 0}</span>,
+      },
+      {
+        key: 'actions',
+        header: '',
+        align: 'right',
+        render: (r) => {
+          const isSystem = SYSTEM_ROLE_CODES.has(r.code);
+          return (
+            <div className="flex justify-end gap-1">
+              <Can permission="roles.update">
+                <button
+                  type="button"
+                  onClick={() => setFormState({ mode: 'edit', id: r.id })}
+                  title="Editar"
+                  className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </Can>
+              <Can permission="roles.delete">
+                <button
+                  type="button"
+                  onClick={() => handleRemove(r.id, r.name)}
+                  disabled={isSystem || remove.isPending}
+                  title={isSystem ? 'Rol del sistema (no eliminable)' : 'Eliminar'}
+                  className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </Can>
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [remove.isPending],
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <table className="w-full text-sm">
-          <thead className="border-b text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Descripción</th>
-              <th className="px-4 py-2 text-right">Permisos</th>
-              <th className="px-4 py-2 text-right">Usuarios</th>
-              <th className="px-4 py-2 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.isLoading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  Cargando...
-                </td>
-              </tr>
-            )}
-            {roles.isError && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-destructive">
-                  {getErrorMessage(roles.error)}
-                </td>
-              </tr>
-            )}
-            {roles.data?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  No hay roles.
-                </td>
-              </tr>
-            )}
-            {roles.data?.map((r) => {
-              const isSystem = SYSTEM_ROLE_CODES.has(r.code);
-              return (
-                <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <span>{r.name}</span>
-                      {isSystem && (
-                        <span title="Rol del sistema">
-                          <Lock className="h-3 w-3 text-amber-500" />
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.description ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-medium text-brand-from">
-                      {r.permissions.length}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">
-                    {r.userCount ?? 0}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Can permission="roles.update">
-                        <button
-                          type="button"
-                          onClick={() => setFormState({ mode: 'edit', id: r.id })}
-                          title="Editar"
-                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </Can>
-                      <Can permission="roles.delete">
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(r.id, r.name)}
-                          disabled={isSystem || remove.isPending}
-                          title={isSystem ? 'Rol del sistema (no eliminable)' : 'Eliminar'}
-                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </Can>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <>
+      <DataTable<AdminRole>
+        columns={columns}
+        rows={sort.sorted}
+        total={sort.sorted.length}
+        rowKey={(r) => r.id}
+        page={1}
+        pageSize={Math.max(sort.sorted.length, 25)}
+        onPageChange={() => undefined}
+        sortKey={sort.sortKey}
+        sortDir={sort.sortDir}
+        onSortChange={sort.onSortChange}
+        isLoading={roles.isLoading}
+        isFetching={roles.isFetching}
+        errorMessage={roles.isError ? getErrorMessage(roles.error) : null}
+        emptyState="No hay roles."
+      />
 
       {formState && (
         <RoleFormDialog
@@ -129,6 +151,6 @@ export function RolesTable() {
       <Can permission="roles.create">
         <Fab label="Nuevo rol" onClick={() => setFormState({ mode: 'create' })} />
       </Can>
-    </div>
+    </>
   );
 }

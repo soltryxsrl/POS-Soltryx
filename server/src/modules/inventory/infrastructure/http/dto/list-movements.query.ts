@@ -1,21 +1,21 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { PaginationSortQuery } from '../../../../../common/dto/pagination-sort.query';
+import { StockMovementType } from '../../../domain/entities/stock-movement-type';
 
-export class ListMovementsQuery {
+export class ListMovementsQuery extends PaginationSortQuery {
   @IsOptional()
   @IsUUID()
   productId?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 50;
+  @IsEnum(StockMovementType)
+  type?: StockMovementType;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number = 0;
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

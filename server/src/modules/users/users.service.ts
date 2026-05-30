@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
+import { resolveSort } from '../../common/dto/pagination-sort.query';
 import {
   PASSWORD_HASHER,
   type PasswordHasher,
@@ -33,11 +34,23 @@ export class UsersService {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
 
+    const sort = resolveSort(
+      q.sort,
+      q.sortDir,
+      ['username', 'email', 'fullName', 'createdAt'] as const,
+      { column: 'username', dir: 'asc' },
+    );
+    const sortColumnMap = {
+      username: 'u.username',
+      email: 'u.email',
+      fullName: 'u.fullName',
+      createdAt: 'u.createdAt',
+    } as const;
     const qb = this.users
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.roles', 'r')
       .where('u.deletedAt IS NULL')
-      .orderBy('u.createdAt', 'DESC')
+      .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .skip(offset)
       .take(limit);
 
@@ -50,6 +63,15 @@ export class UsersService {
     }
     if (q.isActive === 'true') qb.andWhere('u.isActive = true');
     if (q.isActive === 'false') qb.andWhere('u.isActive = false');
+    if (q.roleId) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM user_roles ur
+          WHERE ur.user_id = u.id AND ur.role_id = :rid
+        )`,
+        { rid: q.roleId },
+      );
+    }
 
     const [items, total] = await qb.getManyAndCount();
 

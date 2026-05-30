@@ -1,8 +1,8 @@
-import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { PaginationSortQuery } from '../../../../../common/dto/pagination-sort.query';
 import { CashSessionStatus } from '../../../domain/value-objects/cash-session-status';
 
-export class ListSessionsQuery {
+export class ListSessionsQuery extends PaginationSortQuery {
   @IsOptional()
   @IsEnum(CashSessionStatus)
   status?: CashSessionStatus;
@@ -22,17 +22,4 @@ export class ListSessionsQuery {
   @IsOptional()
   @IsDateString()
   to?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 50;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number = 0;
 }

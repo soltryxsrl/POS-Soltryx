@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { resolveSort } from '../../../../../common/dto/pagination-sort.query';
 import type { TransactionContext } from '../../../../../common/persistence/unit-of-work.port';
 import type { CashSession } from '../../../domain/entities/cash-session.entity';
 import type {
@@ -23,8 +24,11 @@ function toDomain(e: CashSessionOrmEntity): CashSession {
     openedAt: e.openedAt,
     closedAt: e.closedAt,
     openingAmount: e.openingAmount,
+    openingDenominations: e.openingDenominations,
     expectedAmount: e.expectedAmount,
     countedAmount: e.countedAmount,
+    closingDenominations: e.closingDenominations,
+    closingDeclaredByMethod: e.closingDeclaredByMethod,
     difference: e.difference,
     status: e.status as CashSession['status'],
     notes: e.notes,
@@ -48,6 +52,7 @@ export class CashSessionRepositoryTypeOrm implements CashSessionRepository {
       openedById: input.openedById,
       openedAt: new Date(),
       openingAmount: input.openingAmount,
+      openingDenominations: input.openingDenominations ?? null,
       status: CashSessionStatus.OPEN,
       notes: input.notes ?? null,
     });
@@ -68,6 +73,8 @@ export class CashSessionRepositoryTypeOrm implements CashSessionRepository {
         closedAt: patch.closedAt,
         expectedAmount: patch.expectedAmount,
         countedAmount: patch.countedAmount,
+        closingDenominations: patch.closingDenominations ?? null,
+        closingDeclaredByMethod: patch.closingDeclaredByMethod ?? null,
         difference: patch.difference,
         status: CashSessionStatus.CLOSED,
         notes: patch.notes ?? null,
@@ -100,9 +107,20 @@ export class CashSessionRepositoryTypeOrm implements CashSessionRepository {
   async list(filter: ListSessionsFilter): Promise<ListSessionsResult> {
     const limit = filter.limit ?? 50;
     const offset = filter.offset ?? 0;
+    const sort = resolveSort(
+      filter.sort,
+      filter.sortDir,
+      ['openedAt', 'closedAt', 'expectedAmount'] as const,
+      { column: 'openedAt', dir: 'desc' },
+    );
+    const sortColumnMap = {
+      openedAt: 's.opened_at',
+      closedAt: 's.closed_at',
+      expectedAmount: 's.expected_amount',
+    } as const;
     const qb = this.repo
       .createQueryBuilder('s')
-      .orderBy('s.opened_at', 'DESC')
+      .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .take(limit)
       .skip(offset);
     if (filter.status) qb.andWhere('s.status = :st', { st: filter.status });

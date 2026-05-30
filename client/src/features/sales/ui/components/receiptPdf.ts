@@ -1,16 +1,10 @@
 import jsPDF from 'jspdf';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
+import { paymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
 import type { Sale } from '../../domain/types';
 
-const METHOD_LABEL: Record<string, string> = {
-  CASH: 'Efectivo',
-  CARD: 'Tarjeta',
-  TRANSFER: 'Transferencia',
-  OTHER: 'Otro',
-};
-
 const BUSINESS = {
-  name: 'Soltryx POS',
+  name: 'T1ET POS',
   legalName: '',
   rnc: '',
   address: '',
@@ -146,7 +140,11 @@ function itemRow(c: Cursor, qty: string, name: string, total: string) {
   c.y += LINE_H;
 }
 
-export function downloadReceiptPdf(sale: Sale) {
+export function downloadReceiptPdf(
+  sale: Sale,
+  /** Nombres de formas de pago del catálogo (code→name) para reflejar renombres. */
+  methodNames?: Record<string, string>,
+) {
   const height = estimateHeight(sale);
   const doc = new jsPDF({
     unit: 'mm',
@@ -225,7 +223,7 @@ export function downloadReceiptPdf(sale: Sale) {
 
   // Pagos
   for (const p of sale.payments) {
-    const label = `${METHOD_LABEL[p.method] ?? p.method}${p.reference ? ` (${p.reference})` : ''}:`;
+    const label = `${paymentMethodLabel(p.method, methodNames)}${p.reference ? ` (${p.reference})` : ''}:`;
     lineRow(c, label, moneyNum(p.amount));
   }
 

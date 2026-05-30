@@ -9,6 +9,26 @@ export interface ProductPricingSnapshot {
   salePrice: string;
   taxRate: string;
   isActive: boolean;
+  /** Si true, al venderlo el stock se descuenta de sus componentes. */
+  isKit: boolean;
+  /** Receta del kit (vacía si !isKit). */
+  kitComponents: ReadonlyArray<{
+    componentProductId: string;
+    /** Cantidad por 1 kit vendido. */
+    quantity: string;
+  }>;
+  /** Si true, las ventas DEBEN especificar variantId. */
+  hasVariants: boolean;
+}
+
+export interface VariantPricingSnapshot {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  /** Override del precio del padre, o null si hereda. */
+  salePrice: string | null;
+  isActive: boolean;
 }
 
 /**
@@ -20,4 +40,8 @@ export interface ProductPricingPort {
     ctx: TransactionContext,
     productIds: ReadonlyArray<string>,
   ): Promise<ProductPricingSnapshot[]>;
+  findVariantsForSale(
+    ctx: TransactionContext,
+    variantIds: ReadonlyArray<string>,
+  ): Promise<VariantPricingSnapshot[]>;
 }

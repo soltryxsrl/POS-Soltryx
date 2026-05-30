@@ -1,16 +1,10 @@
-import { Transform, Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { PaginationSortQuery } from '../../../common/dto/pagination-sort.query';
 
-export class ListProductsQuery {
+export type ProductTypeFilter = 'simple' | 'kit' | 'variant';
+
+export class ListProductsQuery extends PaginationSortQuery {
   /** Busca en name, sku, barcode (case-insensitive). */
   @IsOptional()
   @IsString()
@@ -32,16 +26,13 @@ export class ListProductsQuery {
   @Transform(({ value }) => (typeof value === 'string' ? value === 'true' : value))
   lowStock?: boolean;
 
+  /**
+   * Tipo de producto:
+   * - simple: no es kit y no tiene variantes
+   * - kit: es kit (isKit = true)
+   * - variant: tiene variantes (hasVariants = true)
+   */
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 50;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number = 0;
+  @IsIn(['simple', 'kit', 'variant'])
+  type?: ProductTypeFilter;
 }

@@ -54,6 +54,14 @@ export class InvalidDiscountError extends Error {
   }
 }
 
+export class OpenItemInvalidError extends Error {
+  readonly code = 'OPEN_ITEM_INVALID';
+  constructor() {
+    super('Un ítem de monto libre requiere descripción y precio unitario');
+    this.name = 'OpenItemInvalidError';
+  }
+}
+
 export class SaleNotFoundError extends Error {
   readonly code = 'SALE_NOT_FOUND';
   constructor(id: string) {
@@ -67,5 +75,31 @@ export class SaleNotCancellableError extends Error {
   constructor(saleId: string, currentStatus: string) {
     super(`Venta ${saleId} no puede cancelarse (status actual: ${currentStatus})`);
     this.name = 'SaleNotCancellableError';
+  }
+}
+
+export class CustomerRequiredForAccountError extends Error {
+  readonly code = 'CUSTOMER_REQUIRED_FOR_ACCOUNT';
+  constructor() {
+    super('Se requiere un cliente para venta a crédito');
+    this.name = 'CustomerRequiredForAccountError';
+  }
+}
+
+export class DiscountOverrideRequiredError extends Error {
+  readonly code = 'DISCOUNT_OVERRIDE_REQUIRED';
+  constructor(public percentage: number, public thresholdPct: number) {
+    super(
+      `Descuento ${percentage.toFixed(1)}% supera el umbral ${thresholdPct}%. Requiere autorización de un manager.`,
+    );
+    this.name = 'DiscountOverrideRequiredError';
+  }
+}
+
+export class DiscountOverrideInvalidError extends Error {
+  readonly code = 'DISCOUNT_OVERRIDE_INVALID';
+  constructor(message: string) {
+    super(message);
+    this.name = 'DiscountOverrideInvalidError';
   }
 }

@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../../common/persistence/unit-of-work.port';
 import { QueryFailedError } from 'typeorm';
-import type { CashSession } from '../../domain/entities/cash-session.entity';
+import type {
+  CashSession,
+  DenominationCounts,
+} from '../../domain/entities/cash-session.entity';
 import {
   CashRegisterInactiveError,
   CashRegisterNotFoundError,
@@ -16,10 +19,12 @@ import {
   CASH_SESSION_REPOSITORY,
   type CashSessionRepository,
 } from '../../domain/ports/cash-session.repository.port';
+import { sumDenominations } from '../math/denominations';
 
 export interface OpenCashSessionInput {
   cashRegisterId: string;
   openingAmount: string;
+  openingDenominations?: DenominationCounts | null;
   notes?: string | null;
   openedById: string;
 }
@@ -37,6 +42,15 @@ export class OpenCashSessionUseCase {
   async execute(input: OpenCashSessionInput): Promise<CashSession> {
     this.assertAmount(input.openingAmount);
 
+    if (input.openingDenominations) {
+      const sum = sumDenominations(input.openingDenominations);
+      if (sum !== input.openingAmount) {
+        throw new InvalidCashAmountError(
+          `El conteo por denominación suma ${sum} pero openingAmount es ${input.openingAmount}`,
+        );
+      }
+    }
+
     const register = await this.registers.findById(input.cashRegisterId);
     if (!register) throw new CashRegisterNotFoundError(input.cashRegisterId);
     if (!register.isActive) throw new CashRegisterInactiveError(register.id);
@@ -50,6 +64,7 @@ export class OpenCashSessionUseCase {
           cashRegisterId: register.id,
           openedById: input.openedById,
           openingAmount: input.openingAmount,
+          openingDenominations: input.openingDenominations ?? null,
           notes: input.notes ?? null,
           branchId: register.branchId,
         }),

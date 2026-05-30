@@ -33,6 +33,9 @@ export class ProductOrmEntity {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
+  @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
+  imageUrl!: string | null;
+
   @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId!: string | null;
 
@@ -71,6 +74,14 @@ export class ProductOrmEntity {
   taxRate!: string;
 
   /**
+   * Tipo de ITBIS del catálogo `tax_types`. Fuente de la tasa: al asignarlo, el
+   * servicio copia su `rate` a `tax_rate` (snapshot que usa el cálculo de venta).
+   * Null = producto legacy con tasa libre en `tax_rate`.
+   */
+  @Column({ name: 'tax_type_code', type: 'varchar', length: 16, nullable: true })
+  taxTypeCode!: string | null;
+
+  /**
    * Cache del stock actual. La fuente de verdad es la suma de `stock_movements`.
    * Solo el módulo Inventory escribe este campo (via ProductStockPort).
    */
@@ -95,6 +106,18 @@ export class ProductOrmEntity {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
+
+  /** Marca este producto como kit/combo (su venta explota a componentes). */
+  @Column({ name: 'is_kit', type: 'boolean', default: false })
+  isKit!: boolean;
+
+  /** Si true, este producto se vende a través de sus variantes (no directo). */
+  @Column({ name: 'has_variants', type: 'boolean', default: false })
+  hasVariants!: boolean;
+
+  /** Si true, se vende por peso (kg): el POS muestra unidad y admite decimales. */
+  @Column({ name: 'sold_by_weight', type: 'boolean', default: false })
+  soldByWeight!: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

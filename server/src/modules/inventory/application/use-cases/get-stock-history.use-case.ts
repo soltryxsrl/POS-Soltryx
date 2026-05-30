@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { StockMovementType } from '../../domain/entities/stock-movement-type';
 import {
   STOCK_MOVEMENT_REPOSITORY,
   type StockMovementRepository,
@@ -7,8 +8,13 @@ import type { StockMovement } from '../../domain/entities/stock-movement.entity'
 
 export interface GetStockHistoryInput {
   productId?: string;
+  type?: StockMovementType;
+  from?: Date;
+  to?: Date;
   limit?: number;
   offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface GetStockHistoryOutput {
@@ -30,8 +36,13 @@ export class GetStockHistoryUseCase {
     const offset = input.offset ?? 0;
     const { items, total } = await this.repo.list({
       productId: input.productId,
+      type: input.type,
+      from: input.from,
+      to: input.to,
       limit,
       offset,
+      sort: input.sort,
+      sortDir: input.sortDir,
     });
     return { items, total, limit, offset };
   }

@@ -1,11 +1,16 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ReactNode } from 'react';
 import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Soltryx POS',
-  description: 'POS web - Soltryx',
+  title: 'T1ET POS',
+  description: 'POS web - T1ET',
+  manifest: '/manifest.webmanifest',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0f172a',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

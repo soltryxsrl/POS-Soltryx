@@ -1,22 +1,29 @@
 'use client';
 
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
+import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import type { BusinessInfo } from '@/features/config/domain/types';
+import { useCustomer } from '@/features/customers/application/hooks/use-customers';
+import { usePaymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
 import type { Sale } from '../../domain/types';
 
-const METHOD_LABEL: Record<string, string> = {
-  CASH: 'Efectivo',
-  CARD: 'Tarjeta',
-  TRANSFER: 'Transferencia',
-  OTHER: 'Otro',
-};
-
-// Config del negocio — TODO: mover a settings/configuración del comercio.
-const BUSINESS = {
-  name: 'Soltryx POS',
+// Defaults conservadores si la query aún no resolvió o el servidor no responde.
+// La fuente real de verdad son los settings en la tabla business_settings.
+const BUSINESS_FALLBACK: BusinessInfo = {
+  name: 'T1ET POS',
   legalName: '',
   rnc: '',
   address: '',
   phone: '',
+  footerNote: '*** Gracias por su compra ***',
+  allowNegativeStock: false,
+  priceIncludesTax: false,
+  tipEnabled: false,
+  tipDefaultPct: '10.00',
+  taxRegime: 'ORDINARIO',
+  discountOverrideThresholdPct: '15.00',
+  logoUrl: null,
+  tagline: null,
 };
 
 function formatTime(iso: string): string {
@@ -37,33 +44,78 @@ function moneyNum(value: string | number): string {
   return formatMoney(value).replace('RD$', '').trim();
 }
 
+/** Nombre legible del tipo de comprobante por código DGII para el recibo. */
+const DOC_TYPE_LABEL: Record<string, string> = {
+  // e-CF
+  E31: 'Factura de Crédito Fiscal Electrónica',
+  E32: 'Factura de Consumo Electrónica',
+  E33: 'Nota de Débito Electrónica',
+  E34: 'Nota de Crédito Electrónica',
+  E44: 'Régimen Especial Electrónico',
+  E45: 'Comprobante Gubernamental Electrónico',
+  // NCF tradicional
+  B01: 'Factura de Crédito Fiscal',
+  B02: 'Factura de Consumo',
+  B03: 'Nota de Débito',
+  B04: 'Nota de Crédito',
+  B14: 'Comprobante Régimen Especial',
+  B15: 'Comprobante Gubernamental',
+  B16: 'Comprobante para Exportaciones',
+};
+
 export function Receipt({ sale }: { sale: Sale }) {
   const isCancelled = sale.status === 'CANCELLED';
-  const isFiscal = !!sale.fiscalDocumentId;
-  const ncf = sale.fiscalDocumentId;
+  const fiscalDoc = sale.fiscalDocument;
+  const isFiscal = !!fiscalDoc;
+  const ncf = fiscalDoc?.ncf ?? null;
+  const docTypeLabel = fiscalDoc
+    ? DOC_TYPE_LABEL[fiscalDoc.docType] ?? fiscalDoc.docType
+    : null;
+  const business = useBusinessInfo().data ?? BUSINESS_FALLBACK;
+  const labelOf = usePaymentMethodLabel();
+  const customer = useCustomer(sale.customerId ?? undefined).data;
+  const hasAccountPayment = sale.payments.some((p) => p.method === 'ACCOUNT');
 
   return (
     <>
       <PrintStyles />
       <div className="receipt mx-auto my-4 w-[80mm] bg-white p-4 font-mono text-[11px] leading-tight text-black shadow-md print:my-0 print:w-full print:p-0 print:shadow-none">
-        {/* Header */}
+        {/* Header con logo opcional */}
         <div className="text-center">
+          {business.logoUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={business.logoUrl}
+              alt={business.name}
+              className="logo mx-auto mb-1 max-h-16 object-contain"
+            />
+          )}
           <div className="text-base font-bold uppercase tracking-wide">
-            {BUSINESS.name}
+            {business.name}
           </div>
-          {BUSINESS.legalName && <div>{BUSINESS.legalName}</div>}
-          {BUSINESS.rnc && <div>RNC: {BUSINESS.rnc}</div>}
-          {BUSINESS.address && <div>{BUSINESS.address}</div>}
-          {BUSINESS.phone && <div>Tel: {BUSINESS.phone}</div>}
+          {business.tagline && (
+            <div className="text-[10px] italic">{business.tagline}</div>
+          )}
+          {business.legalName && <div>{business.legalName}</div>}
+          {business.rnc && <div>RNC: {business.rnc}</div>}
+          {business.address && <div>{business.address}</div>}
+          {business.phone && <div>Tel: {business.phone}</div>}
         </div>
 
         <Sep char="=" />
 
-        {/* Tipo de comprobante */}
+        {/* Tipo de comprobante. ECF: para e-CF, NCF: para tradicional. */}
         <div className="text-center font-bold uppercase">
-          {isFiscal ? 'Factura de Consumo' : 'Recibo no fiscal'}
+          {isFiscal && docTypeLabel ? docTypeLabel : 'Recibo no fiscal'}
         </div>
-        {ncf && <div className="text-center">NCF: {ncf}</div>}
+        {ncf && (
+          <div className="text-center">
+            {fiscalDoc?.docType.startsWith('E') ? 'ECF' : 'NCF'}: {ncf}
+          </div>
+        )}
+        {fiscalDoc?.buyerRnc && (
+          <div className="text-center">RNC Comprador: {fiscalDoc.buyerRnc}</div>
+        )}
         {isCancelled && (
           <div className="my-1 border border-black px-1 py-0.5 text-center font-bold uppercase">
             *** Venta Anulada ***
@@ -77,6 +129,28 @@ export function Receipt({ sale }: { sale: Sale }) {
         <div>
           Fecha: {formatDate(sale.createdAt)} Hora: {formatTime(sale.createdAt)}
         </div>
+        {customer ? (
+          <>
+            <div className="break-words">Cliente: {customer.fullName}</div>
+            {customer.document && (
+              <div>
+                {customer.documentType ?? 'Doc'}: {customer.document}
+              </div>
+            )}
+          </>
+        ) : isFiscal ? (
+          // DGII: en facturas fiscales sin cliente asignado se imprime
+          // "CLIENTE FINAL" con cédula de 11 ceros como placeholder estándar.
+          <>
+            <div>Cliente: CLIENTE FINAL</div>
+            <div>Cédula: 00000000000</div>
+          </>
+        ) : null}
+        {hasAccountPayment && (
+          <div className="my-0.5 border border-black px-1 py-0.5 text-center font-bold uppercase">
+            *** Venta a Crédito ***
+          </div>
+        )}
         {isCancelled && sale.cancelledAt && (
           <div className="italic">
             Anulada: {formatDate(sale.cancelledAt)} {formatTime(sale.cancelledAt)}
@@ -84,6 +158,17 @@ export function Receipt({ sale }: { sale: Sale }) {
         )}
         {isCancelled && sale.cancelReason && (
           <div className="italic">Motivo: {sale.cancelReason}</div>
+        )}
+        {sale.creditNoteFiscalDocument && (
+          <div className="italic">
+            Nota Crédito ({sale.creditNoteFiscalDocument.docType}):{' '}
+            {sale.creditNoteFiscalDocument.ncf}
+          </div>
+        )}
+        {sale.discountAuthorizedBySnapshot && (
+          <div className="italic">
+            Desc. autorizado por: {sale.discountAuthorizedBySnapshot}
+          </div>
         )}
 
         <Sep char="-" />
@@ -120,6 +205,11 @@ export function Receipt({ sale }: { sale: Sale }) {
                   @ {unitPrice} c/u
                 </div>
               )}
+              {it.notes && (
+                <div className="pl-[4ch] italic opacity-75 break-words">
+                  &gt; {it.notes}
+                </div>
+              )}
             </div>
           );
         })}
@@ -129,9 +219,18 @@ export function Receipt({ sale }: { sale: Sale }) {
         {/* Totales */}
         <Line label="Subtotal:" value={moneyNum(sale.subtotal)} />
         {Number(sale.discountTotal) > 0 && (
-          <Line label="Descuento:" value={`-${moneyNum(sale.discountTotal)}`} />
+          <Line label="Desc. lineas:" value={`-${moneyNum(sale.discountTotal)}`} />
         )}
-        <Line label="ITBIS 18%:" value={moneyNum(sale.taxTotal)} />
+        <Line
+          label={sale.priceIncludesTax ? 'ITBIS incluido:' : 'ITBIS:'}
+          value={moneyNum(sale.taxTotal)}
+        />
+        {Number(sale.orderDiscount) > 0 && (
+          <Line label="Desc. orden:" value={`-${moneyNum(sale.orderDiscount)}`} />
+        )}
+        {Number(sale.tipTotal) > 0 && (
+          <Line label="Propina:" value={moneyNum(sale.tipTotal)} />
+        )}
         <Sep char="=" />
         <Line
           label="TOTAL RD$:"
@@ -142,13 +241,23 @@ export function Receipt({ sale }: { sale: Sale }) {
         <Sep char="-" />
 
         {/* Pago */}
-        {sale.payments.map((p) => (
-          <Line
-            key={p.id}
-            label={`${METHOD_LABEL[p.method] ?? p.method}${p.reference ? ` (${p.reference})` : ''}:`}
-            value={moneyNum(p.amount)}
-          />
-        ))}
+        {sale.payments.map((p) => {
+          const inForeign = p.currencyCode && p.currencyCode !== 'DOP';
+          return (
+            <div key={p.id}>
+              <Line
+                label={`${labelOf(p.method)}${p.reference ? ` (${p.reference})` : ''}:`}
+                value={moneyNum(p.amount)}
+              />
+              {inForeign && p.foreignAmount && p.exchangeRate && (
+                <div className="pl-2 text-[10px] opacity-75">
+                  Pagado: {p.currencyCode} {Number(p.foreignAmount).toFixed(2)} @
+                  {' '}{Number(p.exchangeRate).toFixed(2)}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {ncf && (
           <>
@@ -170,9 +279,9 @@ export function Receipt({ sale }: { sale: Sale }) {
         <Sep char="=" />
 
         {/* Cierre */}
-        <div className="text-center font-bold">
-          *** Gracias por su compra ***
-        </div>
+        {business.footerNote && (
+          <div className="text-center font-bold">{business.footerNote}</div>
+        )}
         <div className="text-center text-[10px]">
           Devoluciones: 3 dias con ticket
         </div>

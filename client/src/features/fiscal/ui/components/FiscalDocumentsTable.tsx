@@ -1,0 +1,227 @@
+'use client';
+
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { X } from 'lucide-react';
+import { formatMoney } from '@/shared/lib/format';
+import { getErrorMessage } from '@/shared/lib/error-message';
+import { Input } from '@/shared/ui/controls/Input';
+import { Select } from '@/shared/ui/controls/Select';
+import {
+  DataTable,
+  useTableQueryState,
+  type DataTableColumn,
+} from '@/shared/ui/data-table';
+import { useFiscalDocTypes, useFiscalDocuments } from '../../application/hooks/use-fiscal';
+import type {
+  FiscalDocumentListItem,
+  FiscalDocumentStatus,
+} from '../../domain/types';
+
+const FILTER_KEYS = ['q', 'docType', 'status', 'from', 'to'] as const;
+
+const STATUS_LABEL: Record<FiscalDocumentStatus, string> = {
+  ISSUED: 'Emitido',
+  PUBLISHED: 'Enviado a DGII',
+  REJECTED: 'Rechazado',
+  CANCELLED: 'Anulado',
+};
+
+const STATUS_CLASS: Record<FiscalDocumentStatus, string> = {
+  ISSUED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  PUBLISHED: 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
+  REJECTED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+  CANCELLED: 'bg-muted text-muted-foreground',
+};
+
+function formatIssueDate(iso: string): string {
+  return new Date(iso).toLocaleString('es-DO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function FiscalDocumentsTable() {
+  const table = useTableQueryState({
+    defaultSort: 'issueDate',
+    defaultSortDir: 'desc',
+    filterKeys: FILTER_KEYS,
+  });
+  const docTypes = useFiscalDocTypes();
+  const docs = useFiscalDocuments({
+    q: table.filters.q || undefined,
+    docType: table.filters.docType || undefined,
+    status: (table.filters.status as FiscalDocumentStatus) || undefined,
+    from: table.filters.from || undefined,
+    to: table.filters.to || undefined,
+    limit: table.pageSize,
+    offset: (table.page - 1) * table.pageSize,
+  });
+
+  const columns = useMemo<DataTableColumn<FiscalDocumentListItem>[]>(
+    () => [
+      {
+        key: 'ncf',
+        header: 'NCF',
+        render: (d) => (
+          <Link
+            href={`/sales/${d.saleId}`}
+            className="font-mono text-xs font-medium text-brand-from hover:underline"
+            title="Ir al detalle de la venta"
+          >
+            {d.ncf}
+          </Link>
+        ),
+      },
+      {
+        key: 'docType',
+        header: 'Tipo',
+        render: (d) => (
+          <span className="font-mono text-xs font-medium">{d.docType}</span>
+        ),
+      },
+      {
+        key: 'issueDate',
+        header: 'Emitido',
+        render: (d) => (
+          <span className="text-xs text-muted-foreground">
+            {formatIssueDate(d.issueDate)}
+          </span>
+        ),
+      },
+      {
+        key: 'buyer',
+        header: 'Comprador',
+        render: (d) => (
+          <div className="min-w-0">
+            <div className="line-clamp-1 text-xs font-medium">
+              {d.buyerName ?? '—'}
+            </div>
+            {d.buyerRnc && (
+              <div className="text-[10px] text-muted-foreground">
+                RNC: {d.buyerRnc}
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'total',
+        header: 'Total',
+        align: 'right',
+        render: (d) => (
+          <span className="text-sm font-medium tabular-nums">
+            {formatMoney(d.total)}
+          </span>
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Estado',
+        render: (d) => (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              STATUS_CLASS[d.status]
+            }`}
+          >
+            {STATUS_LABEL[d.status]}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        placeholder="Buscar por NCF, nombre o RNC..."
+        value={table.filterDraft.q ?? ''}
+        onChange={(e) => table.setFilter('q', e.target.value)}
+        className="w-72"
+      />
+      <Select
+        value={table.filterDraft.docType ?? ''}
+        onChange={(e) => table.setFilter('docType', e.target.value)}
+        className="w-44"
+      >
+        <option value="">Todos los tipos</option>
+        {docTypes.data
+          ?.filter((dt) => dt.appliesTo === 'SALE' || dt.appliesTo === 'BOTH')
+          .map((dt) => (
+            <option key={dt.code} value={dt.code}>
+              {dt.code} — {dt.name}
+            </option>
+          ))}
+      </Select>
+      <Select
+        value={table.filterDraft.status ?? ''}
+        onChange={(e) => table.setFilter('status', e.target.value)}
+        className="w-40"
+      >
+        <option value="">Todos los estados</option>
+        <option value="ISSUED">Emitido</option>
+        <option value="PUBLISHED">Enviado a DGII</option>
+        <option value="REJECTED">Rechazado</option>
+        <option value="CANCELLED">Anulado</option>
+      </Select>
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground">Desde:</span>
+        <Input
+          type="date"
+          value={table.filterDraft.from ?? ''}
+          onChange={(e) => table.setFilter('from', e.target.value)}
+          className="w-36"
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground">Hasta:</span>
+        <Input
+          type="date"
+          value={table.filterDraft.to ?? ''}
+          onChange={(e) => table.setFilter('to', e.target.value)}
+          className="w-36"
+        />
+      </div>
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={() => table.clearFilters()}
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-3 w-3" /> Limpiar
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <DataTable<FiscalDocumentListItem>
+      columns={columns}
+      rows={docs.data?.items ?? []}
+      total={docs.data?.total ?? 0}
+      rowKey={(d) => d.id}
+      page={table.page}
+      pageSize={table.pageSize}
+      onPageChange={table.setPage}
+      onPageSizeChange={table.setPageSize}
+      sortKey={table.sort}
+      sortDir={table.sortDir}
+      onSortChange={table.setSort}
+      isLoading={docs.isLoading}
+      isFetching={docs.isFetching}
+      errorMessage={docs.isError ? getErrorMessage(docs.error) : null}
+      emptyState={
+        hasFilters
+          ? 'Sin resultados con esos filtros.'
+          : 'No hay comprobantes emitidos. Emite uno desde el POS seleccionando un tipo de comprobante al cobrar.'
+      }
+      toolbar={toolbar}
+    />
+  );
+}

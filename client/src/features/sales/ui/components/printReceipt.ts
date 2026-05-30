@@ -66,6 +66,14 @@ export function printReceipt(receiptEl: Element | null) {
     border: 0 !important;
   }
   .receipt * { color: #000 !important; background: transparent !important; }
+  /* Logo: máx 16mm de alto para no comerse la cabecera del ticket. */
+  .receipt img.logo {
+    display: block;
+    margin: 0 auto 2mm auto;
+    max-height: 16mm;
+    max-width: 60mm;
+    object-fit: contain;
+  }
 
   /* Tailwind utilities que usa Receipt.tsx (mapeadas a CSS plano). */
   .text-center { text-align: center; }

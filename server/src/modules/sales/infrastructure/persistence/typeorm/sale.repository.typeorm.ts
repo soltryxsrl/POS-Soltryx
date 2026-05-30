@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { resolveSort } from '../../../../../common/dto/pagination-sort.query';
 import type { TransactionContext } from '../../../../../common/persistence/unit-of-work.port';
 import type { Payment } from '../../../domain/entities/payment.entity';
 import type { Sale } from '../../../domain/entities/sale.entity';
@@ -14,6 +15,7 @@ import type {
 } from '../../../domain/ports/sale.repository.port';
 import type { PaymentMethod, PaymentStatus } from '../../../domain/value-objects/payment-method';
 import { SaleStatus, type FiscalStatus } from '../../../domain/value-objects/sale-status';
+import { FiscalDocumentOrmEntity } from '../../../../fiscal/documents/fiscal-document.orm-entity';
 import { PaymentOrmEntity } from './payment.orm-entity';
 import { SaleItemOrmEntity } from './sale-item.orm-entity';
 import { SaleOrmEntity } from './sale.orm-entity';
@@ -23,6 +25,8 @@ function itemToDomain(e: SaleItemOrmEntity): SaleItem {
     id: e.id,
     saleId: e.saleId,
     productId: e.productId,
+    variantId: e.variantId,
+    variantNameSnapshot: e.variantNameSnapshot,
     productNameSnapshot: e.productNameSnapshot,
     productSkuSnapshot: e.productSkuSnapshot,
     quantity: e.quantity,
@@ -31,6 +35,8 @@ function itemToDomain(e: SaleItemOrmEntity): SaleItem {
     taxRate: e.taxRate,
     taxTotal: e.taxTotal,
     total: e.total,
+    kitComponentsSnapshot: e.kitComponentsSnapshot,
+    notes: e.notes,
     createdAt: e.createdAt,
   };
 }
@@ -41,6 +47,9 @@ function paymentToDomain(e: PaymentOrmEntity): Payment {
     saleId: e.saleId,
     method: e.method as PaymentMethod,
     amount: e.amount,
+    currencyCode: e.currencyCode,
+    foreignAmount: e.foreignAmount,
+    exchangeRate: e.exchangeRate,
     reference: e.reference,
     status: e.status as PaymentStatus,
     createdAt: e.createdAt,
@@ -51,6 +60,8 @@ function saleToDomain(
   e: SaleOrmEntity,
   items: SaleItemOrmEntity[] = e.items ?? [],
   payments: PaymentOrmEntity[] = e.payments ?? [],
+  fiscalDoc: import('../../../../fiscal/documents/fiscal-document.orm-entity').FiscalDocumentOrmEntity | null = null,
+  creditNote: import('../../../../fiscal/documents/fiscal-document.orm-entity').FiscalDocumentOrmEntity | null = null,
 ): Sale {
   return {
     id: e.id,
@@ -61,8 +72,12 @@ function saleToDomain(
     cashSessionId: e.cashSessionId,
     subtotal: e.subtotal,
     discountTotal: e.discountTotal,
+    orderDiscount: e.orderDiscount,
     taxTotal: e.taxTotal,
+    tipTotal: e.tipTotal,
     total: e.total,
+    priceIncludesTax: e.priceIncludesTax,
+    publicToken: e.publicToken,
     status: e.status as Sale['status'],
     fiscalStatus: e.fiscalStatus as FiscalStatus,
     fiscalDocumentId: e.fiscalDocumentId,
@@ -72,6 +87,30 @@ function saleToDomain(
     cancelledAt: e.cancelledAt,
     cancelledById: e.cancelledById,
     cancelReason: e.cancelReason,
+    discountAuthorizedById: e.discountAuthorizedById,
+    discountAuthorizedBySnapshot: e.discountAuthorizedBySnapshot,
+    fiscalDocument: fiscalDoc
+      ? {
+          id: fiscalDoc.id,
+          docType: fiscalDoc.docType,
+          ncf: fiscalDoc.ncf,
+          status: fiscalDoc.status,
+          buyerName: fiscalDoc.buyerName,
+          buyerRnc: fiscalDoc.buyerRnc,
+          issueDate: fiscalDoc.issueDate,
+        }
+      : null,
+    creditNoteFiscalDocument: creditNote
+      ? {
+          id: creditNote.id,
+          docType: creditNote.docType,
+          ncf: creditNote.ncf,
+          status: creditNote.status,
+          buyerName: creditNote.buyerName,
+          buyerRnc: creditNote.buyerRnc,
+          issueDate: creditNote.issueDate,
+        }
+      : null,
     items: items.map(itemToDomain),
     payments: payments.map(paymentToDomain),
   };
@@ -85,6 +124,8 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
     private readonly items: Repository<SaleItemOrmEntity>,
     @InjectRepository(PaymentOrmEntity)
     private readonly payments: Repository<PaymentOrmEntity>,
+    @InjectRepository(FiscalDocumentOrmEntity)
+    private readonly fiscalDocs: Repository<FiscalDocumentOrmEntity>,
   ) {}
 
   async insert(ctx: TransactionContext, input: InsertSaleInput): Promise<Sale> {
@@ -100,11 +141,16 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
       cashSessionId: input.cashSessionId,
       subtotal: input.subtotal,
       discountTotal: input.discountTotal,
+      orderDiscount: input.orderDiscount,
       taxTotal: input.taxTotal,
+      tipTotal: input.tipTotal,
       total: input.total,
+      priceIncludesTax: input.priceIncludesTax,
       status: SaleStatus.COMPLETED,
       fiscalStatus: 'NOT_REQUIRED',
       notes: input.notes,
+      discountAuthorizedById: input.discountAuthorizedById,
+      discountAuthorizedBySnapshot: input.discountAuthorizedBySnapshot,
     });
     const savedSale = await salesRepo.save(sale);
 
@@ -112,6 +158,8 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
       itemsRepo.create({
         saleId: savedSale.id,
         productId: i.productId,
+        variantId: i.variantId ?? null,
+        variantNameSnapshot: i.variantNameSnapshot ?? null,
         productNameSnapshot: i.productNameSnapshot,
         productSkuSnapshot: i.productSkuSnapshot,
         quantity: i.quantity,
@@ -120,6 +168,8 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
         taxRate: i.taxRate,
         taxTotal: i.taxTotal,
         total: i.total,
+        kitComponentsSnapshot: i.kitComponentsSnapshot ?? null,
+        notes: i.notes ?? null,
       }),
     );
     const savedItems = await itemsRepo.save(itemEntities);
@@ -129,6 +179,9 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
         saleId: savedSale.id,
         method: p.method,
         amount: p.amount,
+        currencyCode: p.currencyCode ?? 'DOP',
+        foreignAmount: p.foreignAmount ?? null,
+        exchangeRate: p.exchangeRate ?? null,
         reference: p.reference,
         status: 'COMPLETED',
       }),
@@ -166,7 +219,20 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
       where: { id },
       relations: { items: true, payments: true },
     });
-    return r ? saleToDomain(r) : null;
+    if (!r) return null;
+    const fiscalDoc = r.fiscalDocumentId
+      ? await this.fiscalDocs.findOne({ where: { id: r.fiscalDocumentId } })
+      : null;
+    // La nota de crédito (E34/B04) puede vivir como otro fiscal_documents para
+    // la misma venta. La buscamos aparte porque `sales.fiscal_document_id` solo
+    // apunta a la factura original.
+    const creditNote = await this.fiscalDocs
+      .createQueryBuilder('fd')
+      .where('fd.sale_id = :sid', { sid: r.id })
+      .andWhere('fd.doc_type IN (:...types)', { types: ['E34', 'B04'] })
+      .orderBy('fd.created_at', 'DESC')
+      .getOne();
+    return saleToDomain(r, undefined, undefined, fiscalDoc, creditNote);
   }
 
   async findItemsForCancellation(
@@ -185,14 +251,35 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
   async list(filter: ListSalesFilter): Promise<ListSalesResult> {
     const limit = filter.limit ?? 50;
     const offset = filter.offset ?? 0;
+    const sort = resolveSort(
+      filter.sort,
+      filter.sortDir,
+      ['createdAt', 'total', 'saleNumber'] as const,
+      { column: 'createdAt', dir: 'desc' },
+    );
+    const sortColumnMap = {
+      createdAt: 's.createdAt',
+      total: 's.total',
+      saleNumber: 's.saleNumber',
+    } as const;
     const qb = this.sales
       .createQueryBuilder('s')
       .leftJoinAndSelect('s.items', 'i')
       .leftJoinAndSelect('s.payments', 'p')
-      .orderBy('s.createdAt', 'DESC')
+      .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .take(limit)
       .skip(offset);
+    if (filter.q) {
+      const term = `%${filter.q.toLowerCase()}%`;
+      qb.andWhere('LOWER(s.saleNumber) LIKE :term', { term });
+    }
     if (filter.status) qb.andWhere('s.status = :st', { st: filter.status });
+    if (filter.paymentMethod) {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM payments pm WHERE pm.sale_id = s.id AND pm.method = :pmth)`,
+        { pmth: filter.paymentMethod },
+      );
+    }
     if (filter.cashSessionId)
       qb.andWhere('s.cashSessionId = :cs', { cs: filter.cashSessionId });
     if (filter.userId) qb.andWhere('s.userId = :u', { u: filter.userId });

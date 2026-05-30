@@ -1,7 +1,7 @@
-import { Transform } from 'class-transformer';
-import { IsBooleanString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBooleanString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { PaginationSortQuery } from '../../../common/dto/pagination-sort.query';
 
-export class ListUsersQuery {
+export class ListUsersQuery extends PaginationSortQuery {
   @IsOptional()
   @IsString()
   q?: string;
@@ -11,15 +11,6 @@ export class ListUsersQuery {
   isActive?: 'true' | 'false';
 
   @IsOptional()
-  @Transform(({ value }) => Number(value))
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number;
-
-  @IsOptional()
-  @Transform(({ value }) => Number(value))
-  @IsInt()
-  @Min(0)
-  offset?: number;
+  @IsUUID()
+  roleId?: string;
 }

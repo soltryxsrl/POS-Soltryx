@@ -7,6 +7,7 @@ export const STOCK_MOVEMENT_REPOSITORY = Symbol('STOCK_MOVEMENT_REPOSITORY');
 export interface SaveStockMovementInput {
   branchId?: string | null;
   productId: string;
+  variantId?: string | null;
   type: StockMovementType;
   quantity: string;
   previousStock: string;
@@ -18,8 +19,13 @@ export interface SaveStockMovementInput {
 
 export interface ListStockMovementsInput {
   productId?: string;
+  type?: StockMovementType;
+  from?: Date;
+  to?: Date;
   limit?: number;
   offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface StockMovementRepository {

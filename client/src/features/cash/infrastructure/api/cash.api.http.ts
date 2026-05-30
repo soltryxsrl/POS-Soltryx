@@ -1,5 +1,6 @@
 import { http } from '@/shared/lib/http-client';
 import type {
+  CashMovement,
   CashRegister,
   CashSession,
   CashSessionSummary,
@@ -7,6 +8,8 @@ import type {
   CloseCashSessionInput,
   ListSessionsParams,
   OpenCashSessionInput,
+  RecordCashMovementInput,
+  SessionReport,
 } from '../../domain/types';
 
 export const cashApiHttp = {
@@ -30,4 +33,11 @@ export const cashApiHttp = {
     http<CashSessionsList>('/cash-sessions', {
       searchParams: params as Record<string, string | number | boolean | undefined> | undefined,
     }),
+
+  listMovements: (id: string) => http<CashMovement[]>(`/cash-sessions/${id}/movements`),
+
+  recordMovement: (id: string, input: RecordCashMovementInput) =>
+    http<CashMovement>(`/cash-sessions/${id}/movements`, { method: 'POST', body: input }),
+
+  report: (id: string) => http<SessionReport>(`/cash-sessions/${id}/report`),
 };

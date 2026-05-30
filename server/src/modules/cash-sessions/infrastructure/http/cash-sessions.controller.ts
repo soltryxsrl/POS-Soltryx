@@ -17,9 +17,12 @@ import {
 import { Roles } from '../../../auth/infrastructure/http/roles.decorator';
 import { CloseCashSessionUseCase } from '../../application/use-cases/close-cash-session.use-case';
 import { GetActiveSessionUseCase } from '../../application/use-cases/get-active-session.use-case';
+import { GetSessionReportUseCase } from '../../application/use-cases/get-session-report.use-case';
 import { GetSessionSummaryUseCase } from '../../application/use-cases/get-session-summary.use-case';
+import { ListCashMovementsUseCase } from '../../application/use-cases/list-cash-movements.use-case';
 import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case';
 import { OpenCashSessionUseCase } from '../../application/use-cases/open-cash-session.use-case';
+import { RecordCashMovementUseCase } from '../../application/use-cases/record-cash-movement.use-case';
 import {
   CashRegisterInactiveError,
   CashRegisterNotFoundError,
@@ -32,6 +35,7 @@ import { ActiveSessionQuery } from './dto/active-session.query';
 import { CloseCashSessionRequestDto } from './dto/close-cash-session.request-dto';
 import { ListSessionsQuery } from './dto/list-sessions.query';
 import { OpenCashSessionRequestDto } from './dto/open-cash-session.request-dto';
+import { RecordCashMovementRequestDto } from './dto/record-cash-movement.request-dto';
 
 @Controller('cash-sessions')
 export class CashSessionsController {
@@ -40,7 +44,10 @@ export class CashSessionsController {
     private readonly closeUC: CloseCashSessionUseCase,
     private readonly activeUC: GetActiveSessionUseCase,
     private readonly summaryUC: GetSessionSummaryUseCase,
+    private readonly reportUC: GetSessionReportUseCase,
     private readonly listUC: ListSessionsUseCase,
+    private readonly recordMovementUC: RecordCashMovementUseCase,
+    private readonly listMovementsUC: ListCashMovementsUseCase,
   ) {}
 
   @Get('active')
@@ -66,6 +73,8 @@ export class CashSessionsController {
       to: q.to ? new Date(q.to) : undefined,
       limit: q.limit,
       offset: q.offset,
+      sort: q.sort,
+      sortDir: q.sortDir,
     });
   }
 
@@ -87,6 +96,7 @@ export class CashSessionsController {
       this.openUC.execute({
         cashRegisterId: body.cashRegisterId,
         openingAmount: body.openingAmount,
+        openingDenominations: body.openingDenominations ?? null,
         notes: body.notes,
         openedById: user.id,
       }),
@@ -104,10 +114,40 @@ export class CashSessionsController {
       this.closeUC.execute({
         sessionId: id,
         countedAmount: body.countedAmount,
+        closingDenominations: body.closingDenominations ?? null,
+        closingDeclaredByMethod: body.closingDeclaredByMethod ?? null,
         notes: body.notes,
         closedById: user.id,
       }),
     );
+  }
+
+  @Get(':id/movements')
+  listMovements(@Param('id', ParseUUIDPipe) id: string) {
+    return this.handle(() => this.listMovementsUC.execute(id));
+  }
+
+  @Post(':id/movements')
+  @Roles('ADMIN', 'MANAGER', 'CASHIER')
+  recordMovement(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RecordCashMovementRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.handle(() =>
+      this.recordMovementUC.execute({
+        sessionId: id,
+        type: body.type,
+        amount: body.amount,
+        reason: body.reason,
+        userId: user.id,
+      }),
+    );
+  }
+
+  @Get(':id/report')
+  report(@Param('id', ParseUUIDPipe) id: string) {
+    return this.handle(() => this.reportUC.execute(id));
   }
 
   private async handle<T>(fn: () => Promise<T>): Promise<T> {

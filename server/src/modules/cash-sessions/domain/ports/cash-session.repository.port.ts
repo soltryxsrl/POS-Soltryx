@@ -1,5 +1,5 @@
 import type { TransactionContext } from '../../../../common/persistence/unit-of-work.port';
-import type { CashSession } from '../entities/cash-session.entity';
+import type { CashSession, DenominationCounts } from '../entities/cash-session.entity';
 import type { CashSessionStatus } from '../value-objects/cash-session-status';
 
 export const CASH_SESSION_REPOSITORY = Symbol('CASH_SESSION_REPOSITORY');
@@ -8,6 +8,7 @@ export interface OpenCashSessionInput {
   cashRegisterId: string;
   openedById: string;
   openingAmount: string;
+  openingDenominations?: DenominationCounts | null;
   notes?: string | null;
   branchId?: string | null;
 }
@@ -17,6 +18,8 @@ export interface CloseCashSessionPatch {
   closedAt: Date;
   expectedAmount: string;
   countedAmount: string;
+  closingDenominations?: DenominationCounts | null;
+  closingDeclaredByMethod?: Record<string, string> | null;
   difference: string;
   notes?: string | null;
 }
@@ -29,6 +32,8 @@ export interface ListSessionsFilter {
   to?: Date;
   limit?: number;
   offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface ListSessionsResult {

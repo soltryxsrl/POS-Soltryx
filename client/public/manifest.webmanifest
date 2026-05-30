@@ -1,0 +1,12 @@
+{
+  "name": "T1ET POS",
+  "short_name": "T1ET",
+  "description": "Punto de venta T1ET",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "lang": "es"
+}

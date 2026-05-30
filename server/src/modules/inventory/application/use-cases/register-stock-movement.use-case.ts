@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { TransactionContext } from '../../../../common/persistence/unit-of-work.port';
+import { BusinessSettingsService } from '../../../config/business-settings.service';
 import {
   InsufficientStockError,
   InvalidStockQuantityError,
@@ -27,20 +28,69 @@ export class RegisterStockMovementUseCase implements StockMovementRecorder {
     @Inject(PRODUCT_STOCK_PORT) private readonly productStock: ProductStockPort,
     @Inject(STOCK_MOVEMENT_REPOSITORY)
     private readonly movementRepo: StockMovementRepository,
+    private readonly settings: BusinessSettingsService,
   ) {}
 
   async record(ctx: TransactionContext, input: RecordStockMovementInput): Promise<StockMovement> {
+    // Validar y calcular delta antes de bloquear (fail-fast en input inválido).
+    const delta = this.computeDelta(input.type, input.quantity);
+
+    if (input.variantId) {
+      // El movimiento es sobre una variante: bloqueamos la variante y validamos
+      // que pertenezca al productId pasado. El stock del producto padre NO se
+      // toca; la variante mantiene su stock propio.
+      const variantSnap = await this.productStock.lockVariantForUpdate(
+        ctx,
+        input.variantId,
+      );
+      if (!variantSnap) {
+        throw new ProductNotFoundForStockError(input.variantId);
+      }
+      if (variantSnap.productId !== input.productId) {
+        throw new ProductNotFoundForStockError(
+          `Variante ${input.variantId} no pertenece a producto ${input.productId}`,
+        );
+      }
+      const newStock = addDecimal(variantSnap.stock, delta, 3);
+      if (Number(newStock) < 0) {
+        const { allowNegativeStock } = await this.settings.get();
+        if (!allowNegativeStock) {
+          throw new InsufficientStockError(
+            `${input.productId}/${input.variantId}`,
+            variantSnap.stock,
+            input.quantity,
+          );
+        }
+      }
+      const saved = await this.movementRepo.save(ctx, {
+        branchId: input.branchId ?? null,
+        productId: input.productId,
+        variantId: input.variantId,
+        type: input.type,
+        quantity: input.quantity,
+        previousStock: variantSnap.stock,
+        newStock,
+        reason: input.reason ?? null,
+        saleId: input.saleId ?? null,
+        userId: input.userId,
+      });
+      await this.productStock.updateVariantStock(ctx, input.variantId, newStock);
+      return saved;
+    }
+
     const snapshot = await this.productStock.lockForUpdate(ctx, input.productId);
     if (!snapshot) throw new ProductNotFoundForStockError(input.productId);
 
-    const delta = this.computeDelta(input.type, input.quantity);
     const newStock = addDecimal(snapshot.stock, delta, 3);
 
-    // No permitir stock negativo, salvo que el usuario haya pedido eso
-    // explícitamente con ADJUSTMENT — pero validamos al menos que no quede < 0
-    // en SALE (que es el caso peligroso de race condition).
+    // Política configurable: por defecto bloquea stock negativo.
+    // Cuando allowNegativeStock=true, el cajero puede vender aunque el stock
+    // calculado sea impreciso (colmados que "venden y cuentan después").
     if (Number(newStock) < 0) {
-      throw new InsufficientStockError(input.productId, snapshot.stock, input.quantity);
+      const { allowNegativeStock } = await this.settings.get();
+      if (!allowNegativeStock) {
+        throw new InsufficientStockError(input.productId, snapshot.stock, input.quantity);
+      }
     }
 
     const saved = await this.movementRepo.save(ctx, {

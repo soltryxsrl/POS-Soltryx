@@ -6,6 +6,7 @@ import type {
   CloseCashSessionInput,
   ListSessionsParams,
   OpenCashSessionInput,
+  RecordCashMovementInput,
 } from '../../domain/types';
 
 export const cashKey = {
@@ -14,6 +15,8 @@ export const cashKey = {
   activeMine: ['cash', 'active', 'mine'] as const,
   summary: (id: string) => ['cash', 'summary', id] as const,
   list: (params: ListSessionsParams) => ['cash', 'list', params] as const,
+  movements: (id: string) => ['cash', 'movements', id] as const,
+  report: (id: string) => ['cash', 'report', id] as const,
 };
 
 export function useCashRegisters() {
@@ -59,5 +62,29 @@ export function useCloseCashSession(id: string) {
   return useMutation({
     mutationFn: (input: CloseCashSessionInput) => cashApiHttp.close(id, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: cashKey.all }),
+  });
+}
+
+export function useCashMovements(id: string | undefined) {
+  return useQuery({
+    queryKey: cashKey.movements(id ?? '__none__'),
+    queryFn: () => cashApiHttp.listMovements(id!),
+    enabled: !!id,
+  });
+}
+
+export function useRecordCashMovement(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RecordCashMovementInput) => cashApiHttp.recordMovement(id, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: cashKey.all }),
+  });
+}
+
+export function useSessionReport(id: string | undefined) {
+  return useQuery({
+    queryKey: cashKey.report(id ?? '__none__'),
+    queryFn: () => cashApiHttp.report(id!),
+    enabled: !!id,
   });
 }

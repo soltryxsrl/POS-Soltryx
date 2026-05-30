@@ -9,6 +9,8 @@ import type { StockMovement } from '../../domain/entities/stock-movement.entity'
 
 export interface AdjustStockInput {
   productId: string;
+  /** Si se ajusta una variante específica. */
+  variantId?: string | null;
   /** Cantidad signada: "+5" entra, "-3" sale. */
   quantity: string;
   reason: string;
@@ -26,6 +28,7 @@ export class AdjustStockUseCase {
     return this.uow.run(async (ctx) =>
       this.recorder.record(ctx, {
         productId: input.productId,
+        variantId: input.variantId,
         type: StockMovementType.ADJUSTMENT,
         quantity: input.quantity,
         reason: input.reason,

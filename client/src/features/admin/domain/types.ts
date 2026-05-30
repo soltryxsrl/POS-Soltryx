@@ -27,8 +27,11 @@ export interface AdminUsersListResponse {
 export interface ListAdminUsersParams {
   q?: string;
   isActive?: boolean;
+  roleId?: string;
   limit?: number;
   offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface CreateAdminUserInput {

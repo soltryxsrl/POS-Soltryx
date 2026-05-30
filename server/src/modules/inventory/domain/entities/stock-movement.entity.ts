@@ -7,6 +7,8 @@ export interface StockMovement {
   readonly id: string;
   readonly branchId: string | null;
   readonly productId: string;
+  /** Si la línea fue de una variante, su id. */
+  readonly variantId: string | null;
   readonly type: StockMovementType;
   /** Siempre positiva en SALE/PURCHASE/RETURN/CANCELLED_SALE. Signada en ADJUSTMENT. */
   readonly quantity: string;

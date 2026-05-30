@@ -52,7 +52,7 @@ export function LowStockTable() {
           {q.data?.map((p) => (
             <tr key={p.id} className="border-b last:border-0">
               <td className="px-4 py-2">
-                <Link href={`/dashboard/products/${p.id}`} className="font-medium hover:underline">
+                <Link href={`/products/${p.id}`} className="font-medium hover:underline">
                   {p.name}
                 </Link>
                 <div className="text-xs text-muted-foreground">{p.sku}</div>

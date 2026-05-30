@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCategories } from '@/features/categories/application/hooks/use-categories';
+import { useTaxTypes } from '@/features/tax-types/application/hooks/use-tax-types';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
@@ -29,23 +30,41 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
   const create = useCreateProduct();
   const update = useUpdateProduct(product?.id ?? '');
   const categories = useCategories({ isActive: true });
+  const taxTypes = useTaxTypes({ activeOnly: true });
 
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(product?.name ?? '');
   const [sku, setSku] = useState(product?.sku ?? '');
   const [barcode, setBarcode] = useState(product?.barcode ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
+  const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? '');
+  const [imageBroken, setImageBroken] = useState(false);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
   const [costPrice, setCostPrice] = useState(product?.costPrice ?? '0.00');
   const [salePrice, setSalePrice] = useState(product?.salePrice ?? '0.00');
-  const [taxRate, setTaxRate] = useState(product?.taxRate ?? '18.00');
+  const [taxTypeCode, setTaxTypeCode] = useState(product?.taxTypeCode ?? '');
   const [initialStock, setInitialStock] = useState('0');
   const [minStock, setMinStock] = useState(product?.minStock ?? '0');
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
+  const [isKit, setIsKit] = useState(product?.isKit ?? false);
+  const [soldByWeight, setSoldByWeight] = useState(product?.soldByWeight ?? false);
+
+  // Inicializa el tipo de ITBIS cuando carga el catálogo: en edición legacy
+  // (sin tipo) matchea por la tasa guardada; en alta usa el tipo por defecto.
+  useEffect(() => {
+    if (taxTypeCode) return;
+    const list = taxTypes.data;
+    if (!list?.length) return;
+    const matchByRate = product
+      ? list.find((t) => Number(t.rate) === Number(product.taxRate))
+      : undefined;
+    const def = list.find((t) => t.isDefault) ?? list[0];
+    setTaxTypeCode((matchByRate ?? def)?.code ?? '');
+  }, [taxTypes.data, product, taxTypeCode]);
 
   const finish = () => {
     if (onSuccess) onSuccess();
-    else router.push('/dashboard/products');
+    else router.push('/products');
   };
 
   const cancel = () => {
@@ -63,12 +82,15 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           sku,
           barcode: barcode || null,
           description: description || null,
+          imageUrl: imageUrl.trim() || null,
           categoryId: categoryId || null,
           costPrice,
           salePrice,
-          taxRate,
+          ...(taxTypeCode && { taxTypeCode }),
           minStock,
           isActive,
+          isKit,
+          soldByWeight,
         };
         await update.mutateAsync(payload);
         finish();
@@ -78,13 +100,16 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           sku,
           ...(barcode && { barcode }),
           ...(description && { description }),
+          ...(imageUrl.trim() && { imageUrl: imageUrl.trim() }),
           ...(categoryId && { categoryId }),
           costPrice,
           salePrice,
-          taxRate,
+          ...(taxTypeCode && { taxTypeCode }),
           ...(initialStock && Number(initialStock) > 0 && { initialStock }),
           minStock,
           isActive,
+          isKit,
+          soldByWeight,
         };
         await create.mutateAsync(payload);
         finish();
@@ -153,13 +178,22 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
             pattern="^\d+(\.\d{1,2})?$"
           />
         </FormField>
-        <FormField label="ITBIS / impuesto (%)">
-          <Input
-            value={taxRate}
-            onChange={(e) => setTaxRate(e.target.value)}
-            inputMode="decimal"
-            pattern="^\d+(\.\d{1,2})?$"
-          />
+        <FormField
+          label="Tipo de ITBIS"
+          hint="Tasas del catálogo (Impuestos › Tipos de ITBIS)."
+        >
+          <Select
+            value={taxTypeCode}
+            onChange={(e) => setTaxTypeCode(e.target.value)}
+            disabled={taxTypes.isLoading}
+          >
+            {!taxTypeCode && <option value="">Seleccione</option>}
+            {taxTypes.data?.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.name} ({Number(t.rate).toFixed(2)}%)
+              </option>
+            ))}
+          </Select>
         </FormField>
         <FormField label="Stock mínimo">
           <Input
@@ -190,11 +224,73 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           </FormField>
         </div>
 
+        <div className="sm:col-span-2">
+          <FormField
+            label="Imagen del producto (URL)"
+            hint="Pega una URL pública (Cloudinary, Imgur, CDN). Se mostrará en los tiles del POS."
+          >
+            <div className="flex items-start gap-3">
+              <Input
+                value={imageUrl}
+                onChange={(e) => {
+                  setImageUrl(e.target.value);
+                  setImageBroken(false);
+                }}
+                placeholder="https://..."
+                maxLength={500}
+                inputMode="url"
+                className="flex-1"
+              />
+              {imageUrl.trim() && !imageBroken ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imageUrl.trim()}
+                  alt="Vista previa"
+                  onError={() => setImageBroken(true)}
+                  className="h-14 w-14 flex-shrink-0 rounded-lg border border-border object-cover"
+                />
+              ) : (
+                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-[10px] text-muted-foreground">
+                  {imageBroken ? 'URL inválida' : 'Sin img'}
+                </div>
+              )}
+            </div>
+          </FormField>
+        </div>
+
         {isEdit && (
           <div className="sm:col-span-2">
             <Switch checked={isActive} onChange={setIsActive} label="Activo" />
           </div>
         )}
+
+        <div className="sm:col-span-2">
+          <Switch
+            checked={isKit}
+            onChange={setIsKit}
+            label="Es un kit/combo"
+          />
+          {isKit && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Al venderlo se descuenta stock de sus componentes (no del kit).
+              Configura los componentes después de guardar el producto.
+            </p>
+          )}
+        </div>
+
+        <div className="sm:col-span-2">
+          <Switch
+            checked={soldByWeight}
+            onChange={setSoldByWeight}
+            label="Se vende por peso (kg)"
+          />
+          {soldByWeight && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              En el POS se mostrará la unidad &quot;kg&quot; y el cajero podrá teclear
+              cantidades con decimales (ej. 0.750).
+            </p>
+          )}
+        </div>
       </div>
 
       {error && (

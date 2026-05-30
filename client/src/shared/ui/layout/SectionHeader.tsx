@@ -16,7 +16,7 @@ interface Props {
    * antepone automáticamente, ni el título actual). Si se omite, solo se muestra
    * "Dashboard › <title>".
    *
-   * @example crumbs={[{ label: 'Administración' }]} en /dashboard/admin/users
+   * @example crumbs={[{ label: 'Administración' }]} en /admin/users
    */
   crumbs?: BreadcrumbItem[];
   /** Botones / controles a la derecha (opcional). */
@@ -24,7 +24,7 @@ interface Props {
   className?: string;
 }
 
-const ROOT_CRUMB: BreadcrumbItem = { label: 'Dashboard', href: '/dashboard' };
+const ROOT_CRUMB: BreadcrumbItem = { label: 'Dashboard', href: '/' };
 
 export function SectionHeader({
   title,

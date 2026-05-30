@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
+import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case';
 import { LoginUseCase } from '../../application/use-cases/login.use-case';
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case';
 import { RefreshTokensUseCase } from '../../application/use-cases/refresh-tokens.use-case';
@@ -21,10 +23,15 @@ import {
   RefreshTokenInvalidError,
   UserInactiveError,
 } from '../../domain/errors/auth.errors';
+import {
+  CurrentPasswordWrongError,
+  NewPasswordSameAsCurrentError,
+} from '../../domain/errors/change-password.errors';
 import { USER_READER, type UserReader } from '../../domain/ports/user-reader.port';
 import { toPublic } from '../../domain/entities/auth-user.entity';
 import type { AppEnv } from '../../../../config/env.validation';
 import { CurrentUser, type CurrentUserPayload } from './current-user.decorator';
+import { ChangePasswordRequestDto } from './dto/change-password.request-dto';
 import { LoginRequestDto } from './dto/login.request-dto';
 import { Public } from './public.decorator';
 
@@ -36,6 +43,7 @@ export class AuthController {
     private readonly loginUC: LoginUseCase,
     private readonly refreshUC: RefreshTokensUseCase,
     private readonly logoutUC: LogoutUseCase,
+    private readonly changePasswordUC: ChangePasswordUseCase,
     @Inject(USER_READER) private readonly users: UserReader,
     private readonly config: ConfigService<AppEnv, true>,
   ) {}
@@ -116,33 +124,45 @@ export class AuthController {
     return { user: toPublic(user) };
   }
 
-  /**
-   * Opciones base de la cookie de refresh. `domain` solo se incluye si está
-   * configurado (en cross-site Vercel↔Railway debe ir vacío). `sameSite: 'none'`
-   * + `secure: true` es lo que permite enviar la cookie entre dominios distintos.
-   */
-  private cookieOptions(): {
-    httpOnly: true;
-    secure: boolean;
-    sameSite: 'lax' | 'strict' | 'none';
-    path: string;
-    domain?: string;
-  } {
-    const domain = this.config.get('COOKIE_DOMAIN', { infer: true });
-    return {
-      httpOnly: true,
-      secure: this.config.get('COOKIE_SECURE', { infer: true }),
-      sameSite: this.config.get('COOKIE_SAMESITE', { infer: true }),
-      path: '/api/auth',
-      ...(domain ? { domain } : {}),
-    };
+  @Post('change-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changePassword(
+    @Body() body: ChangePasswordRequestDto,
+    @CurrentUser() current: CurrentUserPayload | undefined,
+  ): Promise<void> {
+    if (!current) throw new UnauthorizedException();
+    try {
+      await this.changePasswordUC.execute({
+        userId: current.id,
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+      });
+    } catch (e) {
+      if (e instanceof CurrentPasswordWrongError) throw new UnauthorizedException(e.message);
+      if (e instanceof NewPasswordSameAsCurrentError) throw new BadRequestException(e.message);
+      if (e instanceof InvalidCredentialsError) throw new UnauthorizedException(e.message);
+      throw e;
+    }
   }
 
   private setRefreshCookie(res: Response, token: string, expiresAt: Date): void {
-    res.cookie(REFRESH_COOKIE, token, { ...this.cookieOptions(), expires: expiresAt });
+    res.cookie(REFRESH_COOKIE, token, {
+      httpOnly: true,
+      secure: this.config.get('COOKIE_SECURE', { infer: true }),
+      sameSite: 'lax',
+      domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
+      path: '/api/auth',
+      expires: expiresAt,
+    });
   }
 
   private clearRefreshCookie(res: Response): void {
-    res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
+    res.clearCookie(REFRESH_COOKIE, {
+      httpOnly: true,
+      secure: this.config.get('COOKIE_SECURE', { infer: true }),
+      sameSite: 'lax',
+      domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
+      path: '/api/auth',
+    });
   }
 }

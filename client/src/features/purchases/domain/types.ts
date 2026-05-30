@@ -1,0 +1,86 @@
+import type { MoneyDto } from '@/shared/types/enums';
+
+export type PurchaseOrderStatus = 'PENDING' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+
+export interface PurchaseOrderItem {
+  id: string;
+  productId: string;
+  productNameSnapshot: string;
+  productSkuSnapshot: string;
+  orderedQuantity: string;
+  receivedQuantity: string;
+  unitCost: MoneyDto;
+  taxRate: string;
+  taxTotal: MoneyDto;
+  total: MoneyDto;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  branchId: string | null;
+  orderNumber: string;
+  supplierId: string;
+  supplierName: string;
+  status: PurchaseOrderStatus;
+  expectedDate: string | null;
+  supplierInvoice: string | null;
+  /** Tipo de comprobante DGII del proveedor (B01/B14/B11/E41/E43). Null si no fiscal. */
+  supplierFiscalDocTypeCode: string | null;
+  /** NCF que aparece en la factura del proveedor. Va al 606. */
+  supplierNcf: string | null;
+  /** Fecha del comprobante del proveedor (YYYY-MM-DD). */
+  supplierInvoiceDate: string | null;
+  subtotal: MoneyDto;
+  taxTotal: MoneyDto;
+  total: MoneyDto;
+  notes: string | null;
+  createdById: string;
+  receivedAt: string | null;
+  receivedById: string | null;
+  cancelledAt: string | null;
+  cancelledById: string | null;
+  cancelReason: string | null;
+  items: PurchaseOrderItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrdersList {
+  items: PurchaseOrder[];
+  total: number;
+}
+
+export interface CreatePurchaseOrderInput {
+  supplierId: string;
+  expectedDate?: string;
+  supplierInvoice?: string;
+  /** Datos fiscales DGII del proveedor — opcionales. Si se incluye el tipo,
+   *  los otros 2 son requeridos (server lo valida). */
+  supplierFiscalDocTypeCode?: string;
+  supplierNcf?: string;
+  supplierInvoiceDate?: string;
+  notes?: string;
+  items: Array<{
+    productId: string;
+    orderedQuantity: string;
+    unitCost: MoneyDto;
+    taxRate?: string;
+  }>;
+}
+
+export interface ReceivePurchaseOrderInput {
+  items: Array<{ itemId: string; quantity: string }>;
+  updateProductCost?: boolean;
+}
+
+export interface ListPurchaseOrdersParams {
+  q?: string;
+  supplierId?: string;
+  status?: PurchaseOrderStatus;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+  sortDir?: 'asc' | 'desc';
+}

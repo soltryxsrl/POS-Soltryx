@@ -14,6 +14,10 @@ export class StockMovementOrmEntity {
   @Column({ name: 'product_id', type: 'uuid' })
   productId!: string;
 
+  @Index()
+  @Column({ name: 'variant_id', type: 'uuid', nullable: true })
+  variantId!: string | null;
+
   @Column({ type: 'varchar', length: 24 })
   type!: string;
 

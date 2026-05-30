@@ -1,8 +1,14 @@
 'use client';
 
+import { useMemo } from 'react';
+import { X } from 'lucide-react';
 import { formatDateTime, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { Input } from '@/shared/ui/controls/Input';
+import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
+import { StockMovementType } from '@/shared/types/enums';
 import { useStockMovements } from '../../application/hooks/use-inventory';
+import type { StockMovement } from '../../domain/types';
 
 const TYPE_LABEL: Record<string, string> = {
   PURCHASE: 'Compra',
@@ -20,77 +26,186 @@ const TYPE_COLOR: Record<string, string> = {
   CANCELLED_SALE: 'bg-purple-100 text-purple-800',
 };
 
-export function StockMovementsTable({ productId }: { productId?: string }) {
-  const movements = useStockMovements({ productId, limit: 100 });
+const FILTER_KEYS = ['type', 'from', 'to'] as const;
 
-  return (
-    <div className="rounded-lg border bg-card">
-      <table className="w-full text-sm">
-        <thead className="border-b text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2">Fecha</th>
-            <th className="px-4 py-2">Tipo</th>
-            <th className="px-4 py-2 text-right">Cantidad</th>
-            <th className="px-4 py-2 text-right">Stock antes</th>
-            <th className="px-4 py-2 text-right">Stock después</th>
-            <th className="px-4 py-2">Motivo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {movements.isLoading && (
-            <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                Cargando...
-              </td>
-            </tr>
-          )}
-          {movements.isError && (
-            <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-destructive">
-                {getErrorMessage(movements.error)}
-              </td>
-            </tr>
-          )}
-          {movements.data?.items.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                Sin movimientos.
-              </td>
-            </tr>
-          )}
-          {movements.data?.items.map((m) => {
-            const positive = !m.quantity.startsWith('-');
-            return (
-              <tr key={m.id} className="border-b last:border-0">
-                <td className="px-4 py-2 text-xs text-muted-foreground">
-                  {formatDateTime(m.createdAt)}
-                </td>
-                <td className="px-4 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${TYPE_COLOR[m.type] ?? ''}`}>
-                    {TYPE_LABEL[m.type] ?? m.type}
-                  </span>
-                </td>
-                <td
-                  className={`px-4 py-2 text-right font-medium ${
-                    positive ? 'text-green-700' : 'text-red-700'
-                  }`}
-                >
-                  {positive && !m.quantity.startsWith('+') ? '+' : ''}
-                  {formatQuantity(m.quantity)}
-                </td>
-                <td className="px-4 py-2 text-right">{formatQuantity(m.previousStock)}</td>
-                <td className="px-4 py-2 text-right">{formatQuantity(m.newStock)}</td>
-                <td className="px-4 py-2 text-muted-foreground">{m.reason ?? '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {movements.data && (
-        <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-          Total: {movements.data.total} movimiento(s)
-        </div>
-      )}
+const TYPE_CHIPS: Array<{ value: StockMovementType; label: string }> = [
+  { value: StockMovementType.SALE, label: 'Venta' },
+  { value: StockMovementType.PURCHASE, label: 'Compra' },
+  { value: StockMovementType.ADJUSTMENT, label: 'Ajuste' },
+  { value: StockMovementType.RETURN, label: 'Devolución' },
+  { value: StockMovementType.CANCELLED_SALE, label: 'Anulada' },
+];
+
+export function StockMovementsTable({ productId }: { productId?: string }) {
+  const table = useTableQueryState({
+    defaultSort: 'createdAt',
+    defaultSortDir: 'desc',
+    filterKeys: FILTER_KEYS,
+  });
+
+  const movements = useStockMovements({
+    productId,
+    type: (table.filters.type as StockMovementType) || undefined,
+    from: dateInputToIso(table.filters.from, 'start'),
+    to: dateInputToIso(table.filters.to, 'end'),
+    sort: table.sort,
+    sortDir: table.sortDir,
+    limit: table.pageSize,
+    offset: (table.page - 1) * table.pageSize,
+  });
+
+  const columns = useMemo<DataTableColumn<StockMovement>[]>(
+    () => [
+      {
+        key: 'createdAt',
+        header: 'Fecha',
+        sortable: true,
+        render: (m) => (
+          <span className="text-xs text-muted-foreground">{formatDateTime(m.createdAt)}</span>
+        ),
+      },
+      {
+        key: 'type',
+        header: 'Tipo',
+        render: (m) => (
+          <span className={`rounded-full px-2 py-0.5 text-xs ${TYPE_COLOR[m.type] ?? ''}`}>
+            {TYPE_LABEL[m.type] ?? m.type}
+          </span>
+        ),
+      },
+      {
+        key: 'quantity',
+        header: 'Cantidad',
+        sortable: true,
+        align: 'right',
+        render: (m) => {
+          const positive = !m.quantity.startsWith('-');
+          return (
+            <span className={`font-medium ${positive ? 'text-green-700' : 'text-red-700'}`}>
+              {positive && !m.quantity.startsWith('+') ? '+' : ''}
+              {formatQuantity(m.quantity)}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'previousStock',
+        header: 'Stock antes',
+        align: 'right',
+        render: (m) => formatQuantity(m.previousStock),
+      },
+      {
+        key: 'newStock',
+        header: 'Stock después',
+        align: 'right',
+        render: (m) => formatQuantity(m.newStock),
+      },
+      {
+        key: 'reason',
+        header: 'Motivo',
+        render: (m) => <span className="text-muted-foreground">{m.reason ?? '—'}</span>,
+      },
+    ],
+    [],
+  );
+
+  const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+
+  const toolbar = (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {TYPE_CHIPS.map((c) => (
+          <Chip
+            key={c.value}
+            label={c.label}
+            active={table.filterDraft.type === c.value}
+            onClick={() =>
+              table.setFilter('type', table.filterDraft.type === c.value ? undefined : c.value)
+            }
+          />
+        ))}
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => table.clearFilters()}
+            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3 w-3" /> Limpiar
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>Rango fecha:</span>
+        <Input
+          type="date"
+          value={table.filterDraft.from ?? ''}
+          onChange={(e) => table.setFilter('from', e.target.value)}
+          className="h-8 w-40 text-xs"
+        />
+        <span>—</span>
+        <Input
+          type="date"
+          value={table.filterDraft.to ?? ''}
+          onChange={(e) => table.setFilter('to', e.target.value)}
+          className="h-8 w-40 text-xs"
+        />
+      </div>
     </div>
   );
+
+  return (
+    <DataTable<StockMovement>
+      columns={columns}
+      rows={movements.data?.items ?? []}
+      total={movements.data?.total ?? 0}
+      rowKey={(m) => m.id}
+      page={table.page}
+      pageSize={table.pageSize}
+      onPageChange={table.setPage}
+      onPageSizeChange={table.setPageSize}
+      sortKey={table.sort}
+      sortDir={table.sortDir}
+      onSortChange={table.setSort}
+      isLoading={movements.isLoading}
+      isFetching={movements.isFetching}
+      errorMessage={movements.isError ? getErrorMessage(movements.error) : null}
+      emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'Sin movimientos.'}
+      toolbar={toolbar}
+    />
+  );
+}
+
+function Chip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        active
+          ? 'rounded-md border border-brand-from/60 bg-brand-from/10 px-2.5 py-1.5 text-xs font-medium text-foreground'
+          : 'rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground'
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+function dateInputToIso(value: string | undefined, bound: 'start' | 'end'): string | undefined {
+  if (!value) return undefined;
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return undefined;
+  const date =
+    bound === 'start'
+      ? new Date(y, m - 1, d, 0, 0, 0, 0)
+      : new Date(y, m - 1, d, 23, 59, 59, 999);
+  return date.toISOString();
 }

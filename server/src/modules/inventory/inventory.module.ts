@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule as BusinessConfigModule } from '../config/config.module';
+import { ProductVariantOrmEntity } from '../products/product-variant.orm-entity';
 import { ProductOrmEntity } from '../products/product.orm-entity';
 import { AdjustStockUseCase } from './application/use-cases/adjust-stock.use-case';
 import { GetStockHistoryUseCase } from './application/use-cases/get-stock-history.use-case';
@@ -13,7 +15,14 @@ import { StockMovementOrmEntity } from './infrastructure/persistence/typeorm/sto
 import { StockMovementRepositoryTypeOrm } from './infrastructure/persistence/typeorm/stock-movement.repository.typeorm';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([StockMovementOrmEntity, ProductOrmEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      StockMovementOrmEntity,
+      ProductOrmEntity,
+      ProductVariantOrmEntity,
+    ]),
+    BusinessConfigModule, // expone BusinessSettingsService (lectura de allowNegativeStock)
+  ],
   controllers: [InventoryController],
   providers: [
     AdjustStockUseCase,

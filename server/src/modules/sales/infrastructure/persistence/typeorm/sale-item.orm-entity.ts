@@ -24,8 +24,20 @@ export class SaleItemOrmEntity {
   sale!: SaleOrmEntity;
 
   @Index()
-  @Column({ name: 'product_id', type: 'uuid' })
-  productId!: string;
+  @Column({ name: 'product_id', type: 'uuid', nullable: true })
+  productId!: string | null;
+
+  @Index()
+  @Column({ name: 'variant_id', type: 'uuid', nullable: true })
+  variantId!: string | null;
+
+  @Column({
+    name: 'variant_name_snapshot',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
+  variantNameSnapshot!: string | null;
 
   @Column({ name: 'product_name_snapshot', type: 'varchar', length: 180 })
   productNameSnapshot!: string;
@@ -57,6 +69,21 @@ export class SaleItemOrmEntity {
 
   @Column({ type: 'numeric', precision: 12, scale: 2, transformer: numericString })
   total!: string;
+
+  /**
+   * Si esta línea era un producto-kit al venderse, snapshot de la receta usada.
+   * Permite que la cancelación/devolución reverse exactamente lo que se descontó,
+   * aunque la receta haya cambiado después.
+   */
+  @Column({
+    name: 'kit_components_snapshot',
+    type: 'jsonb',
+    nullable: true,
+  })
+  kitComponentsSnapshot!: Array<{ componentProductId: string; quantity: string }> | null;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  notes!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

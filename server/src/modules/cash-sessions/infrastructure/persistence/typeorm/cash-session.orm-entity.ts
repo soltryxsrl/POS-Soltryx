@@ -41,6 +41,18 @@ export class CashSessionOrmEntity {
   })
   openingAmount!: string;
 
+  @Column({ name: 'opening_denominations', type: 'jsonb', nullable: true })
+  openingDenominations!: Record<string, number> | null;
+
+  @Column({ name: 'closing_denominations', type: 'jsonb', nullable: true })
+  closingDenominations!: Record<string, number> | null;
+
+  /** Mapa methodCode → monto declarado por el cajero al cerrar (cuadre por
+   *  forma de pago). Ej: `{ "CASH": "500.00", "CARD": "300.00" }`. Null si
+   *  el cajero no declaró nada (sesión aún abierta o cierre sin desglose). */
+  @Column({ name: 'closing_declared_by_method', type: 'jsonb', nullable: true })
+  closingDeclaredByMethod!: Record<string, string> | null;
+
   @Column({
     name: 'expected_amount',
     type: 'numeric',

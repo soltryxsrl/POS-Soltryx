@@ -6,6 +6,8 @@ export const STOCK_MOVEMENT_RECORDER = Symbol('STOCK_MOVEMENT_RECORDER');
 
 export interface RecordStockMovementInput {
   productId: string;
+  /** Si se provee, el movimiento descuenta/abona stock de la variante en vez del producto padre. */
+  variantId?: string | null;
   type: StockMovementType;
   /**
    * Cantidad. Para SALE/PURCHASE/RETURN/CANCELLED_SALE debe ser positiva.

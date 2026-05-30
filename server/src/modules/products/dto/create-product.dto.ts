@@ -3,6 +3,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Matches,
   MaxLength,
@@ -34,6 +35,11 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+  @MaxLength(500)
+  imageUrl?: string;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
 
@@ -50,6 +56,15 @@ export class CreateProductDto {
   @IsNumberString()
   @Matches(TAX, { message: 'taxRate debe tener hasta 2 decimales' })
   taxRate?: string;
+
+  /**
+   * Código del tipo de ITBIS (catálogo tax_types). Si se provee, el servidor
+   * deriva `taxRate` de la tasa del tipo (ignora el taxRate enviado).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  taxTypeCode?: string;
 
   /**
    * Stock inicial opcional. Si se provee y > 0, se crea un stock_movement
@@ -69,4 +84,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Si true, este producto es un kit/combo y al venderlo se descuenta el stock de sus componentes. */
+  @IsOptional()
+  @IsBoolean()
+  isKit?: boolean;
+
+  /** Si true, se vende por peso (kg) — el POS muestra unidad y admite decimales. */
+  @IsOptional()
+  @IsBoolean()
+  soldByWeight?: boolean;
 }

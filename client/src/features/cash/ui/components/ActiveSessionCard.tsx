@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import { ArrowLeftRight, FileText } from 'lucide-react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { Fab } from '@/shared/ui/controls/Fab';
 import {
   useActiveSessionMine,
   useCashRegisters,
   useSessionSummary,
 } from '../../application/hooks/use-cash';
+import { CashMovementDialog } from './CashMovementDialog';
+import { CashMovementsList } from './CashMovementsList';
 import { CloseCashDialog } from './CloseCashDialog';
 import { OpenCashDialog } from './OpenCashDialog';
+import { SessionReportDialog } from './SessionReportDialog';
 
 export function ActiveSessionCard() {
   const active = useActiveSessionMine();
@@ -17,6 +22,8 @@ export function ActiveSessionCard() {
   const registers = useCashRegisters();
   const [showOpen, setShowOpen] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [showMovement, setShowMovement] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   if (active.isLoading) {
     return (
@@ -35,25 +42,15 @@ export function ActiveSessionCard() {
 
   if (!active.data) {
     return (
-      <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-lg font-semibold">No tienes caja abierta</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Para registrar ventas necesitas abrir una sesión de caja primero.
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowOpen(true)}
-          className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
-        >
-          Abrir caja
-        </button>
+      <>
+        <Fab label="Abrir caja" onClick={() => setShowOpen(true)} />
         {showOpen && (
           <OpenCashDialog
             onClose={() => setShowOpen(false)}
             defaultCashRegisterId={registers.data?.[0]?.id}
           />
         )}
-      </div>
+      </>
     );
   }
 
@@ -61,42 +58,87 @@ export function ActiveSessionCard() {
   const register = registers.data?.find((r) => r.id === s.cashRegisterId);
 
   return (
-    <div className="rounded-lg border bg-card p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">Caja abierta</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {register ? `${register.code} · ${register.name}` : s.cashRegisterId} · Abierta{' '}
-            {formatDateTime(s.openedAt)}
-          </p>
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Caja abierta</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {register ? `${register.code} · ${register.name}` : s.cashRegisterId} · Abierta{' '}
+              {formatDateTime(s.openedAt)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMovement(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              Pay-in / Pay-out
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReport(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <FileText className="h-4 w-4" />
+              Reporte X
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowClose(true)}
+              className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive/90"
+            >
+              Cerrar caja
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowClose(true)}
-          className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive/90"
-        >
-          Cerrar caja
-        </button>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <Stat label="Monto inicial" value={formatMoney(s.openingAmount)} />
+          <Stat label="Ventas efectivo" value={formatMoney(summary.data?.cashSales ?? '0.00')} />
+          <Stat
+            label="Pay-ins"
+            value={`+${formatMoney(summary.data?.paidIns ?? '0.00')}`}
+          />
+          <Stat
+            label="Pay-outs"
+            value={`−${formatMoney(summary.data?.paidOuts ?? '0.00')}`}
+          />
+          <Stat
+            label="Efectivo esperado"
+            value={formatMoney(summary.data?.expectedAmount ?? s.openingAmount)}
+            strong
+          />
+        </div>
+
+        {s.notes && (
+          <p className="mt-4 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">{s.notes}</p>
+        )}
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Stat label="Monto inicial" value={formatMoney(s.openingAmount)} />
-        <Stat label="Ventas efectivo" value={formatMoney(summary.data?.cashSales ?? '0.00')} />
-        <Stat
-          label="Efectivo esperado"
-          value={formatMoney(summary.data?.expectedAmount ?? s.openingAmount)}
-          strong
-        />
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Movimientos del turno</h3>
+        <CashMovementsList sessionId={s.id} />
       </div>
-
-      {s.notes && (
-        <p className="mt-4 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">{s.notes}</p>
-      )}
 
       {showClose && (
         <CloseCashDialog
           sessionId={s.id}
           onClose={() => setShowClose(false)}
+        />
+      )}
+      {showMovement && (
+        <CashMovementDialog
+          sessionId={s.id}
+          onClose={() => setShowMovement(false)}
+        />
+      )}
+      {showReport && (
+        <SessionReportDialog
+          sessionId={s.id}
+          onClose={() => setShowReport(false)}
         />
       )}
     </div>
