@@ -4,6 +4,13 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCategories } from '@/features/categories/application/hooks/use-categories';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { Button } from '@/shared/ui/controls/Button';
+import { FormField } from '@/shared/ui/controls/FormField';
+import { FormFooter } from '@/shared/ui/controls/FormFooter';
+import { Input } from '@/shared/ui/controls/Input';
+import { Select } from '@/shared/ui/controls/Select';
+import { Switch } from '@/shared/ui/controls/Switch';
+import { Textarea } from '@/shared/ui/controls/Textarea';
 import {
   useCreateProduct,
   useUpdateProduct,
@@ -12,9 +19,11 @@ import type { CreateProductInput, Product, UpdateProductInput } from '../../doma
 
 interface Props {
   product?: Product;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function ProductForm({ product }: Props) {
+export function ProductForm({ product, onSuccess, onCancel }: Props) {
   const router = useRouter();
   const isEdit = !!product;
   const create = useCreateProduct();
@@ -34,6 +43,16 @@ export function ProductForm({ product }: Props) {
   const [minStock, setMinStock] = useState(product?.minStock ?? '0');
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
 
+  const finish = () => {
+    if (onSuccess) onSuccess();
+    else router.push('/dashboard/products');
+  };
+
+  const cancel = () => {
+    if (onCancel) onCancel();
+    else router.back();
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -52,7 +71,7 @@ export function ProductForm({ product }: Props) {
           isActive,
         };
         await update.mutateAsync(payload);
-        router.push('/dashboard/products');
+        finish();
       } else {
         const payload: CreateProductInput = {
           name,
@@ -68,7 +87,7 @@ export function ProductForm({ product }: Props) {
           isActive,
         };
         await create.mutateAsync(payload);
-        router.push('/dashboard/products');
+        finish();
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -78,149 +97,120 @@ export function ProductForm({ product }: Props) {
   const pending = create.isPending || update.isPending;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 max-w-2xl">
+    <form onSubmit={onSubmit} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Nombre *">
-          <input
+        <FormField label="Nombre" required>
+          <Input
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={inputCls}
             maxLength={180}
           />
-        </Field>
-        <Field label="SKU *">
-          <input
+        </FormField>
+        <FormField label="SKU" required>
+          <Input
             required
             value={sku}
             onChange={(e) => setSku(e.target.value)}
-            className={inputCls}
             maxLength={64}
           />
-        </Field>
-        <Field label="Código de barras">
-          <input
+        </FormField>
+        <FormField label="Código de barras">
+          <Input
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
-            className={inputCls}
             maxLength={64}
           />
-        </Field>
-        <Field label="Categoría">
-          <select
+        </FormField>
+        <FormField label="Categoría">
+          <Select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className={inputCls}
           >
-            <option value="">— Sin categoría —</option>
+            <option value="">Seleccione</option>
             {categories.data?.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-          </select>
-        </Field>
+          </Select>
+        </FormField>
 
-        <Field label="Precio costo">
-          <input
+        <FormField label="Precio costo">
+          <Input
             value={costPrice}
             onChange={(e) => setCostPrice(e.target.value)}
-            className={inputCls}
             inputMode="decimal"
             pattern="^\d+(\.\d{1,2})?$"
           />
-        </Field>
-        <Field label="Precio venta *">
-          <input
+        </FormField>
+        <FormField label="Precio venta" required>
+          <Input
             required
             value={salePrice}
             onChange={(e) => setSalePrice(e.target.value)}
-            className={inputCls}
             inputMode="decimal"
             pattern="^\d+(\.\d{1,2})?$"
           />
-        </Field>
-        <Field label="ITBIS / impuesto (%)">
-          <input
+        </FormField>
+        <FormField label="ITBIS / impuesto (%)">
+          <Input
             value={taxRate}
             onChange={(e) => setTaxRate(e.target.value)}
-            className={inputCls}
             inputMode="decimal"
             pattern="^\d+(\.\d{1,2})?$"
           />
-        </Field>
-        <Field label="Stock mínimo">
-          <input
+        </FormField>
+        <FormField label="Stock mínimo">
+          <Input
             value={minStock}
             onChange={(e) => setMinStock(e.target.value)}
-            className={inputCls}
             inputMode="decimal"
             pattern="^\d+(\.\d{1,3})?$"
           />
-        </Field>
+        </FormField>
 
         {!isEdit && (
-          <Field label="Stock inicial (opcional)">
-            <input
+          <FormField label="Stock inicial (opcional)">
+            <Input
               value={initialStock}
               onChange={(e) => setInitialStock(e.target.value)}
-              className={inputCls}
               inputMode="decimal"
               pattern="^\d+(\.\d{1,3})?$"
             />
-          </Field>
+          </FormField>
         )}
 
-        <Field label="Descripción">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className={`${inputCls} min-h-[80px]`}
-          />
-        </Field>
+        <div className="sm:col-span-2">
+          <FormField label="Descripción">
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </FormField>
+        </div>
 
-        <label className="flex items-center gap-2 sm:col-span-2">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-          />
-          <span className="text-sm">Activo</span>
-        </label>
+        {isEdit && (
+          <div className="sm:col-span-2">
+            <Switch checked={isActive} onChange={setIsActive} label="Activo" />
+          </div>
+        )}
       </div>
 
       {error && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </p>
       )}
 
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-        >
-          {pending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear producto'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border px-4 py-2 text-sm transition hover:bg-muted"
-        >
+      <FormFooter>
+        <Button variant="outline" onClick={cancel} disabled={pending}>
           Cancelar
-        </button>
-      </div>
+        </Button>
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear producto'}
+        </Button>
+      </FormFooter>
     </form>
-  );
-}
-
-const inputCls =
-  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring';
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1.5">
-      <span className="block text-sm font-medium">{label}</span>
-      {children}
-    </label>
   );
 }

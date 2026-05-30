@@ -5,16 +5,30 @@ import type { AppEnv } from './env.validation';
 
 export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
-  useFactory: (config: ConfigService<AppEnv, true>): TypeOrmModuleOptions => ({
+  useFactory: (config: ConfigService<AppEnv, true>): TypeOrmModuleOptions => {
+    const url = config.get('DATABASE_URL', { infer: true });
+    const ssl = config.get('DB_SSL', { infer: true });
+    const conn = url
+      ? { url }
+      : {
+          host: config.get('DB_HOST', { infer: true }),
+          port: config.get('DB_PORT', { infer: true }),
+          username: config.get('DB_USER', { infer: true }),
+          password: config.get('DB_PASSWORD', { infer: true }),
+          database: config.get('DB_NAME', { infer: true }),
+        };
+    return {
     type: 'postgres',
-    host: config.get('DB_HOST', { infer: true }),
-    port: config.get('DB_PORT', { infer: true }),
-    username: config.get('DB_USER', { infer: true }),
-    password: config.get('DB_PASSWORD', { infer: true }),
-    database: config.get('DB_NAME', { infer: true }),
+    ...conn,
+    ...(ssl ? { ssl: { rejectUnauthorized: false } } : {}),
     schema: config.get('DB_SCHEMA', { infer: true }),
     autoLoadEntities: true,
     synchronize: false,
+    // Fuerza la zona horaria de la sesión Postgres. Crítico para que
+    // `created_at::date` en reportes use la fecha LOCAL del negocio y no UTC.
+    extra: {
+      options: `-c timezone=${config.get('TZ', { infer: true })}`,
+    },
     // Aplica migraciones pendientes en cada arranque del API.
     // En dev: cómodo para clonar el repo en otra PC y arrancar sin pasos extra.
     // En prod: revisar si prefieres correr migraciones como step separado de deploy.
@@ -27,5 +41,6 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
     migrationsTableName: 't1et_migrations',
     logging:
       config.get('NODE_ENV', { infer: true }) === 'development' ? ['error', 'warn'] : ['error'],
-  }),
+    };
+  },
 };

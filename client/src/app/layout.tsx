@@ -4,8 +4,8 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'T1ET POS',
-  description: 'POS web - T1ET',
+  title: 'Soltryx POS',
+  description: 'POS web - Soltryx',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

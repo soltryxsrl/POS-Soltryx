@@ -12,6 +12,7 @@ export interface AccessTokenPayload {
   sub: string;
   username: string;
   roles: string[];
+  permissions: string[];
 }
 
 export interface RefreshTokenPayload {
@@ -33,7 +34,12 @@ export interface IssuedTokens {
 }
 
 export interface TokenIssuer {
-  issue(payload: { sub: string; username: string; roles: string[] }): Promise<IssuedTokens>;
+  issue(payload: {
+    sub: string;
+    username: string;
+    roles: string[];
+    permissions: string[];
+  }): Promise<IssuedTokens>;
   verifyAccess(token: string): Promise<AccessTokenPayload>;
   verifyRefresh(token: string): Promise<RefreshTokenPayload>;
 }

@@ -10,7 +10,7 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 const BUSINESS = {
-  name: 'T1ET POS',
+  name: 'Soltryx POS',
   legalName: '',
   rnc: '',
   address: '',

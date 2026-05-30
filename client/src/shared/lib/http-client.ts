@@ -101,6 +101,11 @@ export async function http<T>(path: string, opts: HttpRequestOptions = {}): Prom
   }
 
   if (!res.ok) throw await parseError(res, path);
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  if (res.status === 204) return null as T;
+  // Algunos endpoints devuelven 200 con body vacío (p.ej. /cash-sessions/active sin
+  // sesión). Retornamos `null` (no `undefined`) para que TanStack Query no falle
+  // con "data is undefined" y para no romper con "Unexpected end of JSON input".
+  const text = await res.text();
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
 }

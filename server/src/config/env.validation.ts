@@ -7,11 +7,19 @@ const envSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
   API_PORT: z.coerce.number().int().positive().default(3001),
 
+  // Si está presente (Railway/Heroku) tiene prioridad sobre las DB_* sueltas.
+  DATABASE_URL: z.string().optional(),
+  // Postgres por SSL (proxy público de Railway). 'true' para forzarlo.
+  DB_SSL: z
+    .union([z.boolean(), z.string()])
+    .transform((v) => (typeof v === 'string' ? v === 'true' : v))
+    .default(false),
+
   DB_HOST: z.string().default('localhost'),
   DB_PORT: z.coerce.number().int().positive().default(5433),
-  DB_NAME: z.string().min(1),
-  DB_USER: z.string().min(1),
-  DB_PASSWORD: z.string().min(1),
+  DB_NAME: z.string().min(1).default('t1et_pos'),
+  DB_USER: z.string().min(1).default('t1et_app'),
+  DB_PASSWORD: z.string().min(1).default('postgres'),
   DB_SCHEMA: z.string().default('public'),
 
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET debe tener al menos 32 caracteres'),
@@ -19,12 +27,16 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
-  WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
+  WEB_ORIGIN: z.string().default('http://localhost:3000'),
+  // Vacío → no se setea atributo Domain (necesario en cross-site Vercel↔Railway,
+  // donde la cookie la pone el dominio del API y no se puede compartir dominio).
   COOKIE_DOMAIN: z.string().default('localhost'),
   COOKIE_SECURE: z
     .union([z.boolean(), z.string()])
     .transform((v) => (typeof v === 'string' ? v === 'true' : v))
     .default(false),
+  // 'lax' en local (mismo host), 'none' en cross-site (requiere secure=true).
+  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { authApiHttp } from '../../infrastructure/api/auth.api.http';
 import { setupHttpAuth } from '../setup-http-auth';
 import { useAuthStore } from '../stores/auth.store';
@@ -12,26 +12,20 @@ import { useAuthStore } from '../stores/auth.store';
  *      sigue válida tras recargar la página.
  */
 export function useBootstrapAuth() {
-  const setSession = useAuthStore((s) => s.setSession);
-  const setStatus = useAuthStore((s) => s.setStatus);
-  const status = useAuthStore((s) => s.status);
+  const bootstrapped = useRef(false);
 
   useEffect(() => {
     setupHttpAuth();
-  }, []);
+    if (bootstrapped.current) return;
+    if (useAuthStore.getState().status !== 'idle') return;
+    bootstrapped.current = true;
 
-  useEffect(() => {
-    if (status !== 'idle') return;
+    const { setSession, setStatus } = useAuthStore.getState();
     setStatus('loading');
-    let cancelled = false;
     void (async () => {
       const session = await authApiHttp.refresh();
-      if (cancelled) return;
       if (session) setSession(session);
       else setStatus('unauthenticated');
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, setSession, setStatus]);
+  }, []);
 }

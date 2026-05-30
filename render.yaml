@@ -16,12 +16,16 @@ services:
     plan: free
     rootDir: server
     region: oregon
+    # Render ya trae pnpm; NO usar `corepack enable` (FS de solo-lectura → EROFS).
     # --prod=false fuerza instalar devDependencies (nest CLI, tsc) aunque
     # NODE_ENV=production esté presente en el build; sin esto `nest build` no existe.
-    buildCommand: corepack enable && pnpm install --prod=false --frozen-lockfile && pnpm build
+    buildCommand: pnpm install --prod=false --no-frozen-lockfile && pnpm build
     startCommand: node dist/database/seeds/run-seed.js && node dist/main.js
     healthCheckPath: /health
     envVars:
+      # Node 26 (default de Render) es demasiado nuevo; fijamos 22 LTS.
+      - key: NODE_VERSION
+        value: "22.11.0"
       - key: DATABASE_URL
         fromDatabase:
           name: t1et-db
@@ -47,6 +51,7 @@ services:
       # Vacío = sin atributo Domain (necesario cross-site con Vercel).
       - key: COOKIE_DOMAIN
         value: ""
-      # Se actualiza con la URL real de Vercel tras desplegar el client.
+      # Orígenes permitidos (CORS). Lista separada por comas: alias estable de
+      # Vercel + alias con scope del equipo, por si se abre cualquiera de los dos.
       - key: WEB_ORIGIN
-        value: https://CHANGEME.vercel.app
+        value: https://pos-soltryx.vercel.app,https://pos-soltryx-soltryx-s-projects.vercel.app

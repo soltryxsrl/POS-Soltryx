@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { HttpClientError } from '@/shared/lib/http-client';
+import { Button } from '@/shared/ui/controls/Button';
+import { FormField } from '@/shared/ui/controls/FormField';
+import { Input } from '@/shared/ui/controls/Input';
 import { useLogin } from '../../application/hooks/use-login';
 
 export function LoginForm() {
@@ -32,17 +35,11 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm">
-      <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">T1ET POS</h1>
-        <p className="text-sm text-muted-foreground">Iniciar sesión</p>
-      </div>
+    <form onSubmit={onSubmit} className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-6 shadow-xl shadow-brand-from/10">
+      <h1 className="text-center text-2xl font-semibold tracking-tight">Soltryx POS</h1>
 
-      <div className="space-y-2">
-        <label htmlFor="emailOrUsername" className="text-sm font-medium">
-          Usuario o email
-        </label>
-        <input
+      <FormField label="Usuario o email" required htmlFor="emailOrUsername">
+        <Input
           id="emailOrUsername"
           name="emailOrUsername"
           type="text"
@@ -51,15 +48,11 @@ export function LoginForm() {
           required
           value={emailOrUsername}
           onChange={(e) => setEmailOrUsername(e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
-      </div>
+      </FormField>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium">
-          Contraseña
-        </label>
-        <input
+      <FormField label="Contraseña" required htmlFor="password">
+        <Input
           id="password"
           name="password"
           type="password"
@@ -68,21 +61,18 @@ export function LoginForm() {
           minLength={6}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
-      </div>
+      </FormField>
 
       {error && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </p>
       )}
 
-      <button
-        type="submit"
-        disabled={login.isPending}
-        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-      >
+      <Button type="submit" disabled={login.isPending} className="w-full">
         {login.isPending ? 'Entrando...' : 'Entrar'}
-      </button>
+      </Button>
 
       <p className="text-center text-xs text-muted-foreground">
         admin@t1et.local / Admin123!
