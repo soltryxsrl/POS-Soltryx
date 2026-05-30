@@ -16,7 +16,9 @@ services:
     plan: free
     rootDir: server
     region: oregon
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    # --prod=false fuerza instalar devDependencies (nest CLI, tsc) aunque
+    # NODE_ENV=production esté presente en el build; sin esto `nest build` no existe.
+    buildCommand: corepack enable && pnpm install --prod=false --frozen-lockfile && pnpm build
     startCommand: node dist/database/seeds/run-seed.js && node dist/main.js
     healthCheckPath: /health
     envVars:
