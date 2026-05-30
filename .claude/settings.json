@@ -8,7 +8,13 @@
       "Bash(echo \"exit: $?\")",
       "Bash(pnpm build *)",
       "Bash(railway link *)",
-      "Bash(railway delete *)"
+      "Bash(railway delete *)",
+      "Bash(grep -iE \"\\(^|/\\)\\\\.env\\($|\\\\.\\)|node_modules|/dist/|\\\\.tsbuildinfo\")",
+      "Bash(git credential-manager *)",
+      "Bash(echo \"erase exit: $?\")",
+      "Bash(git credential *)",
+      "Bash(echo \"reject exit: $?\")",
+      "Bash(GIT_TERMINAL_PROMPT=1 git -c credential.interactive=true -c credential.guiPrompt=true push origin main)"
     ]
   }
 }

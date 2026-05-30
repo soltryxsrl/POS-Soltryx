@@ -3,7 +3,6 @@
   "version": "0.0.1",
   "private": true,
   "description": "T1ET POS - server (NestJS)",
-  "packageManager": "pnpm@10.33.4",
   "engines": {
     "node": ">=20"
   },
