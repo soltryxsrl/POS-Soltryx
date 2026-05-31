@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { Building2, Save } from 'lucide-react';
+import { Building2, Save, Trash2, Upload } from 'lucide-react';
 import {
   useBusinessInfo,
   useUpdateBusinessInfo,
@@ -57,6 +57,43 @@ export default function BusinessSettingsPage() {
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((s) => ({ ...s, [key]: e.target.checked }));
 
+  // Sube un logo desde el dispositivo: lo reescala (lado mayor 240px) y lo
+  // guarda como data URI PNG, así viaja embebido sin necesitar un CDN externo.
+  const onLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('El logo debe ser un archivo de imagen (PNG, JPG, etc.).');
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 240;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setForm((s) => ({ ...s, logoUrl: String(reader.result) }));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        setForm((s) => ({ ...s, logoUrl: canvas.toDataURL('image/png') }));
+      };
+      img.onerror = () => setError('No se pudo leer la imagen seleccionada.');
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => setError('No se pudo leer el archivo.');
+    reader.readAsDataURL(file);
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -87,7 +124,7 @@ export default function BusinessSettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <SectionHeader
         title="Datos del negocio"
         description="Aparecen en la cabecera y pie de cada recibo impreso o exportado a PDF."
@@ -184,37 +221,51 @@ export default function BusinessSettingsPage() {
           </FormField>
 
           <FormField
-            label="Logo del negocio (URL, opcional)"
+            label="Logo del negocio (opcional)"
             className="sm:col-span-2"
-            hint="Pega una URL pública (Cloudinary, Imgur, CDN). Se imprime arriba del nombre."
+            hint="Se imprime arriba del nombre en cada recibo. PNG o JPG; se reescala automáticamente."
           >
-            <div className="flex items-start gap-3">
-              <Input
-                value={form.logoUrl ?? ''}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, logoUrl: e.target.value || null }))
-                }
-                maxLength={500}
-                disabled={!canEdit}
-                placeholder="https://..."
-                inputMode="url"
-                className="flex-1"
-              />
+            <div className="flex items-center gap-4">
               {form.logoUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={form.logoUrl}
                   alt="Logo"
-                  className="h-14 w-14 flex-shrink-0 rounded-md border border-border object-contain bg-white p-1"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+                  className="h-16 w-16 flex-shrink-0 rounded-md border border-border object-contain bg-white p-1"
                 />
               ) : (
-                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-[10px] text-muted-foreground">
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-[10px] text-muted-foreground">
                   Sin logo
                 </div>
               )}
+              <div className="flex flex-col gap-2">
+                <label
+                  className={
+                    'inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition hover:border-brand-from/50 hover:bg-brand-tint ' +
+                    (!canEdit ? 'pointer-events-none opacity-50' : '')
+                  }
+                >
+                  <Upload className="h-4 w-4" />
+                  {form.logoUrl ? 'Cambiar imagen' : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={onLogoFile}
+                    disabled={!canEdit}
+                  />
+                </label>
+                {form.logoUrl && canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((s) => ({ ...s, logoUrl: null }))}
+                    className="inline-flex w-fit items-center gap-1.5 text-xs text-destructive transition hover:underline"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Quitar logo
+                  </button>
+                )}
+              </div>
             </div>
           </FormField>
         </div>

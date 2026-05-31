@@ -29,8 +29,11 @@ export class BusinessSettingsOrmEntity {
   @Column({ name: 'footer_note', type: 'varchar', length: 255 })
   footerNote!: string;
 
-  /** URL pública del logo (Cloudinary, S3, CDN). Opcional. */
-  @Column({ name: 'logo_url', type: 'varchar', length: 500, nullable: true })
+  /**
+   * Logo del negocio: URL pública o un data URI (`data:image/...;base64,...`)
+   * cuando se sube un archivo desde el dispositivo. `text` para alojar el base64.
+   */
+  @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl!: string | null;
 
   /** Eslogan corto del negocio que aparece bajo el nombre en el recibo. */

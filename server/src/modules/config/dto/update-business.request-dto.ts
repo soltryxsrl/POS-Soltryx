@@ -4,7 +4,6 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
-  IsUrl,
   Matches,
   MaxLength,
   ValidateIf,
@@ -73,12 +72,18 @@ export class UpdateBusinessRequestDto {
   })
   discountOverrideThresholdPct?: string;
 
-  /** URL pública del logo del negocio. Vacío = sin logo. */
+  /**
+   * Logo del negocio. Vacío = sin logo. Acepta una URL pública http(s) O un
+   * data URI de imagen (`data:image/...;base64,...`) cuando se sube un archivo
+   * desde el dispositivo. El límite alto cubre el base64 (la UI reescala antes).
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(1_500_000)
   @ValidateIf((_, value) => value !== null && value !== '')
-  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+  @Matches(/^(https?:\/\/|data:image\/)/, {
+    message: 'logoUrl debe ser una URL http(s) o un data URI de imagen',
+  })
   logoUrl?: string | null;
 
   /** Eslogan corto del negocio. */
