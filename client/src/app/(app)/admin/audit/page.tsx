@@ -138,12 +138,9 @@ export default function AuditPage() {
                 >
                   <Shield className="h-4 w-4 flex-shrink-0 text-brand-from" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-medium">
-                        {ACTION_LABEL[e.action] ?? e.action}
-                      </span>
-                      <code className="text-[10px] text-muted-foreground">{e.action}</code>
-                    </div>
+                    <span className="text-sm font-medium">
+                      {ACTION_LABEL[e.action] ?? e.action}
+                    </span>
                     <div className="text-[11px] text-muted-foreground">
                       {formatDateTime(e.createdAt)}
                       {e.actorName && ` · ${e.actorName}`}
