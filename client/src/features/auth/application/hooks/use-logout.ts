@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
 import { authApiHttp } from '../../infrastructure/api/auth.api.http';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -11,6 +12,7 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authApiHttp.logout(),
     onSettled: () => {
+      useActiveBranchStore.getState().clearActiveBranch();
       clear();
       qc.clear();
     },

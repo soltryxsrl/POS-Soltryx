@@ -94,10 +94,6 @@ export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
             /
           </kbd>
         </div>
-        <p className="mt-1 pl-1 text-[11px] text-muted-foreground">
-          <strong className="font-medium text-foreground">Enter</strong> agrega el
-          primer resultado · escanea para auto-añadir
-        </p>
       </div>
 
       {/* Grid de productos */}

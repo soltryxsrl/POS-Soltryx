@@ -159,15 +159,17 @@ export function SupplierFormDialog({ supplier, onClose, onSaved }: Props) {
           />
         </FormField>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="rounded border-border"
-          />
-          Proveedor activo
-        </label>
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              className="rounded border-border"
+            />
+            Proveedor activo
+          </label>
+        )}
 
         {error && (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">

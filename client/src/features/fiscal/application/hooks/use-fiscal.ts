@@ -77,18 +77,28 @@ export function useFiscalDocuments(params: ListFiscalDocumentsParams = {}) {
  * Preview del 607 para un rango [from..to]. La descarga TXT se hace con
  * `fiscalApiHttp.download607Txt(from, to)` directamente (no es un hook).
  */
-export function useFiscal607(params: { from: string; to: string; enabled?: boolean }) {
+export function useFiscal607(params: {
+  from: string;
+  to: string;
+  branchId?: string;
+  enabled?: boolean;
+}) {
   return useQuery({
-    queryKey: ['fiscal', 'reports', '607', params.from, params.to] as const,
-    queryFn: () => fiscalApiHttp.get607(params.from, params.to),
+    queryKey: ['fiscal', 'reports', '607', params.from, params.to, params.branchId ?? null] as const,
+    queryFn: () => fiscalApiHttp.get607(params.from, params.to, params.branchId),
     enabled: params.enabled ?? !!(params.from && params.to),
   });
 }
 
-export function useFiscal606(params: { from: string; to: string; enabled?: boolean }) {
+export function useFiscal606(params: {
+  from: string;
+  to: string;
+  branchId?: string;
+  enabled?: boolean;
+}) {
   return useQuery({
-    queryKey: ['fiscal', 'reports', '606', params.from, params.to] as const,
-    queryFn: () => fiscalApiHttp.get606(params.from, params.to),
+    queryKey: ['fiscal', 'reports', '606', params.from, params.to, params.branchId ?? null] as const,
+    queryFn: () => fiscalApiHttp.get606(params.from, params.to, params.branchId),
     enabled: params.enabled ?? !!(params.from && params.to),
   });
 }

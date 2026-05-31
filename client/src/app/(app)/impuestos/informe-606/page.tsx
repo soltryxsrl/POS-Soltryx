@@ -7,7 +7,9 @@ import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
 import { Input } from '@/shared/ui/controls/Input';
+import { Switch } from '@/shared/ui/controls/Switch';
 import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
+import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { useFiscal606 } from '@/features/fiscal/application/hooks/use-fiscal';
 import { fiscalApiHttp } from '@/features/fiscal/infrastructure/api/fiscal.api.http';
 
@@ -16,14 +18,17 @@ export default function Informe606Page() {
   const [to, setTo] = useState(localDateISO());
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const canConsolidate = useHasPermission('branches.switch');
+  const [allBranches, setAllBranches] = useState(false);
+  const branchId = canConsolidate && allBranches ? 'all' : undefined;
 
-  const report = useFiscal606({ from, to });
+  const report = useFiscal606({ from, to, branchId });
 
   const handleDownload = async () => {
     setDownloadError(null);
     setDownloading(true);
     try {
-      await fiscalApiHttp.download606Txt(from, to);
+      await fiscalApiHttp.download606Txt(from, to, branchId);
     } catch (err) {
       setDownloadError(getErrorMessage(err));
     } finally {
@@ -76,6 +81,15 @@ export default function Informe606Page() {
             <Download className="h-4 w-4" />
             {downloading ? 'Descargando…' : `Descargar ${fileName}`}
           </Button>
+          {canConsolidate && (
+            <div className="ml-auto">
+              <Switch
+                checked={allBranches}
+                onChange={setAllBranches}
+                label="Todas las sucursales"
+              />
+            </div>
+          )}
         </div>
         {downloadError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">

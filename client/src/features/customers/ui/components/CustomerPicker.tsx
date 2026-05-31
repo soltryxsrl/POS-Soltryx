@@ -59,11 +59,6 @@ export function CustomerPicker({ onPick, onClose, onClear }: Props) {
               {getErrorMessage(customers.error)}
             </p>
           )}
-          {customers.data?.items.length === 0 && (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              No se encontraron clientes. Crea uno con el botón &quot;Nuevo&quot;.
-            </p>
-          )}
           <ul className="divide-y">
             {customers.data?.items.map((c) => (
               <li key={c.id}>

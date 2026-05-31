@@ -1,7 +1,7 @@
 'use client';
 
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
-import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import { useReceiptBusinessInfo } from '@/features/config/application/hooks/use-business-info';
 import type { BusinessInfo } from '@/features/config/domain/types';
 import { useCustomer } from '@/features/customers/application/hooks/use-customers';
 import { usePaymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
@@ -10,7 +10,7 @@ import type { Sale } from '../../domain/types';
 // Defaults conservadores si la query aún no resolvió o el servidor no responde.
 // La fuente real de verdad son los settings en la tabla business_settings.
 const BUSINESS_FALLBACK: BusinessInfo = {
-  name: 'T1ET POS',
+  name: 'Soltryx',
   legalName: '',
   rnc: '',
   address: '',
@@ -71,7 +71,7 @@ export function Receipt({ sale }: { sale: Sale }) {
   const docTypeLabel = fiscalDoc
     ? DOC_TYPE_LABEL[fiscalDoc.docType] ?? fiscalDoc.docType
     : null;
-  const business = useBusinessInfo().data ?? BUSINESS_FALLBACK;
+  const business = useReceiptBusinessInfo(sale.branchId).data ?? BUSINESS_FALLBACK;
   const labelOf = usePaymentMethodLabel();
   const customer = useCustomer(sale.customerId ?? undefined).data;
   const hasAccountPayment = sale.payments.some((p) => p.method === 'ACCOUNT');

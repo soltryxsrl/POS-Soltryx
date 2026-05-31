@@ -5,8 +5,8 @@ import { formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useLowStock } from '../../application/hooks/use-reports';
 
-export function LowStockTable() {
-  const q = useLowStock();
+export function LowStockTable({ branchId }: { branchId?: string } = {}) {
+  const q = useLowStock(branchId);
 
   return (
     <div className="rounded-lg border bg-card">

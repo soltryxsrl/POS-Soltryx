@@ -1,4 +1,5 @@
 import { getAccessTokenFromStore } from '@/features/auth/application/stores/auth.store';
+import { getActiveBranchIdFromStore } from '@/features/branches/application/stores/active-branch.store';
 import { env } from '@/shared/lib/env';
 import { http } from '@/shared/lib/http-client';
 import type {
@@ -70,24 +71,24 @@ export const fiscalApiHttp = {
       },
     }),
 
-  // Reporte 607 (ventas con NCF a DGII)
-  get607: (from: string, to: string) =>
+  // Reporte 607 (ventas con NCF a DGII). branchId='all' = consolidado.
+  get607: (from: string, to: string, branchId?: string) =>
     http<Fiscal607Response>('/fiscal/reports/607', {
-      searchParams: { from, to },
+      searchParams: { from, to, branchId },
     }),
 
-  download607Txt: async (from: string, to: string): Promise<void> => {
-    await downloadReportTxt('607', from, to);
+  download607Txt: async (from: string, to: string, branchId?: string): Promise<void> => {
+    await downloadReportTxt('607', from, to, branchId);
   },
 
-  // Reporte 606 (compras con NCF de proveedores)
-  get606: (from: string, to: string) =>
+  // Reporte 606 (compras con NCF de proveedores). branchId='all' = consolidado.
+  get606: (from: string, to: string, branchId?: string) =>
     http<Fiscal606Response>('/fiscal/reports/606', {
-      searchParams: { from, to },
+      searchParams: { from, to, branchId },
     }),
 
-  download606Txt: async (from: string, to: string): Promise<void> => {
-    await downloadReportTxt('606', from, to);
+  download606Txt: async (from: string, to: string, branchId?: string): Promise<void> => {
+    await downloadReportTxt('606', from, to, branchId);
   },
 };
 
@@ -99,18 +100,24 @@ async function downloadReportTxt(
   kind: '606' | '607',
   from: string,
   to: string,
+  branchId?: string,
 ): Promise<void> {
   const token = getAccessTokenFromStore();
+  // Igual que http(): el archivo TXT debe respetar la SUCURSAL ACTIVA (header
+  // X-Branch-Id), o el download podría quedar en otra sucursal que la vista
+  // previa → 606/607 incorrecto enviado a la DGII.
+  const activeBranch = getActiveBranchIdFromStore();
+  const branchParam = branchId ? `&branchId=${encodeURIComponent(branchId)}` : '';
   const url = `${env.apiUrl.replace(
     /\/$/,
     '',
   )}/api/fiscal/reports/${kind}?from=${encodeURIComponent(
     from,
-  )}&to=${encodeURIComponent(to)}&format=txt`;
-  const res = await fetch(url, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  )}&to=${encodeURIComponent(to)}&format=txt${branchParam}`;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (activeBranch) headers['X-Branch-Id'] = activeBranch;
+  const res = await fetch(url, { credentials: 'include', headers });
   if (!res.ok) {
     throw new Error(`No se pudo descargar el ${kind} (HTTP ${res.status})`);
   }

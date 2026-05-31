@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -7,13 +8,13 @@ import {
   Banknote,
   BarChart3,
   Boxes,
+  Clock,
   CreditCard,
   Crown,
   Package,
   Receipt,
   ScanLine,
   Smartphone,
-  Sparkles,
   TrendingUp,
   Wallet,
   type LucideIcon,
@@ -50,6 +51,33 @@ function greeting(): string {
   if (h < 12) return 'Buenos días';
   if (h < 19) return 'Buenas tardes';
   return 'Buenas noches';
+}
+
+/**
+ * Reloj en vivo (tick cada segundo). Componente aislado para que solo él
+ * re-renderice y no todo el dashboard. Inicia en null y se setea en el cliente
+ * para evitar mismatch de hidratación (SSR no conoce la hora exacta).
+ */
+function LiveClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <span className="inline-flex items-center gap-1 tabular-nums">
+      <Clock className="h-3.5 w-3.5" />
+      {now
+        ? now.toLocaleTimeString('es-DO', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          })
+        : '—'}
+    </span>
+  );
 }
 
 function todayLong(): string {
@@ -212,14 +240,19 @@ function Hero({
 
       <div className="relative flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-white/80">
-            <Sparkles className="h-3.5 w-3.5" />
+          <div className="text-xs font-medium uppercase tracking-wider text-white/80">
             {greeting()}
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
             {name || 'Bienvenido'}
           </h1>
-          <p className="mt-1 text-sm capitalize text-white/85">{todayLong()}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-white/85">
+            <span className="capitalize">{todayLong()}</span>
+            <span className="text-white/40" aria-hidden>
+              ·
+            </span>
+            <LiveClock />
+          </div>
         </div>
 
         <div className="flex flex-col items-end gap-2">

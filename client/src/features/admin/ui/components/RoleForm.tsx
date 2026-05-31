@@ -23,7 +23,6 @@ interface Props {
 }
 
 interface FormState {
-  code: string;
   name: string;
   description: string;
   permissionIds: Set<string>;
@@ -31,11 +30,27 @@ interface FormState {
 
 function initialState(role?: AdminRole): FormState {
   return {
-    code: role?.code ?? '',
     name: role?.name ?? '',
     description: role?.description ?? '',
     permissionIds: new Set(role?.permissions.map((p) => p.id) ?? []),
   };
+}
+
+/**
+ * Deriva un código interno estable a partir del nombre del rol. El código no se
+ * muestra en el form (es un detalle interno); el backend exige el patrón
+ * ^[A-Z][A-Z0-9_]*$ y unicidad. Ej: "Encargado de almacén" → "ENCARGADO_DE_ALMACEN".
+ */
+function codeFromName(name: string): string {
+  const base = name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // quita acentos
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_') // todo lo no alfanumérico → _
+    .replace(/^_+|_+$/g, '') // sin _ al inicio/fin
+    .replace(/_{2,}/g, '_'); // colapsa __
+  if (!base) return 'ROL';
+  return /^[A-Z]/.test(base) ? base : `R_${base}`;
 }
 
 function groupByModule(perms: AdminPermission[]): Record<string, AdminPermission[]> {
@@ -105,7 +120,7 @@ export function RoleForm({ role, onSuccess, onCancel }: Props) {
         });
       } else {
         await create.mutateAsync({
-          code: form.code.toUpperCase(),
+          code: codeFromName(form.name),
           name: form.name,
           description: form.description || undefined,
           permissionIds,
@@ -119,26 +134,14 @@ export function RoleForm({ role, onSuccess, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField label="Código" required>
-          <Input
-            required
-            disabled={isEdit}
-            value={form.code}
-            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-            pattern="^[A-Z][A-Z0-9_]*$"
-            className="font-mono"
-            placeholder="WAREHOUSE_OPS"
-          />
-        </FormField>
-        <FormField label="Nombre" required>
-          <Input
-            required
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-        </FormField>
-      </div>
+      <FormField label="Nombre" required>
+        <Input
+          required
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder="Ej: Encargado de almacén"
+        />
+      </FormField>
 
       <FormField label="Descripción">
         <Input

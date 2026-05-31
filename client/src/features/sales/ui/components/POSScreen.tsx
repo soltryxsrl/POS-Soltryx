@@ -17,7 +17,6 @@ import { Cart } from './Cart';
 import { CategoryChips } from './CategoryChips';
 import { OpenItemDialog } from './OpenItemDialog';
 import { PaymentModal } from './PaymentModal';
-import { POSHeader } from './POSHeader';
 import { ProductSearch } from './ProductSearch';
 import { RecentProducts } from './RecentProducts';
 import { VariantPicker } from './VariantPicker';
@@ -142,10 +141,8 @@ export function POSScreen() {
   const parkedCount = parked.data?.length ?? 0;
 
   return (
-    <div className="space-y-3">
-      <POSHeader session={activeSession.data} />
-
-      <div className="grid gap-3 lg:grid-cols-[1fr_400px]">
+    <div className="flex flex-col gap-3 lg:h-full">
+      <div className="grid gap-3 lg:min-h-0 lg:flex-1 lg:grid-rows-1 lg:grid-cols-[1fr_400px]">
         <div className="flex min-h-0 flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
@@ -191,7 +188,7 @@ export function POSScreen() {
           <KeyboardHints />
         </div>
 
-        <div className="lg:h-[calc(100vh-260px)]">
+        <div className="min-h-0 lg:h-full">
           <Cart
             onCheckout={() => setShowPay(true)}
             onPark={cartHasItems ? () => setShowPark(true) : undefined}

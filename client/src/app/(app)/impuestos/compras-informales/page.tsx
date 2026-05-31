@@ -29,7 +29,7 @@ export default function ProveedoresInformalesPage() {
     <div className="space-y-6">
       <SectionHeader
         title="Compras a proveedores informales"
-        description="Registra una compra a un proveedor sin NCF propio. T1ET emite un E41 o B11 desde su secuencia y la compra aparece en el 606."
+        description="Registra una compra a un proveedor sin NCF propio. Soltryx emite un E41 o B11 desde su secuencia y la compra aparece en el 606."
         crumbs={[{ label: 'Impuestos' }]}
       />
 

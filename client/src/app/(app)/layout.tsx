@@ -18,6 +18,7 @@ import {
   FileText,
   Home,
   LogOut,
+  Menu,
   Package,
   Receipt,
   RotateCcw,
@@ -33,6 +34,10 @@ import {
 import { AuthGuard } from '@/features/auth/ui/components/AuthGuard';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { useLogout } from '@/features/auth/application/hooks/use-logout';
+import { useActiveSessionMine } from '@/features/cash/application/hooks/use-cash';
+import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import { BranchSwitcher } from '@/features/branches/ui/components/BranchSwitcher';
+import { POSHeader } from '@/features/sales/ui/components/POSHeader';
 import { cn } from '@/shared/lib/cn';
 import { VisualSettingsDialog } from '@/shared/ui/preferences/VisualSettingsDialog';
 
@@ -155,6 +160,7 @@ const NAV_ITEMS: NavItem[] = [
     permissions: [
       'users.read',
       'roles.read',
+      'branches.read',
       'settings.read',
       'customers.read',
       'suppliers.read',
@@ -164,6 +170,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { href: '/admin/users', label: 'Usuarios', permissions: ['users.read'] },
       { href: '/admin/roles', label: 'Roles', permissions: ['roles.read'] },
+      { href: '/admin/branches', label: 'Sucursales', permissions: ['branches.read'] },
       {
         href: '/admin/customers',
         label: 'Clientes',
@@ -250,8 +257,115 @@ function useSidebarCollapsed(): readonly [boolean, () => void] {
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
-      <DashboardShell>{children}</DashboardShell>
+      <AppShell>{children}</AppShell>
     </AuthGuard>
+  );
+}
+
+/**
+ * El POS corre en modo kiosco a pantalla completa (sin sidebar fijo ni la
+ * tarjeta del dashboard) para maximizar el área de trabajo. El resto del
+ * sistema usa el DashboardShell normal con sidebar.
+ */
+function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isPos = pathname === '/pos' || pathname.startsWith('/pos/');
+  return isPos ? <PosShell>{children}</PosShell> : <DashboardShell>{children}</DashboardShell>;
+}
+
+/**
+ * Marca de la app. Reutiliza el logo del negocio (el mismo de los recibos /
+ * e-CF) cuando está configurado en business_settings; si no, un cuadro con la
+ * inicial. El nombre del producto es "Soltryx".
+ */
+function BrandLogo({ withName = true }: { withName?: boolean }) {
+  const business = useBusinessInfo();
+  const logoUrl = business.data?.logoUrl ?? null;
+  return (
+    <span className="flex min-w-0 items-center gap-2.5">
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoUrl}
+          alt="Logo"
+          className="h-8 w-8 flex-shrink-0 rounded-lg object-contain"
+        />
+      ) : (
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-from to-brand-to text-sm font-bold text-white shadow-sm shadow-brand-from/30">
+          S
+        </span>
+      )}
+      {withName && (
+        <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+          Soltryx
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PosShell({ children }: { children: ReactNode }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const activeSession = useActiveSessionMine();
+
+  return (
+    <div className="flex h-screen flex-col bg-gradient-to-br from-brand-tint via-background to-brand-soft">
+      {/* Barra superior: menú + marca a la izquierda, info de turno a la derecha
+          (la info de turno vive aquí para no gastar una franja vertical aparte). */}
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-3 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Abrir menú"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Link href="/" className="flex-shrink-0" title="Ir al inicio">
+          <BrandLogo />
+        </Link>
+        <BranchSwitcher className="ml-1 flex-shrink-0" />
+        {activeSession.data && (
+          <div className="ml-auto min-w-0">
+            <POSHeader session={activeSession.data} />
+          </div>
+        )}
+      </header>
+
+      {/* Contenido a pantalla completa */}
+      <main className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">{children}</main>
+
+      {/* Menú deslizable (off-canvas) reutilizando el Sidebar */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuOpen(false)}
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+          />
+          <div
+            className="relative z-10 h-full animate-in fade-in slide-in-from-left duration-200"
+            onClickCapture={(e) => {
+              // Cierra el menú al pulsar cualquier enlace de navegación.
+              if ((e.target as HTMLElement).closest('a[href]')) setMenuOpen(false);
+            }}
+          >
+            <Sidebar
+              collapsed={false}
+              onToggle={() => {}}
+              onOpenSettings={() => {
+                setMenuOpen(false);
+                setSettingsOpen(true);
+              }}
+              variant="drawer"
+            />
+          </div>
+        </div>
+      )}
+      <VisualSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </div>
   );
 }
 
@@ -296,10 +410,12 @@ function Sidebar({
   collapsed,
   onToggle,
   onOpenSettings,
+  variant = 'docked',
 }: {
   collapsed: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
+  variant?: 'docked' | 'drawer';
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -307,22 +423,30 @@ function Sidebar({
     () => filterNav(NAV_ITEMS, user?.permissions ?? []),
     [user?.permissions],
   );
+  const isDrawer = variant === 'drawer';
 
   return (
     <aside
       className={cn(
-        'sticky top-5 flex h-[calc(100vh-2.5rem)] shrink-0 flex-col rounded-3xl border border-border bg-card shadow-xl shadow-brand-soft/40 transition-[width] duration-200',
-        collapsed ? 'w-[76px]' : 'w-60',
+        'flex shrink-0 flex-col bg-card shadow-xl shadow-brand-soft/40',
+        isDrawer
+          ? 'h-full w-64 border-r border-border'
+          : cn(
+              'sticky top-5 h-[calc(100vh-2.5rem)] rounded-3xl border border-border transition-[width] duration-200',
+              collapsed ? 'w-[76px]' : 'w-60',
+            ),
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-label={collapsed ? 'Expandir' : 'Colapsar'}
-        className="absolute -right-3 top-8 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-md transition hover:scale-110 hover:text-foreground hover:shadow-lg"
-      >
-        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-      </button>
+      {!isDrawer && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expandir' : 'Colapsar'}
+          className="absolute -right-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-md transition hover:scale-110 hover:text-foreground hover:shadow-lg"
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
+      )}
 
       <div
         className={cn(
@@ -330,20 +454,10 @@ function Sidebar({
           collapsed ? 'flex justify-center px-3' : 'px-5',
         )}
       >
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 min-w-0"
-          title="T1ET POS"
-        >
-          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-from to-brand-to text-sm font-bold text-white shadow-lg shadow-brand-from/30">
-            T1
-          </span>
-          {!collapsed && (
-            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-              T1ET POS
-            </span>
-          )}
+        <Link href="/" className="flex min-w-0 items-center" title="Soltryx">
+          <BrandLogo withName={!collapsed} />
         </Link>
+        {!collapsed && <BranchSwitcher className="mt-3" />}
       </div>
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">

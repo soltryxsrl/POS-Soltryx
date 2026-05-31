@@ -15,6 +15,9 @@ import type {
 export const cashApiHttp = {
   listRegisters: () => http<CashRegister[]>('/cash-registers', { searchParams: { isActive: true } }),
 
+  createRegister: (input: { name: string; code?: string }) =>
+    http<CashRegister>('/cash-registers', { method: 'POST', body: input }),
+
   getActiveMine: () =>
     http<CashSession | null>('/cash-sessions/active', { searchParams: { mine: 'true' } }),
 

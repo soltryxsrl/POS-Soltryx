@@ -40,6 +40,7 @@ export interface CreateAdminUserInput {
   fullName: string;
   password: string;
   roleIds?: string[];
+  branchId?: string;
   isActive?: boolean;
 }
 
@@ -49,6 +50,7 @@ export interface UpdateAdminUserInput {
   fullName?: string;
   password?: string;
   roleIds?: string[];
+  branchId?: string;
   isActive?: boolean;
 }
 

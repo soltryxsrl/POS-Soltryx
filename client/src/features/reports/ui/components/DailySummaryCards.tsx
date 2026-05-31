@@ -6,9 +6,9 @@ import { usePaymentMethodLabel } from '@/features/payment-methods/application/ho
 import { useDailySales } from '../../application/hooks/use-reports';
 import { StatCard } from './StatCard';
 
-export function DailySummaryCards({ date }: { date: string }) {
+export function DailySummaryCards({ date, branchId }: { date: string; branchId?: string }) {
   const labelOf = usePaymentMethodLabel();
-  const summary = useDailySales(date);
+  const summary = useDailySales(date, branchId);
 
   if (summary.isLoading) {
     return <div className="rounded-lg border bg-card p-6 text-center text-muted-foreground">Cargando resumen...</div>;

@@ -35,6 +35,8 @@ interface AuthBridge {
   getAccessToken: () => string | null;
   refresh: () => Promise<string | null>; // devuelve el nuevo accessToken o null si falló
   onAuthLost: () => void; // limpia el store y redirige
+  /** Sucursal activa seleccionada (solo si hay selección explícita). Null = usar HOME. */
+  getBranchId: () => string | null;
 }
 
 let auth: AuthBridge | null = null;
@@ -63,6 +65,12 @@ async function doFetch(path: string, opts: HttpRequestOptions, accessToken: stri
   };
   if (accessToken && !opts.skipAuth) {
     finalHeaders.Authorization = `Bearer ${accessToken}`;
+  }
+  // Sucursal activa: solo si hay selección explícita (admins). Sin header, el
+  // servidor usa la sucursal HOME del usuario (cajeros).
+  if (auth && !opts.skipAuth) {
+    const branchId = auth.getBranchId();
+    if (branchId) finalHeaders['X-Branch-Id'] = branchId;
   }
   return fetch(buildUrl(path, searchParams), {
     credentials: 'include',

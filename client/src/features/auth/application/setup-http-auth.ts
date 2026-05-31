@@ -1,4 +1,5 @@
 import { configureHttpAuth } from '@/shared/lib/http-client';
+import { getActiveBranchIdFromStore } from '@/features/branches/application/stores/active-branch.store';
 import { authApiHttp } from '../infrastructure/api/auth.api.http';
 import { getAccessTokenFromStore, useAuthStore } from './stores/auth.store';
 
@@ -26,5 +27,6 @@ export function setupHttpAuth(): void {
     onAuthLost: () => {
       useAuthStore.getState().clear();
     },
+    getBranchId: () => getActiveBranchIdFromStore(),
   });
 }

@@ -8,7 +8,7 @@ import { Button } from '@/shared/ui/controls/Button';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
-import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import { useReceiptBusinessInfo } from '@/features/config/application/hooks/use-business-info';
 import { usePaymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
 import { useCashRegisters, useSessionReport } from '../../application/hooks/use-cash';
 import { RD_DENOMINATIONS } from '../../application/math/denominations';
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function SessionReportDialog({ sessionId, onClose }: Props) {
-  const business = useBusinessInfo();
+  const business = useReceiptBusinessInfo();
   const labelOf = usePaymentMethodLabel();
   const registers = useCashRegisters();
   const { user } = useAuth();
@@ -63,7 +63,7 @@ export function SessionReportDialog({ sessionId, onClose }: Props) {
               />
             )}
             <div className="text-base font-bold uppercase">
-              {business.data?.name ?? 'T1ET POS'}
+              {business.data?.name ?? 'Soltryx'}
             </div>
             {business.data?.tagline && (
               <div className="text-[10px] italic">{business.data.tagline}</div>

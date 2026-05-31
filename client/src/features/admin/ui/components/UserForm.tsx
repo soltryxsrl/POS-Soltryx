@@ -9,6 +9,7 @@ import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
 import { Switch } from '@/shared/ui/controls/Switch';
+import { useBranches } from '@/features/branches/application/hooks/use-branches';
 import { useAdminRoles } from '../../application/hooks/use-admin-roles';
 import {
   useCreateAdminUser,
@@ -29,6 +30,7 @@ interface FormState {
   password: string;
   isActive: boolean;
   roleIds: string[];
+  branchId: string;
 }
 
 function initialState(user?: AdminUser): FormState {
@@ -39,12 +41,14 @@ function initialState(user?: AdminUser): FormState {
     password: '',
     isActive: user?.isActive ?? true,
     roleIds: user?.roles.map((r) => r.id) ?? [],
+    branchId: user?.branchId ?? '',
   };
 }
 
 export function UserForm({ user, onSuccess, onCancel }: Props) {
   const isEdit = !!user;
   const roles = useAdminRoles();
+  const branches = useBranches({ isActive: 'true', limit: 100 });
   const create = useCreateAdminUser();
   const update = useUpdateAdminUser(user?.id ?? '');
   const [form, setForm] = useState<FormState>(() => initialState(user));
@@ -68,6 +72,7 @@ export function UserForm({ user, onSuccess, onCancel }: Props) {
           fullName: form.fullName,
           isActive: form.isActive,
           roleIds: form.roleIds,
+          branchId: form.branchId || undefined,
         };
         if (form.password) payload.password = form.password;
         await update.mutateAsync(payload);
@@ -79,6 +84,7 @@ export function UserForm({ user, onSuccess, onCancel }: Props) {
           password: form.password,
           isActive: form.isActive,
           roleIds: form.roleIds,
+          branchId: form.branchId || undefined,
         });
       }
       onSuccess();
@@ -122,6 +128,21 @@ export function UserForm({ user, onSuccess, onCancel }: Props) {
           value={form.fullName}
           onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
         />
+      </FormField>
+
+      <FormField label="Sucursal">
+        <select
+          value={form.branchId}
+          onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
+          className="w-full rounded-xl border border-border/60 bg-background/60 px-3.5 py-2.5 text-sm outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
+        >
+          <option value="">— Sin sucursal (solo ADMIN) —</option>
+          {branches.data?.items.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
       </FormField>
 
       <FormField

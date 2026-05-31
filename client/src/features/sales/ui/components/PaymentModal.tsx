@@ -15,7 +15,10 @@ import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell
 import { cn } from '@/shared/lib/cn';
 import { useOnlineStatus } from '@/shared/lib/use-online-status';
 import { useCurrencies } from '@/features/currencies/application/hooks/use-currencies';
-import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import {
+  useBusinessInfo,
+  useReceiptBusinessInfo,
+} from '@/features/config/application/hooks/use-business-info';
 import { usePaymentMethods } from '@/features/payment-methods/application/hooks/use-payment-methods';
 import { useFiscalDocTypes } from '@/features/fiscal/application/hooks/use-fiscal';
 import { usePrinter } from '@/features/printing/application/use-printer';
@@ -107,6 +110,8 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
   });
   const business = useBusinessInfo();
   const priceIncludesTax = business.data?.priceIncludesTax ?? false;
+  // Encabezado del recibo con datos de la sucursal activa (RNC/nombre por local).
+  const receiptBusiness = useReceiptBusinessInfo();
   // Catálogo de formas de pago activas. El `code` ES la clase de comportamiento.
   const paymentMethods = usePaymentMethods({ activeOnly: true });
   const methodButtons =
@@ -490,7 +495,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
                     .printBytes(
                       buildReceiptBytes(
                         successSale.data!,
-                        business.data!,
+                        receiptBusiness.data ?? business.data!,
                         (m) => METHOD_LABEL[m] ?? m,
                       ),
                       true,

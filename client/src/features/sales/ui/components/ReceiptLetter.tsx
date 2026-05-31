@@ -1,7 +1,7 @@
 'use client';
 
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
-import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
+import { useReceiptBusinessInfo } from '@/features/config/application/hooks/use-business-info';
 import type { BusinessInfo } from '@/features/config/domain/types';
 import { useCustomer } from '@/features/customers/application/hooks/use-customers';
 import { usePaymentMethodLabel } from '@/features/payment-methods/application/hooks/use-payment-methods';
@@ -22,7 +22,7 @@ const DOC_TYPE_LABEL: Record<string, string> = {
 };
 
 const BUSINESS_FALLBACK: BusinessInfo = {
-  name: 'T1ET POS',
+  name: 'Soltryx',
   legalName: '',
   rnc: '',
   address: '',
@@ -57,7 +57,7 @@ function formatDateTime(iso: string): string {
  * monoespaciado — usa el font del sistema y deja margen generoso.
  */
 export function ReceiptLetter({ sale }: { sale: Sale }) {
-  const business = useBusinessInfo().data ?? BUSINESS_FALLBACK;
+  const business = useReceiptBusinessInfo(sale.branchId).data ?? BUSINESS_FALLBACK;
   const labelOf = usePaymentMethodLabel();
   const customer = useCustomer(sale.customerId ?? undefined).data;
   const fiscalDoc = sale.fiscalDocument;

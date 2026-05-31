@@ -29,7 +29,7 @@ export default function GastosMenoresPage() {
     <div className="space-y-6">
       <SectionHeader
         title="Gastos menores"
-        description="Combustible, parqueo, propinas a delivery y similares. T1ET emite un E43 o B13 que entra al 606."
+        description="Combustible, parqueo, propinas a delivery y similares. Soltryx emite un E43 o B13 que entra al 606."
         crumbs={[{ label: 'Impuestos' }]}
       />
 

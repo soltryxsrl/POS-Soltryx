@@ -45,44 +45,39 @@ export function POSHeader({ session }: Props) {
     Number(summary.data?.cashSales ?? 0) + Number(summary.data?.nonCashSales ?? 0);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-brand-tint via-card to-brand-soft shadow-sm shadow-brand-soft/40">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-gradient-to-br from-brand-from/20 to-brand-to/10 blur-3xl"
+    <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
+      <Stat
+        icon={<UserRound className="h-3.5 w-3.5" />}
+        label="Cajero"
+        value={user?.fullName ?? '—'}
       />
-      <div className="relative grid gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          icon={<UserRound className="h-4 w-4" />}
-          label="Cajero"
-          value={user?.fullName ?? '—'}
-          sub={user?.roles?.[0] ?? ''}
-        />
-        <Stat
-          icon={<Warehouse className="h-4 w-4" />}
-          label="Caja"
-          value={register?.name ?? register?.code ?? 'CR-001'}
-          sub={register?.code ?? ''}
-        />
-        <Stat
-          icon={<Clock className="h-4 w-4" />}
-          label="Turno abierto"
-          value={formatClock(session.openedAt)}
-          sub={`Hace ${formatElapsed(session.openedAt)}`}
-        />
-        <Stat
-          icon={<ReceiptText className="h-4 w-4" />}
-          label="Ventas del turno"
-          value={formatMoney(totalSales.toFixed(2))}
-          sub={
-            summary.data
-              ? `Efectivo ${formatMoney(summary.data.cashSales)}`
-              : 'cargando…'
-          }
-          accent
-        />
-      </div>
+      <Divider />
+      <Stat
+        icon={<Warehouse className="h-3.5 w-3.5" />}
+        label="Caja"
+        value={register?.name ?? register?.code ?? 'CR-001'}
+      />
+      <Divider />
+      <Stat
+        icon={<Clock className="h-3.5 w-3.5" />}
+        label="Turno"
+        value={formatClock(session.openedAt)}
+        sub={`hace ${formatElapsed(session.openedAt)}`}
+      />
+      <Divider />
+      <Stat
+        icon={<ReceiptText className="h-3.5 w-3.5" />}
+        label="Ventas turno"
+        value={formatMoney(totalSales.toFixed(2))}
+        sub={summary.data ? `Efectivo ${formatMoney(summary.data.cashSales)}` : '…'}
+        accent
+      />
     </div>
   );
+}
+
+function Divider() {
+  return <div aria-hidden className="h-7 w-px flex-shrink-0 bg-border/70" />;
 }
 
 function Stat({
@@ -99,24 +94,34 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex shrink-0 items-center gap-2 px-2">
       <div
         className={
           accent
-            ? 'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-from to-brand-to text-white shadow-sm shadow-brand-from/30'
-            : 'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-card text-brand-from shadow-sm shadow-brand-soft/40 ring-1 ring-border/60'
+            ? 'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-from to-brand-to text-white shadow-sm shadow-brand-from/30'
+            : 'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-card text-brand-from ring-1 ring-border/60'
         }
       >
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="flex flex-col whitespace-nowrap leading-tight">
+        <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
           {label}
-        </div>
-        <div className="truncate text-sm font-semibold text-foreground">{value}</div>
-        {sub && (
-          <div className="truncate text-[11px] text-muted-foreground">{sub}</div>
-        )}
+        </span>
+        <span
+          className={
+            accent
+              ? 'text-sm font-bold tabular-nums text-brand-from'
+              : 'text-sm font-semibold text-foreground'
+          }
+        >
+          {value}
+          {sub && (
+            <span className="ml-1 hidden text-[10px] font-normal text-muted-foreground sm:inline">
+              · {sub}
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

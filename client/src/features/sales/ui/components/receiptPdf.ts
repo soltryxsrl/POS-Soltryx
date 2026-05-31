@@ -4,7 +4,7 @@ import { paymentMethodLabel } from '@/features/payment-methods/application/hooks
 import type { Sale } from '../../domain/types';
 
 const BUSINESS = {
-  name: 'T1ET POS',
+  name: 'Soltryx',
   legalName: '',
   rnc: '',
   address: '',

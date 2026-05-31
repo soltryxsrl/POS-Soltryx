@@ -26,6 +26,15 @@ export function useCashRegisters() {
   });
 }
 
+export function useCreateCashRegister() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; code?: string }) =>
+      cashApiHttp.createRegister(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: cashKey.registers }),
+  });
+}
+
 export function useActiveSessionMine() {
   return useQuery({
     queryKey: cashKey.activeMine,

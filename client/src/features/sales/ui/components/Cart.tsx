@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Clock, HandCoins, MessageSquare, Minus, Plus, ShieldAlert, ShoppingBag, Sparkles, Trash2, UserCircle2, X } from 'lucide-react';
+import { Clock, HandCoins, MessageSquare, Minus, Percent, Plus, ShieldAlert, ShoppingBag, Sparkles, Tag, Trash2, UserCircle2, X } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { useOnlineStatus } from '@/shared/lib/use-online-status';
@@ -10,7 +10,7 @@ import { useBusinessInfo } from '@/features/config/application/hooks/use-busines
 import { usePromotions } from '@/features/promotions/application/hooks/use-promotions';
 import { usePreviewTotals } from '../../application/hooks/use-preview-totals';
 import { computeCartTotals } from '../../application/math/totals';
-import { useCartStore } from '../../application/stores/cart.store';
+import { useCartStore, type CartItem } from '../../application/stores/cart.store';
 
 interface Props {
   onCheckout: () => void;
@@ -27,17 +27,11 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
   const setTipTotal = useCartStore((s) => s.setTipTotal);
   const customer = useCartStore((s) => s.customer);
   const setCustomer = useCartStore((s) => s.setCustomer);
-  const setQuantity = useCartStore((s) => s.setQuantity);
-  const setDiscount = useCartStore((s) => s.setDiscount);
-  const setDiscountPct = useCartStore((s) => s.setDiscountPct);
-  const setDiscountMode = useCartStore((s) => s.setDiscountMode);
-  const setNotes = useCartStore((s) => s.setNotes);
   const setOrderDiscount = useCartStore((s) => s.setOrderDiscount);
   const orderDiscountMode = useCartStore((s) => s.orderDiscountMode);
   const orderDiscountPct = useCartStore((s) => s.orderDiscountPct);
   const setOrderDiscountPct = useCartStore((s) => s.setOrderDiscountPct);
   const setOrderDiscountMode = useCartStore((s) => s.setOrderDiscountMode);
-  const removeItem = useCartStore((s) => s.removeItem);
   const clear = useCartStore((s) => s.clear);
   const bump = useCartStore((s) => s.bump);
   const lastAddedKey = useCartStore((s) => s.lastAddedKey);
@@ -213,173 +207,43 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
             </p>
           </div>
         )}
-        {items.map((it) => {
-          const lineSubtotal = Number(it.unitPrice) * it.quantity;
-          const lineDiscount = Number(it.discount) || 0;
-          const lineNet = lineSubtotal - lineDiscount;
-          const displayName = it.variantName
-            ? `${it.productName} · ${it.variantName}`
-            : it.productName;
-          return (
-            <div
-              key={it.lineKey}
-              className={cn(
-                'group mb-1.5 rounded-xl border bg-background px-2.5 py-2 transition hover:border-brand-from/30 hover:shadow-sm',
-                flashKey === it.lineKey
-                  ? 'border-brand-from bg-brand-tint/40 ring-2 ring-brand-from/50'
-                  : 'border-border/60',
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="line-clamp-1 text-sm font-medium text-foreground">
-                    {displayName}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {it.sku} · {formatMoney(it.unitPrice)} {it.soldByWeight ? '/kg' : 'c/u'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeItem(it.lineKey)}
-                  className="rounded-md p-1.5 text-muted-foreground opacity-50 transition group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-                  title="Quitar línea"
-                  aria-label="Quitar línea"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-1.5 flex items-center gap-1.5">
-                {/* stepper */}
-                <div className="inline-flex items-center rounded-lg border border-border/60 bg-card">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(it.lineKey, it.quantity - 1)}
-                    className="flex h-9 w-9 items-center justify-center text-muted-foreground transition hover:text-brand-from"
-                    aria-label="Disminuir cantidad"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.001"
-                    value={it.quantity}
-                    onChange={(e) => setQuantity(it.lineKey, Number(e.target.value) || 0)}
-                    aria-label="Cantidad (admite decimales para venta por peso)"
-                    title="Admite decimales (venta por peso: 0.750, 1.5, etc.)"
-                    className="h-9 w-14 border-x border-border/60 bg-transparent text-center text-sm font-semibold tabular-nums outline-none focus:bg-brand-tint/40"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(it.lineKey, it.quantity + 1)}
-                    className="flex h-9 w-9 items-center justify-center text-muted-foreground transition hover:text-brand-from"
-                    aria-label="Aumentar cantidad"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {it.soldByWeight && (
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
-                    title="Producto por peso — cantidad en kilogramos"
-                  >
-                    kg
-                  </span>
-                )}
-
-                {/* descuento de línea: RD$ o % (toggle de unidad visible) */}
-                <div
-                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-border/60 bg-card pl-1 pr-1.5"
-                  title="Descuento de la línea (RD$ o %)"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDiscountMode(
-                        it.lineKey,
-                        it.discountMode === 'PERCENT' ? 'AMOUNT' : 'PERCENT',
-                      )
-                    }
-                    className="rounded-md border border-border bg-muted/60 px-1.5 py-1 text-[11px] font-bold text-foreground transition hover:border-brand-from/50 hover:bg-brand-tint hover:text-brand-from"
-                    title="Cambiar entre RD$ y % (toca para alternar)"
-                    aria-label="Cambiar unidad del descuento de la línea"
-                  >
-                    {it.discountMode === 'PERCENT' ? '%' : 'RD$'}
-                  </button>
-                  {it.discountMode === 'PERCENT' ? (
-                    <input
-                      value={it.discountPct}
-                      onChange={(e) => setDiscountPct(it.lineKey, e.target.value)}
-                      pattern="^\d+(\.\d{1,2})?$"
-                      inputMode="decimal"
-                      aria-label="Descuento de la línea en porcentaje"
-                      className="w-12 bg-transparent text-right text-xs tabular-nums outline-none placeholder:text-muted-foreground/50"
-                      placeholder="0"
-                    />
-                  ) : (
-                    <input
-                      value={it.discount}
-                      onChange={(e) => setDiscount(it.lineKey, e.target.value)}
-                      pattern="^\d+(\.\d{1,2})?$"
-                      inputMode="decimal"
-                      aria-label="Descuento de la línea en pesos dominicanos"
-                      className="w-16 bg-transparent text-right text-xs tabular-nums outline-none placeholder:text-muted-foreground/50"
-                      placeholder="0.00"
-                    />
-                  )}
-                </div>
-
-                <div className="ml-auto text-right">
-                  {lineDiscount > 0 && (
-                    <div className="text-[10px] text-muted-foreground line-through">
-                      {formatMoney(lineSubtotal)}
-                    </div>
-                  )}
-                  <div className="text-sm font-semibold tabular-nums text-foreground">
-                    {formatMoney(lineNet)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Nota por línea: input visible solo si ya hay texto, de lo contrario
-                  botón para mostrarlo. Mantiene la línea compacta para items normales. */}
-              <NoteRow
-                lineKey={it.lineKey}
-                value={it.notes}
-                onChange={(v) => setNotes(it.lineKey, v)}
-              />
-            </div>
-          );
-        })}
+        {items.map((it) => (
+          <CartLine key={it.lineKey} item={it} isFlashing={flashKey === it.lineKey} />
+        ))}
       </div>
 
-      {/* Totales */}
-      <div className="border-t border-border bg-gradient-to-b from-card to-brand-tint/30 px-4 py-3">
-        <div className="space-y-1.5 text-sm">
-          <Row label="Subtotal" value={formatMoney(totals.subtotal)} />
+      {/* Totales — compacto: desglose en una línea para no comerse la lista */}
+      <div className="border-t border-border bg-gradient-to-b from-card to-brand-tint/30 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>
+            Subtotal{' '}
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatMoney(totals.subtotal)}
+            </span>
+          </span>
           {Number(totals.discountTotal) > 0 && (
-            <Row
-              label="Desc. líneas"
-              value={`−${formatMoney(totals.discountTotal)}`}
-              negative
-            />
+            <span>
+              Desc.{' '}
+              <span className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                −{formatMoney(totals.discountTotal)}
+              </span>
+            </span>
           )}
-          <Row
-            label={priceIncludesTax ? 'ITBIS incluido' : 'ITBIS / Impuestos'}
-            value={formatMoney(totals.taxTotal)}
-            muted
-          />
+          <span>
+            {priceIncludesTax ? 'ITBIS incl.' : 'ITBIS'}{' '}
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatMoney(totals.taxTotal)}
+            </span>
+          </span>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card px-2 py-1.5">
+        <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1">
           <label
-            className="text-xs font-medium text-muted-foreground"
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
             htmlFor="order-discount-input"
           >
-            Descuento orden
+            <Tag className="h-3 w-3" />
+            Descuento a toda la orden
           </label>
           <div className="flex items-center gap-1">
             <button
@@ -425,7 +289,7 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
         {Number(totals.orderDiscount) > 0 && (
           <div className="mt-1.5 text-sm">
             <Row
-              label="Descuento aplicado"
+              label="Descuento de orden aplicado"
               value={`−${formatMoney(totals.orderDiscount)}`}
               negative
             />
@@ -460,7 +324,7 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
           <div className="mt-2 space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
             <div className="flex items-center gap-1.5 font-semibold">
               <Sparkles className="h-3 w-3" />
-              Promociones aplicadas
+              Promociones (automáticas)
             </div>
             <ul className="space-y-0.5 pl-4">
               {promoApplied.map((p) => (
@@ -481,19 +345,6 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
           </div>
         )}
 
-        {/* Total */}
-        <div className="mt-3 flex items-end justify-between rounded-xl bg-gradient-to-br from-brand-from to-brand-to px-3 py-2.5 text-white shadow-sm shadow-brand-from/30">
-          <div>
-            <div className="text-[10px] font-medium uppercase tracking-wider text-white/80">
-              Total a cobrar
-            </div>
-            <div className="text-2xl font-bold tabular-nums">
-              {formatMoney(totals.total)}
-            </div>
-          </div>
-          <ShoppingBag className="h-7 w-7 text-white/40" />
-        </div>
-
         {!online && (
           <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
             Sin conexión: el carrito queda guardado, pero el cobro se habilita al
@@ -501,28 +352,39 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
           </p>
         )}
 
-        <Button
-          type="button"
-          size="lg"
-          onClick={onCheckout}
-          disabled={!canCheckout || !online}
-          className="mt-3 w-full"
-          title={online ? 'Cobrar (F2)' : 'Sin conexión: no puedes cobrar'}
-        >
-          Cobrar
-          <span className="ml-1 hidden rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider sm:inline">
-            F2
-          </span>
-        </Button>
+        {/* Total + Cobrar en la misma fila para ahorrar alto vertical */}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="flex flex-col justify-center rounded-xl bg-gradient-to-br from-brand-from to-brand-to px-3 py-2 text-white shadow-sm shadow-brand-from/30">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-white/80">
+              Total a cobrar
+            </span>
+            <span className="text-xl font-bold leading-tight tabular-nums">
+              {formatMoney(totals.total)}
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            onClick={onCheckout}
+            disabled={!canCheckout || !online}
+            className="h-full w-full text-base"
+            title={online ? 'Cobrar (F2)' : 'Sin conexión: no puedes cobrar'}
+          >
+            Cobrar
+            <span className="ml-1 hidden rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider sm:inline">
+              F2
+            </span>
+          </Button>
+        </div>
 
         {onPark && (
           <Button
             type="button"
             variant="outline"
-            size="md"
+            size="sm"
             onClick={onPark}
             disabled={items.length === 0}
-            className="mt-2 w-full"
+            className="mt-1.5 w-full"
             title="Guardar para después (F4)"
           >
             <Clock className="h-4 w-4" />
@@ -533,6 +395,202 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Una línea del carrito. Fila limpia por defecto (nombre + cantidad + total);
+ * el descuento de la línea vive detrás del botón "Desc." y se muestra como chip
+ * (−RD$X / −Y%) cuando está activo, para que nunca se confunda con el precio.
+ */
+function CartLine({ item: it, isFlashing }: { item: CartItem; isFlashing: boolean }) {
+  const setQuantity = useCartStore((s) => s.setQuantity);
+  const setDiscount = useCartStore((s) => s.setDiscount);
+  const setDiscountPct = useCartStore((s) => s.setDiscountPct);
+  const setDiscountMode = useCartStore((s) => s.setDiscountMode);
+  const setNotes = useCartStore((s) => s.setNotes);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const [discOpen, setDiscOpen] = useState(false);
+
+  const lineSubtotal = Number(it.unitPrice) * it.quantity;
+  const lineDiscount = Number(it.discount) || 0;
+  const lineNet = lineSubtotal - lineDiscount;
+  const hasDiscount = lineDiscount > 0;
+  const displayName = it.variantName
+    ? `${it.productName} · ${it.variantName}`
+    : it.productName;
+  const isPercent = it.discountMode === 'PERCENT';
+  const chipLabel =
+    isPercent && Number(it.discountPct) > 0
+      ? `−${it.discountPct}%`
+      : `−${formatMoney(it.discount)}`;
+
+  return (
+    <div
+      className={cn(
+        'group mb-1.5 rounded-xl border bg-background px-2.5 py-2 transition hover:border-brand-from/30 hover:shadow-sm',
+        isFlashing
+          ? 'border-brand-from bg-brand-tint/40 ring-2 ring-brand-from/50'
+          : 'border-border/60',
+      )}
+    >
+      {/* Fila A: nombre · total de la línea · quitar */}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-1 text-sm font-medium text-foreground">
+            {displayName}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {it.sku} · {formatMoney(it.unitPrice)} {it.soldByWeight ? '/kg' : 'c/u'}
+          </div>
+        </div>
+        <div className="text-right">
+          {hasDiscount && (
+            <div className="text-[10px] tabular-nums text-muted-foreground line-through">
+              {formatMoney(lineSubtotal)}
+            </div>
+          )}
+          <div className="text-sm font-bold tabular-nums text-foreground">
+            {formatMoney(lineNet)}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => removeItem(it.lineKey)}
+          className="-mr-1 -mt-1 rounded-md p-1.5 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+          title="Quitar línea"
+          aria-label="Quitar línea"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Fila C: cantidad + botón de descuento (oculto por defecto) */}
+      <div className="mt-2 flex items-center gap-2">
+        <div className="inline-flex items-center rounded-lg border border-border/60 bg-card">
+          <button
+            type="button"
+            onClick={() => setQuantity(it.lineKey, it.quantity - 1)}
+            className="flex h-10 w-10 items-center justify-center text-muted-foreground transition hover:text-brand-from"
+            aria-label="Disminuir cantidad"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <input
+            type="number"
+            min={0}
+            step="0.001"
+            value={it.quantity}
+            onChange={(e) => setQuantity(it.lineKey, Number(e.target.value) || 0)}
+            aria-label="Cantidad (admite decimales para venta por peso)"
+            title="Admite decimales (venta por peso: 0.750, 1.5, etc.)"
+            className="h-10 w-14 border-x border-border/60 bg-transparent text-center text-sm font-semibold tabular-nums outline-none focus:bg-brand-tint/40"
+          />
+          <button
+            type="button"
+            onClick={() => setQuantity(it.lineKey, it.quantity + 1)}
+            className="flex h-10 w-10 items-center justify-center text-muted-foreground transition hover:text-brand-from"
+            aria-label="Aumentar cantidad"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        {it.soldByWeight && (
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            title="Producto por peso — cantidad en kilogramos"
+          >
+            kg
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setDiscOpen((o) => !o)}
+          aria-expanded={discOpen}
+          className={cn(
+            'ml-auto inline-flex h-10 items-center gap-1 rounded-lg border px-2.5 text-xs font-semibold transition',
+            hasDiscount
+              ? 'border-brand-from/40 bg-brand-tint text-brand-from'
+              : 'border-border/60 bg-card text-muted-foreground hover:border-brand-from/40 hover:text-brand-from',
+          )}
+          title="Descuento de esta línea"
+        >
+          <Percent className="h-3.5 w-3.5" />
+          {hasDiscount ? chipLabel : 'Desc.'}
+        </button>
+      </div>
+
+      {/* Editor de descuento de la línea (colapsado) */}
+      {discOpen && (
+        <div className="mt-2 rounded-lg border border-border/60 bg-card px-2.5 py-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] font-medium text-muted-foreground">
+              Descuento de esta línea
+            </span>
+            {hasDiscount && (
+              <span className="text-[11px] font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                −{formatMoney(it.discount)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex flex-shrink-0 overflow-hidden rounded-lg border border-border/60">
+              <button
+                type="button"
+                onClick={() => setDiscountMode(it.lineKey, 'AMOUNT')}
+                className={cn(
+                  'px-2.5 py-2 text-xs font-bold transition',
+                  !isPercent
+                    ? 'bg-brand-from text-white'
+                    : 'bg-card text-muted-foreground hover:text-foreground',
+                )}
+              >
+                RD$
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscountMode(it.lineKey, 'PERCENT')}
+                className={cn(
+                  'px-2.5 py-2 text-xs font-bold transition',
+                  isPercent
+                    ? 'bg-brand-from text-white'
+                    : 'bg-card text-muted-foreground hover:text-foreground',
+                )}
+              >
+                %
+              </button>
+            </div>
+            {isPercent ? (
+              <input
+                value={it.discountPct}
+                onChange={(e) => setDiscountPct(it.lineKey, e.target.value)}
+                pattern="^\d+(\.\d{1,2})?$"
+                inputMode="decimal"
+                autoFocus
+                aria-label="Descuento de la línea en porcentaje"
+                className="h-10 flex-1 rounded-lg border border-border/60 bg-background px-2.5 text-right text-sm tabular-nums outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
+                placeholder="0"
+              />
+            ) : (
+              <input
+                value={it.discount}
+                onChange={(e) => setDiscount(it.lineKey, e.target.value)}
+                pattern="^\d+(\.\d{1,2})?$"
+                inputMode="decimal"
+                autoFocus
+                aria-label="Descuento de la línea en pesos dominicanos"
+                className="h-10 flex-1 rounded-lg border border-border/60 bg-background px-2.5 text-right text-sm tabular-nums outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
+                placeholder="0.00"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      <NoteRow lineKey={it.lineKey} value={it.notes} onChange={(v) => setNotes(it.lineKey, v)} />
     </div>
   );
 }

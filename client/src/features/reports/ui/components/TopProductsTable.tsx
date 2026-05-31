@@ -8,10 +8,11 @@ interface Props {
   from?: string;
   to?: string;
   limit?: number;
+  branchId?: string;
 }
 
-export function TopProductsTable({ from, to, limit = 10 }: Props) {
-  const q = useTopProducts({ from, to, limit });
+export function TopProductsTable({ from, to, limit = 10, branchId }: Props) {
+  const q = useTopProducts({ from, to, limit, branchId });
 
   return (
     <div className="rounded-lg border bg-card">

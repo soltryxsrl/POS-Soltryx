@@ -3,6 +3,8 @@ export interface AuthUser {
   email: string;
   username: string;
   fullName: string;
+  /** Sucursal HOME del usuario. Null para ADMIN sin sucursal. */
+  branchId: string | null;
   roles: string[];
   permissions: string[];
 }
