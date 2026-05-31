@@ -9,6 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import {
+  applyBranchFilter,
+  assertSameBranch,
+} from '../../common/branch/branch-scope.util';
+import {
   UNIT_OF_WORK,
   type UnitOfWork,
 } from '../../common/persistence/unit-of-work.port';
@@ -91,7 +95,7 @@ export class PurchasesService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(q: ListPurchaseOrdersQuery): Promise<PurchaseOrdersListResponse> {
+  async list(q: ListPurchaseOrdersQuery, branchId: string): Promise<PurchaseOrdersListResponse> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
     const sort = resolveSort(
@@ -112,6 +116,7 @@ export class PurchasesService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .skip(offset)
       .take(limit);
+    applyBranchFilter(qb, 'po', branchId);
     if (q.q) {
       qb.andWhere('LOWER(po.orderNumber) LIKE :term', {
         term: `%${q.q.toLowerCase()}%`,
@@ -130,9 +135,10 @@ export class PurchasesService {
     };
   }
 
-  async findById(id: string): Promise<PurchaseOrderResponse> {
+  async findById(id: string, branchId: string): Promise<PurchaseOrderResponse> {
     const row = await this.orders.findOne({ where: { id }, relations: { items: true } });
     if (!row) throw new NotFoundException(`Orden de compra ${id} no encontrada`);
+    assertSameBranch(row.branchId, branchId);
     const supplierMap = await this.loadSupplierNames([row.supplierId]);
     return toResponse(row, supplierMap.get(row.supplierId) ?? '?');
   }
@@ -140,9 +146,11 @@ export class PurchasesService {
   async create(
     dto: CreatePurchaseOrderRequestDto,
     createdById: string,
+    branchId: string,
   ): Promise<PurchaseOrderResponse> {
     const supplier = await this.suppliers.findOne({ where: { id: dto.supplierId } });
     if (!supplier) throw new NotFoundException(`Proveedor ${dto.supplierId} no encontrado`);
+    assertSameBranch(supplier.branchId, branchId);
     if (!supplier.isActive) {
       throw new ConflictException(`Proveedor ${supplier.tradeName} está inactivo`);
     }
@@ -232,7 +240,7 @@ export class PurchasesService {
       }
 
       const po = ordersRepo.create({
-        branchId: supplier.branchId ?? null,
+        branchId,
         orderNumber,
         supplierId: supplier.id,
         status: PurchaseOrderStatus.PENDING,
@@ -260,9 +268,11 @@ export class PurchasesService {
     id: string,
     dto: ReceivePurchaseOrderRequestDto,
     userId: string,
+    branchId: string,
   ): Promise<PurchaseOrderResponse> {
     const po = await this.orders.findOne({ where: { id }, relations: { items: true } });
     if (!po) throw new NotFoundException(`Orden ${id} no encontrada`);
+    assertSameBranch(po.branchId, branchId);
     if (
       po.status !== PurchaseOrderStatus.PENDING &&
       po.status !== PurchaseOrderStatus.PARTIAL
@@ -363,9 +373,11 @@ export class PurchasesService {
     id: string,
     dto: CancelPurchaseOrderRequestDto,
     userId: string,
+    branchId: string,
   ): Promise<PurchaseOrderResponse> {
     const po = await this.orders.findOne({ where: { id }, relations: { items: true } });
     if (!po) throw new NotFoundException(`Orden ${id} no encontrada`);
+    assertSameBranch(po.branchId, branchId);
     if (po.status === PurchaseOrderStatus.CANCELLED) {
       throw new ConflictException('La orden ya está cancelada');
     }

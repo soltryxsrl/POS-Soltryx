@@ -24,6 +24,8 @@ export interface EvaluatorCartLine {
 
 export interface EvaluatorCart {
   lines: EvaluatorCartLine[];
+  /** Sucursal de la venta: solo se evalúan promociones de esa sucursal. */
+  branchId: string | null;
 }
 
 /**
@@ -96,6 +98,7 @@ export class PromotionEvaluatorService {
       .createQueryBuilder('p')
       .where('p.deletedAt IS NULL')
       .andWhere('p.isActive = true')
+      .andWhere('p.branchId = :branchId', { branchId: cart.branchId })
       .andWhere('(p.validFrom IS NULL OR p.validFrom <= :now)', { now })
       .andWhere('(p.validUntil IS NULL OR p.validUntil >= :now)', { now })
       .orderBy('p.priority', 'DESC')

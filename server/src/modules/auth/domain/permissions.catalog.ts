@@ -120,6 +120,13 @@ export const PERMISSIONS = {
   // --- Formas de pago ---
   PAYMENT_METHODS_READ:   { code: 'payment-methods.read',   name: 'Ver formas de pago',                 module: 'payment-methods' },
   PAYMENT_METHODS_MANAGE: { code: 'payment-methods.manage', name: 'Configurar formas de pago (nombre, referencia, default)', module: 'payment-methods' },
+
+  // --- Sucursales (multi-branch) ---
+  BRANCHES_READ:   { code: 'branches.read',   name: 'Ver sucursales',      module: 'branches' },
+  BRANCHES_CREATE: { code: 'branches.create', name: 'Crear sucursales',    module: 'branches' },
+  BRANCHES_UPDATE: { code: 'branches.update', name: 'Editar sucursales',   module: 'branches' },
+  BRANCHES_DELETE: { code: 'branches.delete', name: 'Eliminar sucursales', module: 'branches' },
+  BRANCHES_SWITCH: { code: 'branches.switch', name: 'Cambiar de sucursal activa (ver todas)', module: 'branches' },
 } as const satisfies Record<string, PermissionDefinition>;
 
 export const ALL_PERMISSIONS: readonly PermissionDefinition[] = Object.values(PERMISSIONS);
@@ -187,6 +194,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]>
     PERMISSIONS.TAX_TYPES_MANAGE.code,
     PERMISSIONS.PAYMENT_METHODS_READ.code,
     PERMISSIONS.PAYMENT_METHODS_MANAGE.code,
+    // Sucursales: el gerente puede ver y cambiar de sucursal activa.
+    PERMISSIONS.BRANCHES_READ.code,
+    PERMISSIONS.BRANCHES_SWITCH.code,
   ],
   CASHIER: [
     PERMISSIONS.PRODUCTS_READ.code,
@@ -218,5 +228,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]>
     PERMISSIONS.TAX_TYPES_READ.code,
     // Formas de pago: el cajero necesita ver las activas para cobrar
     PERMISSIONS.PAYMENT_METHODS_READ.code,
+    // Sucursales: el cajero solo ve (queda fijado a su sucursal, no cambia).
+    PERMISSIONS.BRANCHES_READ.code,
   ],
 };

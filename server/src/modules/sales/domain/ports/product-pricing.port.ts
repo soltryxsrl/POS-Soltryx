@@ -4,6 +4,8 @@ export const PRODUCT_PRICING_PORT = Symbol('PRODUCT_PRICING_PORT');
 
 export interface ProductPricingSnapshot {
   id: string;
+  /** Sucursal dueña del producto (anti-IDOR: debe coincidir con la de la venta). */
+  branchId: string | null;
   name: string;
   sku: string;
   salePrice: string;

@@ -124,7 +124,7 @@ export class Fiscal607Service {
    * asignada, y la nota de crédito se reporta como un row aparte que apunta
    * a la original via "NCF modificado".
    */
-  async generate(from: string, to: string): Promise<{
+  async generate(from: string, to: string, branchId: string | null): Promise<{
     rows: Fiscal607Row[];
     summary: Fiscal607Summary;
   }> {
@@ -147,6 +147,8 @@ export class Fiscal607Service {
     const docsRaw = await this.docs
       .createQueryBuilder('d')
       .where('d.issueDate BETWEEN :from AND :to', { from: fromDate, to: toDate })
+      // branchId null = consolidado (todas las sucursales).
+      .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .andWhere('d.docType IN (:...types)', { types: SALE_TYPES })
       .andWhere('d.saleId IS NOT NULL')
       .orderBy('d.issueDate', 'ASC')

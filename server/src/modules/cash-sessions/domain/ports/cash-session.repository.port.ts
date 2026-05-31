@@ -28,6 +28,7 @@ export interface ListSessionsFilter {
   status?: CashSessionStatus;
   cashRegisterId?: string;
   openedById?: string;
+  branchId?: string;
   from?: Date;
   to?: Date;
   limit?: number;

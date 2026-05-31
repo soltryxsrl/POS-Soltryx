@@ -7,6 +7,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ActiveBranch } from '../../common/branch/active-branch.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
@@ -24,14 +25,14 @@ export class PurchasesController {
 
   @Get()
   @RequirePermissions('purchases.read')
-  list(@Query() q: ListPurchaseOrdersQuery) {
-    return this.service.list(q);
+  list(@Query() q: ListPurchaseOrdersQuery, @ActiveBranch() branchId: string) {
+    return this.service.list(q, branchId);
   }
 
   @Get(':id')
   @RequirePermissions('purchases.read')
-  findById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findById(id);
+  findById(@Param('id', ParseUUIDPipe) id: string, @ActiveBranch() branchId: string) {
+    return this.service.findById(id, branchId);
   }
 
   @Post()
@@ -39,8 +40,9 @@ export class PurchasesController {
   create(
     @Body() dto: CreatePurchaseOrderRequestDto,
     @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
   ) {
-    return this.service.create(dto, user.id);
+    return this.service.create(dto, user.id, branchId);
   }
 
   @Post(':id/receive')
@@ -49,8 +51,9 @@ export class PurchasesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReceivePurchaseOrderRequestDto,
     @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
   ) {
-    return this.service.receive(id, dto, user.id);
+    return this.service.receive(id, dto, user.id, branchId);
   }
 
   @Post(':id/cancel')
@@ -59,7 +62,8 @@ export class PurchasesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelPurchaseOrderRequestDto,
     @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
   ) {
-    return this.service.cancel(id, dto, user.id);
+    return this.service.cancel(id, dto, user.id, branchId);
   }
 }

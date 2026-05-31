@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -6,8 +7,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, EntityManager, IsNull, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, IsNull, Repository } from 'typeorm';
+import { CategoryOrmEntity } from '../categories/category.orm-entity';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import {
+  applyBranchFilter,
+  assertSameBranch,
+} from '../../common/branch/branch-scope.util';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../common/persistence/unit-of-work.port';
 import {
   STOCK_MOVEMENT_RECORDER,
@@ -62,6 +68,19 @@ export interface VariantResponse {
   isActive: boolean;
 }
 
+export interface CloneCatalogResult {
+  categoriesCreated: number;
+  productsCreated: number;
+  variantsCreated: number;
+  kitComponentsCreated: number;
+  barcodesCreated: number;
+  /** Códigos de barras del origen que ya existían en destino y se descartaron. */
+  barcodesSkipped: number;
+  /** Componentes de kit que no se pudieron remapear (componente borrado en origen). */
+  kitComponentsSkipped: number;
+  skipped: number;
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -83,7 +102,7 @@ export class ProductsService {
     private readonly stockRecorder: StockMovementRecorder | null,
   ) {}
 
-  async list(q: ListProductsQuery): Promise<PagedProducts> {
+  async list(q: ListProductsQuery, branchId: string): Promise<PagedProducts> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
     const sort = resolveSort(
@@ -106,6 +125,7 @@ export class ProductsService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .take(limit)
       .skip(offset);
+    applyBranchFilter(qb, 'p', branchId);
 
     if (q.q) {
       const term = `%${q.q.toLowerCase()}%`;
@@ -139,12 +159,13 @@ export class ProductsService {
     return { items, total, limit, offset };
   }
 
-  async findById(id: string): Promise<ProductOrmEntity> {
+  async findById(id: string, branchId?: string): Promise<ProductOrmEntity> {
     const p = await this.repo.findOne({
       where: { id, deletedAt: IsNull() },
       relations: { category: true },
     });
     if (!p) throw new NotFoundException(`Producto ${id} no encontrado`);
+    if (branchId) assertSameBranch(p.branchId, branchId);
     return p;
   }
 
@@ -152,10 +173,14 @@ export class ProductsService {
    * Crea producto y, si se provee `initialStock > 0`, registra un movimiento PURCHASE
    * — todo dentro de la misma transacción.
    */
-  async create(dto: CreateProductDto, actorUserId: string): Promise<ProductOrmEntity> {
+  async create(
+    dto: CreateProductDto,
+    actorUserId: string,
+    branchId: string,
+  ): Promise<ProductOrmEntity> {
     return this.uow.run(async ({ manager }) => {
-      await this.assertSkuFree(manager, dto.sku);
-      if (dto.barcode) await this.assertBarcodeFreeAny(manager, dto.barcode);
+      await this.assertSkuFree(manager, dto.sku, branchId);
+      if (dto.barcode) await this.assertBarcodeFreeAny(manager, dto.barcode, branchId);
 
       // Si se referencia un tipo de ITBIS, la tasa sale del catálogo (no del dto).
       const taxTypeCode = dto.taxTypeCode || null;
@@ -164,6 +189,7 @@ export class ProductsService {
         : (dto.taxRate ?? '0.00');
 
       const product = manager.create(ProductOrmEntity, {
+        branchId,
         name: dto.name,
         sku: dto.sku,
         barcode: dto.barcode ?? null,
@@ -186,6 +212,7 @@ export class ProductsService {
       // como primary. Así la búsqueda por barcode lo encuentra desde el día 1.
       if (dto.barcode) {
         await manager.insert(ProductBarcodeOrmEntity, {
+          branchId,
           productId: saved.id,
           barcode: dto.barcode,
           isPrimary: true,
@@ -217,8 +244,8 @@ export class ProductsService {
 
   // --- Barcodes (múltiples por producto) ---
 
-  async listBarcodes(productId: string): Promise<ProductBarcodeResponse[]> {
-    await this.findById(productId); // valida que existe
+  async listBarcodes(productId: string, branchId: string): Promise<ProductBarcodeResponse[]> {
+    await this.findById(productId, branchId); // valida que existe + pertenece a la sucursal
     const rows = await this.barcodes.find({
       where: { productId },
       order: { isPrimary: 'DESC', createdAt: 'ASC' },
@@ -229,12 +256,13 @@ export class ProductsService {
   async addBarcode(
     productId: string,
     barcode: string,
-    makePrimary = false,
+    makePrimary: boolean,
+    branchId: string,
   ): Promise<ProductBarcodeResponse> {
     const trimmed = barcode.trim();
     if (!trimmed) throw new ConflictException('Barcode no puede estar vacío');
-    await this.findById(productId);
-    await this.assertBarcodeFreeAny(this.repo.manager, trimmed);
+    await this.findById(productId, branchId);
+    await this.assertBarcodeFreeAny(this.repo.manager, trimmed, branchId);
 
     return this.uow.run(async ({ manager }) => {
       // Si va a ser primary, primero quitamos cualquier otro primary del producto.
@@ -249,6 +277,7 @@ export class ProductsService {
       }
       const saved = await manager.save(
         manager.create(ProductBarcodeOrmEntity, {
+          branchId,
           productId,
           barcode: trimmed,
           isPrimary: makePrimary,
@@ -273,7 +302,8 @@ export class ProductsService {
     });
   }
 
-  async setPrimaryBarcode(productId: string, barcodeId: string): Promise<void> {
+  async setPrimaryBarcode(productId: string, barcodeId: string, branchId: string): Promise<void> {
+    await this.findById(productId, branchId);
     const bc = await this.barcodes.findOne({ where: { id: barcodeId, productId } });
     if (!bc) throw new NotFoundException(`Barcode ${barcodeId} no pertenece al producto`);
 
@@ -289,7 +319,8 @@ export class ProductsService {
     });
   }
 
-  async removeBarcode(productId: string, barcodeId: string): Promise<void> {
+  async removeBarcode(productId: string, barcodeId: string, branchId: string): Promise<void> {
+    await this.findById(productId, branchId);
     const bc = await this.barcodes.findOne({ where: { id: barcodeId, productId } });
     if (!bc) throw new NotFoundException(`Barcode ${barcodeId} no pertenece al producto`);
 
@@ -311,13 +342,13 @@ export class ProductsService {
     });
   }
 
-  async update(id: string, dto: UpdateProductDto): Promise<ProductOrmEntity> {
-    const current = await this.findById(id);
+  async update(id: string, dto: UpdateProductDto, branchId: string): Promise<ProductOrmEntity> {
+    const current = await this.findById(id, branchId);
     if (dto.sku && dto.sku !== current.sku) {
-      await this.assertSkuFree(this.repo.manager, dto.sku, id);
+      await this.assertSkuFree(this.repo.manager, dto.sku, branchId, id);
     }
     if (dto.barcode && dto.barcode !== current.barcode) {
-      await this.assertBarcodeFreeAny(this.repo.manager, dto.barcode, id);
+      await this.assertBarcodeFreeAny(this.repo.manager, dto.barcode, branchId, id);
     }
 
     // Aplicamos solo campos permitidos — stock NO se toca aquí.
@@ -350,8 +381,8 @@ export class ProductsService {
 
   // --- Variants ---
 
-  async listVariants(productId: string): Promise<VariantResponse[]> {
-    await this.findById(productId);
+  async listVariants(productId: string, branchId: string): Promise<VariantResponse[]> {
+    await this.findById(productId, branchId);
     const rows = await this.variants.find({
       where: { productId, deletedAt: IsNull() },
       order: { createdAt: 'ASC' },
@@ -363,19 +394,21 @@ export class ProductsService {
     productId: string,
     dto: CreateVariantDto,
     actorUserId: string,
+    branchId: string,
   ): Promise<VariantResponse> {
-    const product = await this.findById(productId);
+    const product = await this.findById(productId, branchId);
     if (product.isKit) {
       throw new ConflictException(
         'Un producto kit no puede tener variantes. Desactiva el flag isKit primero.',
       );
     }
-    await this.assertVariantSkuFree(this.repo.manager, dto.sku);
+    await this.assertVariantSkuFree(this.repo.manager, dto.sku, branchId);
     if (dto.barcode) {
-      await this.assertVariantBarcodeFree(this.repo.manager, dto.barcode);
+      await this.assertVariantBarcodeFree(this.repo.manager, dto.barcode, branchId);
     }
     return this.uow.run(async ({ manager }) => {
       const variant = manager.create(ProductVariantOrmEntity, {
+        branchId,
         productId,
         name: dto.name,
         sku: dto.sku,
@@ -420,7 +453,9 @@ export class ProductsService {
     productId: string,
     variantId: string,
     dto: UpdateVariantDto,
+    branchId: string,
   ): Promise<VariantResponse> {
+    await this.findById(productId, branchId);
     const variant = await this.variants.findOne({
       where: { id: variantId, productId, deletedAt: IsNull() },
     });
@@ -428,10 +463,10 @@ export class ProductsService {
       throw new NotFoundException(`Variante ${variantId} no encontrada`);
     }
     if (dto.sku && dto.sku !== variant.sku) {
-      await this.assertVariantSkuFree(this.repo.manager, dto.sku, variantId);
+      await this.assertVariantSkuFree(this.repo.manager, dto.sku, branchId, variantId);
     }
     if (dto.barcode && dto.barcode !== variant.barcode) {
-      await this.assertVariantBarcodeFree(this.repo.manager, dto.barcode, variantId);
+      await this.assertVariantBarcodeFree(this.repo.manager, dto.barcode, branchId, variantId);
     }
     const patch: Partial<ProductVariantOrmEntity> = {};
     if (dto.name !== undefined) patch.name = dto.name;
@@ -446,7 +481,8 @@ export class ProductsService {
     return toVariantResponse(saved);
   }
 
-  async deleteVariant(productId: string, variantId: string): Promise<void> {
+  async deleteVariant(productId: string, variantId: string, branchId: string): Promise<void> {
+    await this.findById(productId, branchId);
     const variant = await this.variants.findOne({
       where: { id: variantId, productId, deletedAt: IsNull() },
     });
@@ -466,35 +502,41 @@ export class ProductsService {
   private async assertVariantSkuFree(
     em: EntityManager,
     sku: string,
+    branchId: string,
     excludeId?: string,
   ): Promise<void> {
     const qb = em
       .createQueryBuilder(ProductVariantOrmEntity, 'v')
       .where('v.sku = :sku', { sku })
+      .andWhere('v.branch_id = :branchId', { branchId })
       .andWhere('v.deleted_at IS NULL');
     if (excludeId) qb.andWhere('v.id <> :id', { id: excludeId });
     const exists = await qb.getOne();
-    if (exists) throw new ConflictException(`SKU variante "${sku}" ya está en uso`);
+    if (exists)
+      throw new ConflictException(`SKU variante "${sku}" ya está en uso en esta sucursal`);
   }
 
   private async assertVariantBarcodeFree(
     em: EntityManager,
     barcode: string,
+    branchId: string,
     excludeId?: string,
   ): Promise<void> {
     const qb = em
       .createQueryBuilder(ProductVariantOrmEntity, 'v')
       .where('v.barcode = :b', { b: barcode })
+      .andWhere('v.branch_id = :branchId', { branchId })
       .andWhere('v.deleted_at IS NULL');
     if (excludeId) qb.andWhere('v.id <> :id', { id: excludeId });
     const exists = await qb.getOne();
-    if (exists) throw new ConflictException(`Barcode "${barcode}" ya está en uso`);
+    if (exists)
+      throw new ConflictException(`Barcode "${barcode}" ya está en uso en esta sucursal`);
   }
 
   // --- Kits / Combos ---
 
-  async listKitComponents(kitProductId: string): Promise<KitComponentResponse[]> {
-    await this.findById(kitProductId);
+  async listKitComponents(kitProductId: string, branchId: string): Promise<KitComponentResponse[]> {
+    await this.findById(kitProductId, branchId);
     const rows = await this.kitComponents
       .createQueryBuilder('kc')
       .leftJoinAndSelect('kc.component', 'c')
@@ -518,8 +560,9 @@ export class ProductsService {
   async setKitComponents(
     kitProductId: string,
     dto: SetKitComponentsDto,
+    branchId: string,
   ): Promise<KitComponentResponse[]> {
-    const kit = await this.findById(kitProductId);
+    const kit = await this.findById(kitProductId, branchId);
     if (!kit.isKit) {
       throw new ConflictException(
         'El producto no está marcado como kit. Actívalo primero.',
@@ -533,8 +576,11 @@ export class ProductsService {
       throw new ConflictException('El kit no puede contenerse a sí mismo.');
     }
     if (componentIds.length > 0) {
+      // Los componentes deben ser de la MISMA sucursal del kit. Scopear por
+      // branchId evita armar recetas cross-sucursal (que al vender drenarían
+      // stock de otra sucursal). Un componente de otra sucursal cae en `missing`.
       const found = await this.repo.find({
-        where: componentIds.map((id) => ({ id, deletedAt: IsNull() })),
+        where: componentIds.map((id) => ({ id, branchId, deletedAt: IsNull() })),
       });
       const foundIds = new Set(found.map((p) => p.id));
       const missing = componentIds.filter((id) => !foundIds.has(id));
@@ -579,9 +625,322 @@ export class ProductsService {
     });
   }
 
-  async softDelete(id: string): Promise<void> {
-    const p = await this.findById(id);
-    await this.repo.softRemove(p);
+  async softDelete(id: string, branchId?: string): Promise<void> {
+    await this.findById(id, branchId); // valida existencia + sucursal
+    await this.uow.run(async ({ manager }) => {
+      // Liberar el SKU/código para reúso en la sucursal. Los índices únicos son
+      // parciales (deleted_at IS NULL) o, en product_barcodes, sin deleted_at,
+      // así que dejar estas filas bloquearía reutilizar el mismo código tras
+      // borrar el producto. Borramos barcodes (no tienen soft-delete) y hacemos
+      // soft-delete de las variantes junto con el producto.
+      await manager.delete(ProductBarcodeOrmEntity, { productId: id });
+      await manager.softDelete(ProductVariantOrmEntity, { productId: id });
+      await manager.softDelete(ProductOrmEntity, { id });
+    });
+  }
+
+  /**
+   * Clona el catálogo de `sourceBranchId` a la sucursal destino:
+   *   - categorías (por nombre, sin duplicar) CON su jerarquía (parentId remapeado),
+   *   - productos SIMPLES, con VARIANTES y KITS (stock en 0),
+   *   - variantes de cada producto, códigos de barras secundarios, y la receta
+   *     de cada kit (remapeando los componentes a los productos clonados).
+   * Para productos cuyo SKU YA existe en destino hace "top-up": agrega las
+   * variantes/códigos que falten (sin tocar ni duplicar lo existente; no voltea
+   * un producto simple a con-variantes para no romper su stock). Las colisiones
+   * de código de barras se resuelven dejando el código fuera (no aborta).
+   */
+  async cloneCatalog(
+    sourceBranchId: string,
+    targetBranchId: string,
+  ): Promise<CloneCatalogResult> {
+    if (sourceBranchId === targetBranchId) {
+      throw new BadRequestException('La sucursal origen y destino no pueden ser la misma');
+    }
+    return this.uow.run(async ({ manager }) => {
+      const result: CloneCatalogResult = {
+        categoriesCreated: 0,
+        productsCreated: 0,
+        variantsCreated: 0,
+        kitComponentsCreated: 0,
+        barcodesCreated: 0,
+        barcodesSkipped: 0,
+        kitComponentsSkipped: 0,
+        skipped: 0,
+      };
+
+      // 1) Categorías: clonar por nombre las que falten en destino.
+      const srcCats = await manager.find(CategoryOrmEntity, {
+        where: { branchId: sourceBranchId, deletedAt: IsNull() },
+      });
+      const dstCats = await manager.find(CategoryOrmEntity, {
+        where: { branchId: targetBranchId, deletedAt: IsNull() },
+      });
+      const catMap = new Map<string, string>();
+      const dstCatByName = new Map(dstCats.map((c) => [c.name.toLowerCase(), c.id]));
+      const createdCats: Array<{ src: CategoryOrmEntity; dstId: string }> = [];
+      for (const c of srcCats) {
+        const existing = dstCatByName.get(c.name.toLowerCase());
+        if (existing) {
+          catMap.set(c.id, existing);
+          continue;
+        }
+        const saved = await manager.save(
+          manager.create(CategoryOrmEntity, {
+            branchId: targetBranchId,
+            name: c.name,
+            description: c.description,
+            parentId: null, // se remapea en la 2da pasada
+            isActive: c.isActive,
+          }),
+        );
+        catMap.set(c.id, saved.id);
+        createdCats.push({ src: c, dstId: saved.id });
+        result.categoriesCreated += 1;
+      }
+      // 2da pasada: remapear la jerarquía SOLO en las categorías recién creadas
+      // (no tocamos el árbol de categorías preexistentes del destino).
+      for (const { src, dstId } of createdCats) {
+        if (!src.parentId) continue;
+        const dstParent = catMap.get(src.parentId);
+        if (dstParent && dstParent !== dstId) {
+          await manager.update(CategoryOrmEntity, { id: dstId }, { parentId: dstParent });
+        }
+      }
+
+      // 2) Estado del destino (para evitar colisiones y duplicados).
+      const dstProducts = await manager.find(ProductOrmEntity, {
+        where: { branchId: targetBranchId, deletedAt: IsNull() },
+        select: { id: true, sku: true, barcode: true, hasVariants: true },
+      });
+      const dstProductBySku = new Map(dstProducts.map((p) => [p.sku, p]));
+      // Namespace de barcodes del destino = products.barcode + product_barcodes.
+      const usedProductBarcodes = new Set<string>();
+      for (const p of dstProducts) if (p.barcode) usedProductBarcodes.add(p.barcode);
+      const dstPb = await manager.find(ProductBarcodeOrmEntity, {
+        where: { branchId: targetBranchId },
+        select: { barcode: true },
+      });
+      for (const b of dstPb) usedProductBarcodes.add(b.barcode);
+      // Namespace de SKU/barcode de variantes del destino.
+      const dstVariants = await manager.find(ProductVariantOrmEntity, {
+        where: { branchId: targetBranchId, deletedAt: IsNull() },
+        select: { sku: true, barcode: true },
+      });
+      const usedVariantSkus = new Set(dstVariants.map((v) => v.sku));
+      const usedVariantBarcodes = new Set(
+        dstVariants.map((v) => v.barcode).filter((b): b is string => !!b),
+      );
+
+      // 3) Catálogo origen + sub-recursos (una query por tabla).
+      const srcProducts = await manager.find(ProductOrmEntity, {
+        where: { branchId: sourceBranchId, deletedAt: IsNull() },
+      });
+      const srcVariants = await manager.find(ProductVariantOrmEntity, {
+        where: { branchId: sourceBranchId, deletedAt: IsNull() },
+      });
+      const srcBarcodes = await manager.find(ProductBarcodeOrmEntity, {
+        where: { branchId: sourceBranchId },
+        order: { isPrimary: 'DESC', createdAt: 'ASC' },
+      });
+      const srcKitIds = srcProducts.filter((p) => p.isKit).map((p) => p.id);
+      const srcKitComps = srcKitIds.length
+        ? await manager.find(ProductKitComponentOrmEntity, {
+            where: { kitProductId: In(srcKitIds) },
+          })
+        : [];
+
+      // Agrupar sub-recursos por producto/kit origen.
+      const variantsByProduct = new Map<string, ProductVariantOrmEntity[]>();
+      for (const v of srcVariants) {
+        const arr = variantsByProduct.get(v.productId);
+        if (arr) arr.push(v);
+        else variantsByProduct.set(v.productId, [v]);
+      }
+      const barcodesByProduct = new Map<string, ProductBarcodeOrmEntity[]>();
+      for (const b of srcBarcodes) {
+        const arr = barcodesByProduct.get(b.productId);
+        if (arr) arr.push(b);
+        else barcodesByProduct.set(b.productId, [b]);
+      }
+      const compsByKit = new Map<string, ProductKitComponentOrmEntity[]>();
+      for (const kc of srcKitComps) {
+        const arr = compsByKit.get(kc.kitProductId);
+        if (arr) arr.push(kc);
+        else compsByKit.set(kc.kitProductId, [kc]);
+      }
+
+      // id producto origen -> id producto destino (recién creado o ya existente).
+      const productMap = new Map<string, string>();
+      const createdKits: Array<{ srcId: string; dstId: string }> = [];
+
+      // Clona los códigos de barras del origen al producto destino. `allowPrimary`
+      // marca el primer código que sobrevive como primary (solo cuando el destino
+      // aún no tiene uno — un producto preexistente ya conserva su primary, y
+      // marcar otro violaría uq_pb_one_primary_per_product). Devuelve el barcode
+      // que quedó como primary nuevo, o null.
+      const cloneBarcodesFor = async (
+        src: ProductOrmEntity,
+        dstProductId: string,
+        allowPrimary: boolean,
+      ): Promise<string | null> => {
+        let srcPbs = barcodesByProduct.get(src.id) ?? [];
+        if (srcPbs.length === 0 && src.barcode) {
+          // Defensivo: barcode en cache sin fila en product_barcodes (legacy).
+          srcPbs = [{ barcode: src.barcode, isPrimary: true } as ProductBarcodeOrmEntity];
+        }
+        let newPrimary: string | null = null;
+        for (const pb of srcPbs) {
+          if (usedProductBarcodes.has(pb.barcode)) {
+            result.barcodesSkipped += 1;
+            continue;
+          }
+          const makePrimary = allowPrimary && newPrimary === null;
+          await manager.insert(ProductBarcodeOrmEntity, {
+            branchId: targetBranchId,
+            productId: dstProductId,
+            barcode: pb.barcode,
+            isPrimary: makePrimary,
+          });
+          usedProductBarcodes.add(pb.barcode);
+          result.barcodesCreated += 1;
+          if (makePrimary) newPrimary = pb.barcode;
+        }
+        return newPrimary;
+      };
+
+      // Clona las variantes del origen que falten en el destino (por SKU). Stock
+      // en 0. Devuelve cuántas agregó.
+      const cloneVariantsFor = async (
+        srcProductId: string,
+        dstProductId: string,
+      ): Promise<number> => {
+        let added = 0;
+        for (const v of variantsByProduct.get(srcProductId) ?? []) {
+          if (usedVariantSkus.has(v.sku)) continue;
+          const vBarcode =
+            v.barcode && !usedVariantBarcodes.has(v.barcode) ? v.barcode : null;
+          await manager.insert(ProductVariantOrmEntity, {
+            branchId: targetBranchId,
+            productId: dstProductId,
+            name: v.name,
+            sku: v.sku,
+            barcode: vBarcode,
+            salePrice: v.salePrice,
+            costPrice: v.costPrice,
+            stock: '0.000',
+            minStock: v.minStock,
+            isActive: v.isActive,
+          });
+          usedVariantSkus.add(v.sku);
+          if (vBarcode) usedVariantBarcodes.add(vBarcode);
+          result.variantsCreated += 1;
+          added += 1;
+        }
+        return added;
+      };
+
+      // Crea la fila producto (cualquier tipo) + variantes + barcodes.
+      const cloneProductRow = async (p: ProductOrmEntity): Promise<string> => {
+        const created = await manager.save(
+          manager.create(ProductOrmEntity, {
+            branchId: targetBranchId,
+            name: p.name,
+            sku: p.sku,
+            barcode: null,
+            description: p.description,
+            imageUrl: p.imageUrl,
+            categoryId: p.categoryId ? catMap.get(p.categoryId) ?? null : null,
+            costPrice: p.costPrice,
+            salePrice: p.salePrice,
+            taxRate: p.taxRate,
+            taxTypeCode: p.taxTypeCode,
+            minStock: p.minStock,
+            stock: '0.000',
+            isActive: p.isActive,
+            isKit: p.isKit,
+            hasVariants: p.hasVariants,
+            soldByWeight: p.soldByWeight,
+          }),
+        );
+        result.productsCreated += 1;
+        if (p.hasVariants) await cloneVariantsFor(p.id, created.id);
+        const newPrimary = await cloneBarcodesFor(p, created.id, true);
+        if (newPrimary) {
+          await manager.update(ProductOrmEntity, { id: created.id }, { barcode: newPrimary });
+        }
+        return created.id;
+      };
+
+      // TOP-UP de un producto que YA existe en destino: agrega variantes/códigos
+      // faltantes sin tocar lo existente. NO voltea un producto simple del destino
+      // a con-variantes (rompería su stock); solo completa los que ya manejan
+      // variantes. Los barcodes nuevos van como secundarios (el primary se respeta).
+      const topUpExisting = async (
+        src: ProductOrmEntity,
+        existing: { id: string; barcode: string | null; hasVariants: boolean },
+      ): Promise<void> => {
+        if (!src.isKit && existing.hasVariants) {
+          await cloneVariantsFor(src.id, existing.id);
+        }
+        const hasPrimary = !!existing.barcode;
+        const newPrimary = await cloneBarcodesFor(src, existing.id, !hasPrimary);
+        if (newPrimary) {
+          await manager.update(ProductOrmEntity, { id: existing.id }, { barcode: newPrimary });
+        }
+      };
+
+      // 4) Productos NO kit (simples + con variantes). Deben existir antes que
+      //    las recetas de kit, porque pueden ser componentes.
+      for (const p of srcProducts) {
+        if (p.isKit) continue;
+        const existing = dstProductBySku.get(p.sku);
+        if (existing) {
+          productMap.set(p.id, existing.id);
+          result.skipped += 1;
+          await topUpExisting(p, existing);
+          continue;
+        }
+        const newId = await cloneProductRow(p);
+        productMap.set(p.id, newId);
+      }
+
+      // 5) Productos kit (solo la fila producto). Las recetas, después.
+      for (const p of srcProducts) {
+        if (!p.isKit) continue;
+        const existing = dstProductBySku.get(p.sku);
+        if (existing) {
+          productMap.set(p.id, existing.id);
+          result.skipped += 1;
+          await topUpExisting(p, existing);
+          continue;
+        }
+        const newId = await cloneProductRow(p);
+        productMap.set(p.id, newId);
+        createdKits.push({ srcId: p.id, dstId: newId });
+      }
+
+      // 6) Recetas de los kits recién creados — remapear componentes a destino.
+      for (const { srcId, dstId } of createdKits) {
+        for (const kc of compsByKit.get(srcId) ?? []) {
+          const dstComp = productMap.get(kc.componentProductId);
+          if (dstComp === dstId) continue; // self-ref (no debería ocurrir)
+          if (!dstComp) {
+            // Componente no clonable (borrado en origen): no lo silenciamos.
+            result.kitComponentsSkipped += 1;
+            continue;
+          }
+          await manager.insert(ProductKitComponentOrmEntity, {
+            kitProductId: dstId,
+            componentProductId: dstComp,
+            quantity: kc.quantity,
+          });
+          result.kitComponentsCreated += 1;
+        }
+      }
+
+      return result;
+    });
   }
 
   /** Devuelve la tasa (%) del tipo de ITBIS, o lanza si el código no existe. */
@@ -591,14 +950,20 @@ export class ProductsService {
     return tt.rate;
   }
 
-  private async assertSkuFree(em: EntityManager, sku: string, excludeId?: string): Promise<void> {
+  private async assertSkuFree(
+    em: EntityManager,
+    sku: string,
+    branchId: string,
+    excludeId?: string,
+  ): Promise<void> {
     const qb = em
       .createQueryBuilder(ProductOrmEntity, 'p')
       .where('p.sku = :sku', { sku })
+      .andWhere('p.branch_id = :branchId', { branchId })
       .andWhere('p.deleted_at IS NULL');
     if (excludeId) qb.andWhere('p.id <> :id', { id: excludeId });
     const exists = await qb.getOne();
-    if (exists) throw new ConflictException(`SKU "${sku}" ya está en uso`);
+    if (exists) throw new ConflictException(`SKU "${sku}" ya está en uso en esta sucursal`);
   }
 
   /**
@@ -608,24 +973,29 @@ export class ProductsService {
   private async assertBarcodeFreeAny(
     em: EntityManager,
     barcode: string,
+    branchId: string,
     excludeProductId?: string,
   ): Promise<void> {
     const qb1 = em
       .createQueryBuilder(ProductOrmEntity, 'p')
       .where('p.barcode = :b', { b: barcode })
+      .andWhere('p.branch_id = :branchId', { branchId })
       .andWhere('p.deleted_at IS NULL');
     if (excludeProductId) qb1.andWhere('p.id <> :id', { id: excludeProductId });
     const productHit = await qb1.getOne();
     if (productHit) {
-      throw new ConflictException(`Código de barras "${barcode}" ya está en uso`);
+      throw new ConflictException(`Código de barras "${barcode}" ya está en uso en esta sucursal`);
     }
+    // El barcode secundario (product_barcodes) se scopea por su sucursal
+    // (denormalizada), para que el mismo código pueda existir en otra sucursal.
     const qb2 = em
       .createQueryBuilder(ProductBarcodeOrmEntity, 'pb')
-      .where('pb.barcode = :b', { b: barcode });
+      .where('pb.barcode = :b', { b: barcode })
+      .andWhere('pb.branch_id = :branchId', { branchId });
     if (excludeProductId) qb2.andWhere('pb.product_id <> :id', { id: excludeProductId });
     const pbHit = await qb2.getOne();
     if (pbHit) {
-      throw new ConflictException(`Código de barras "${barcode}" ya está en uso`);
+      throw new ConflictException(`Código de barras "${barcode}" ya está en uso en esta sucursal`);
     }
   }
 }

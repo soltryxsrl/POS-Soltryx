@@ -53,6 +53,7 @@ export class JwtTokenIssuer implements TokenIssuer {
     username: string;
     roles: string[];
     permissions: string[];
+    branchId: string | null;
   }): Promise<IssuedTokens> {
     const refreshTokenId = randomUUID();
 
@@ -62,6 +63,7 @@ export class JwtTokenIssuer implements TokenIssuer {
         username: payload.username,
         roles: payload.roles,
         permissions: payload.permissions,
+        branchId: payload.branchId,
       },
       { secret: this.accessSecret, expiresIn: this.accessExpiresInSec },
     );

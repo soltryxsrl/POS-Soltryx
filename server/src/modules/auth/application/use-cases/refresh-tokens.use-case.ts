@@ -64,6 +64,7 @@ export class RefreshTokensUseCase {
       username: user.username,
       roles: [...user.roles],
       permissions: [...user.permissions],
+      branchId: user.branchId,
     });
 
     await this.refreshRepo.save({

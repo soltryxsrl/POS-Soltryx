@@ -12,6 +12,11 @@ export class ProductBarcodeOrmEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  /** Sucursal dueña (denormalizado del producto padre; ver migración 046). */
+  @Index()
+  @Column({ name: 'branch_id', type: 'uuid', nullable: true })
+  branchId!: string | null;
+
   @Column({ name: 'product_id', type: 'uuid' })
   productId!: string;
 

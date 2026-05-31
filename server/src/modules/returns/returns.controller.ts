@@ -11,6 +11,7 @@ import {
   CurrentUser,
   type CurrentUserPayload,
 } from '../auth/infrastructure/http/current-user.decorator';
+import { ActiveBranch } from '../../common/branch/active-branch.decorator';
 import { RequirePermissions } from '../auth/infrastructure/http/permissions.decorator';
 import { CreateReturnRequestDto } from './dto/create-return.request-dto';
 import { ListReturnsQuery } from './dto/list-returns.query';
@@ -22,8 +23,8 @@ export class ReturnsController {
 
   @Get('returns')
   @RequirePermissions('returns.read')
-  list(@Query() q: ListReturnsQuery) {
-    return this.service.list(q);
+  list(@Query() q: ListReturnsQuery, @ActiveBranch() branchId: string) {
+    return this.service.list(q, branchId);
   }
 
   @Get('returns/:id')

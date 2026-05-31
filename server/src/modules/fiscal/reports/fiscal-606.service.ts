@@ -83,6 +83,7 @@ export class Fiscal606Service {
   async generate(
     from: string,
     to: string,
+    branchId: string | null,
   ): Promise<{ rows: Fiscal606Row[]; summary: Fiscal606Summary }> {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       throw new BadRequestException(
@@ -96,6 +97,8 @@ export class Fiscal606Service {
     const pos = await this.orders
       .createQueryBuilder('po')
       .where('po.supplierNcf IS NOT NULL')
+      // branchId null = consolidado (todas las sucursales).
+      .andWhere('(:branchId::uuid IS NULL OR po.branchId = :branchId)', { branchId })
       .andWhere('po.supplierFiscalDocTypeCode IS NOT NULL')
       .andWhere('po.supplierInvoiceDate BETWEEN :from AND :to', { from, to })
       .andWhere('po.status <> :cancelled', { cancelled: 'CANCELLED' })
@@ -110,6 +113,8 @@ export class Fiscal606Service {
     const standaloneDocs = await this.fiscalDocs
       .createQueryBuilder('d')
       .where('d.issueDate BETWEEN :from AND :to', { from: fromDate, to: toDate })
+      // branchId null = consolidado (todas las sucursales).
+      .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .andWhere('d.docType IN (:...types)', {
         types: ['E41', 'E43', 'B11', 'B13'],
       })

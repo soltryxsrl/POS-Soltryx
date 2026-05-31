@@ -36,6 +36,11 @@ export class CreateUserDto {
   @IsUUID('all', { each: true })
   roleIds?: string[];
 
+  /** Sucursal del usuario. Obligatoria para usuarios sin rol ADMIN. */
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;

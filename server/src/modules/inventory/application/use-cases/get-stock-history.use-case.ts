@@ -9,6 +9,7 @@ import type { StockMovement } from '../../domain/entities/stock-movement.entity'
 export interface GetStockHistoryInput {
   productId?: string;
   type?: StockMovementType;
+  branchId?: string;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -37,6 +38,7 @@ export class GetStockHistoryUseCase {
     const { items, total } = await this.repo.list({
       productId: input.productId,
       type: input.type,
+      branchId: input.branchId,
       from: input.from,
       to: input.to,
       limit,

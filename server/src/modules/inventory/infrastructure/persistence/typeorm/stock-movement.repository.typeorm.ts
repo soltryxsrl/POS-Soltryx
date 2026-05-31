@@ -73,6 +73,7 @@ export class StockMovementRepositoryTypeOrm implements StockMovementRepository {
       .take(limit)
       .skip(offset);
     if (input.productId) qb.andWhere('m.product_id = :pid', { pid: input.productId });
+    if (input.branchId) qb.andWhere('m.branch_id = :branchId', { branchId: input.branchId });
     if (input.type) qb.andWhere('m.type = :type', { type: input.type });
     if (input.from) qb.andWhere('m.created_at >= :from', { from: input.from });
     if (input.to) qb.andWhere('m.created_at <= :to', { to: input.to });

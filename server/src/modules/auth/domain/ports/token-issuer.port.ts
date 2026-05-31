@@ -13,6 +13,8 @@ export interface AccessTokenPayload {
   username: string;
   roles: string[];
   permissions: string[];
+  /** sucursal HOME del usuario (null = ADMIN sin sucursal) */
+  branchId: string | null;
 }
 
 export interface RefreshTokenPayload {
@@ -39,6 +41,7 @@ export interface TokenIssuer {
     username: string;
     roles: string[];
     permissions: string[];
+    branchId: string | null;
   }): Promise<IssuedTokens>;
   verifyAccess(token: string): Promise<AccessTokenPayload>;
   verifyRefresh(token: string): Promise<RefreshTokenPayload>;

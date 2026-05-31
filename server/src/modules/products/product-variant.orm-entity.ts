@@ -17,6 +17,11 @@ export class ProductVariantOrmEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  /** Sucursal dueña (denormalizado del producto padre; ver migración 046). */
+  @Index()
+  @Column({ name: 'branch_id', type: 'uuid', nullable: true })
+  branchId!: string | null;
+
   @Index()
   @Column({ name: 'product_id', type: 'uuid' })
   productId!: string;

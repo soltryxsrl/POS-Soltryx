@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ActiveBranch } from '../../../../common/branch/active-branch.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
@@ -62,13 +63,18 @@ export class CashSessionsController {
   }
 
   @Get()
-  async list(@Query() q: ListSessionsQuery, @CurrentUser() user: CurrentUserPayload) {
+  async list(
+    @Query() q: ListSessionsQuery,
+    @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
+  ) {
     // CASHIER solo ve sus propias sesiones
     const restrictToSelf = !user.roles.includes('ADMIN') && !user.roles.includes('MANAGER');
     return this.listUC.execute({
       status: q.status,
       cashRegisterId: q.cashRegisterId,
       openedById: restrictToSelf ? user.id : q.openedById,
+      branchId,
       from: q.from ? new Date(q.from) : undefined,
       to: q.to ? new Date(q.to) : undefined,
       limit: q.limit,
@@ -91,7 +97,11 @@ export class CashSessionsController {
 
   @Post('open')
   @Roles('ADMIN', 'MANAGER', 'CASHIER')
-  open(@Body() body: OpenCashSessionRequestDto, @CurrentUser() user: CurrentUserPayload) {
+  open(
+    @Body() body: OpenCashSessionRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
+  ) {
     return this.handle(() =>
       this.openUC.execute({
         cashRegisterId: body.cashRegisterId,
@@ -99,6 +109,7 @@ export class CashSessionsController {
         openingDenominations: body.openingDenominations ?? null,
         notes: body.notes,
         openedById: user.id,
+        activeBranchId: branchId,
       }),
     );
   }

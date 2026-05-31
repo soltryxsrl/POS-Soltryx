@@ -28,6 +28,20 @@ async function run(): Promise<void> {
   console.log(`[seed] ${applied.length} migration(s) applied`);
 
   await AppDataSource.transaction(async (m) => {
+    // Sucursal por defecto. La migración 043 ya la crea y backfillea todo a
+    // ella; aquí es idempotente por si el seed corre en otro orden. Todo lo
+    // sembrado pertenece a esta sucursal.
+    await m.query(
+      `INSERT INTO branches (code, name) VALUES ('PRINCIPAL', 'Principal')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+    const [principalBranch] = await m.query<{ id: string }[]>(
+      `SELECT id FROM branches WHERE code = 'PRINCIPAL'`,
+    );
+    const branchId = principalBranch.id;
+    // eslint-disable-next-line no-console
+    console.log('[seed] default branch ensured (code=PRINCIPAL)');
+
     const roles = [
       { code: 'ADMIN', name: 'Administrador', description: 'Acceso total al sistema' },
       { code: 'MANAGER', name: 'Gerente', description: 'Gestión operativa y reportes' },
@@ -82,10 +96,10 @@ async function run(): Promise<void> {
 
     const passwordHash = await bcrypt.hash('Admin123!', 10);
     await m.query(
-      `INSERT INTO users (email, username, full_name, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, true)
+      `INSERT INTO users (email, username, full_name, password_hash, is_active, branch_id)
+       VALUES ($1, $2, $3, $4, true, $5)
        ON CONFLICT (email) DO NOTHING`,
-      ['admin@t1et.local', 'admin', 'Administrador', passwordHash],
+      ['admin@t1et.local', 'admin', 'Administrador', passwordHash, branchId],
     );
 
     const [admin] = await m.query<{ id: string }[]>(
@@ -107,17 +121,19 @@ async function run(): Promise<void> {
     console.log('[seed] admin user ensured (admin@t1et.local / Admin123!)');
 
     await m.query(
-      `INSERT INTO categories (name, description)
-       SELECT 'General', 'Categoría por defecto'
+      `INSERT INTO categories (name, description, branch_id)
+       SELECT 'General', 'Categoría por defecto', $1
        WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'General')`,
+      [branchId],
     );
     // eslint-disable-next-line no-console
     console.log('[seed] default category ensured');
 
     await m.query(
-      `INSERT INTO cash_registers (code, name, is_active)
-       VALUES ('CR-001', 'Caja 1', true)
+      `INSERT INTO cash_registers (code, name, is_active, branch_id)
+       VALUES ('CR-001', 'Caja 1', true, $1)
        ON CONFLICT (code) DO NOTHING`,
+      [branchId],
     );
     // eslint-disable-next-line no-console
     console.log('[seed] default cash register ensured (code=CR-001)');
@@ -180,14 +196,14 @@ async function run(): Promise<void> {
     let newSequences = 0;
     for (const s of DEFAULT_SEQUENCES) {
       const existing = await m.query(
-        `SELECT id FROM fiscal_sequences WHERE doc_type = $1 AND prefix = $2 AND is_active = true LIMIT 1`,
-        [s.docType, s.prefix],
+        `SELECT id FROM fiscal_sequences WHERE doc_type = $1 AND prefix = $2 AND branch_id = $3 AND is_active = true LIMIT 1`,
+        [s.docType, s.prefix, branchId],
       );
       if (existing.length > 0) continue;
       await m.query(
-        `INSERT INTO fiscal_sequences (doc_type, prefix, range_from, range_to, next_number, valid_until, is_active)
-         VALUES ($1, $2, $3, $4, $3, '2099-12-31', true)`,
-        [s.docType, s.prefix, s.rangeFrom, s.rangeTo],
+        `INSERT INTO fiscal_sequences (doc_type, prefix, range_from, range_to, next_number, valid_until, is_active, branch_id)
+         VALUES ($1, $2, $3, $4, $3, '2099-12-31', true, $5)`,
+        [s.docType, s.prefix, s.rangeFrom, s.rangeTo, branchId],
       );
       newSequences += 1;
     }

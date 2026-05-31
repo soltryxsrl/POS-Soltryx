@@ -1,11 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class DateQuery {
   /** YYYY-MM-DD; default = hoy. */
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  /** Sucursal a consultar; `all` = consolidado (solo con permiso branches.switch). */
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }
 
 export class DateRangeQuery {
@@ -25,4 +30,9 @@ export class DateRangeQuery {
   @Min(1)
   @Max(100)
   limit?: number = 10;
+
+  /** Sucursal a consultar; `all` = consolidado (solo con permiso branches.switch). */
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

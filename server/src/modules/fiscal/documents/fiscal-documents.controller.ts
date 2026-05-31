@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ActiveBranch } from '../../../common/branch/active-branch.decorator';
 import { RequirePermissions } from '../../auth/infrastructure/http/permissions.decorator';
 import { IssueStandaloneDocumentRequestDto } from './dto/issue-standalone-doc.request-dto';
 import { FiscalDocumentsService } from './fiscal-documents.service';
@@ -10,6 +11,7 @@ export class FiscalDocumentsController {
   @Get()
   @RequirePermissions('fiscal.docs.read')
   list(
+    @ActiveBranch() branchId: string,
     @Query('q') q?: string,
     @Query('docType') docType?: string,
     @Query('status') status?: string,
@@ -26,6 +28,7 @@ export class FiscalDocumentsController {
       to,
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
+      branchId,
     });
   }
 
@@ -37,10 +40,13 @@ export class FiscalDocumentsController {
    */
   @Post('standalone')
   @RequirePermissions('fiscal.purchases.create')
-  issueStandalone(@Body() dto: IssueStandaloneDocumentRequestDto) {
+  issueStandalone(
+    @Body() dto: IssueStandaloneDocumentRequestDto,
+    @ActiveBranch() branchId: string,
+  ) {
     return this.service.issueStandalone({
       docTypeCode: dto.docTypeCode,
-      branchId: null,
+      branchId,
       counterpartyName: dto.counterpartyName?.trim() || null,
       counterpartyRnc: dto.counterpartyRnc?.trim() || null,
       subtotal: dto.subtotal,

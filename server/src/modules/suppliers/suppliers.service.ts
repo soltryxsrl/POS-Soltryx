@@ -6,6 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import {
+  applyBranchFilter,
+  assertSameBranch,
+} from '../../common/branch/branch-scope.util';
 import type { CreateSupplierDto } from './dto/create-supplier.dto';
 import type { ListSuppliersQuery } from './dto/list-suppliers.query';
 import type { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -23,7 +27,7 @@ export class SuppliersService {
     private readonly repo: Repository<SupplierOrmEntity>,
   ) {}
 
-  async list(q: ListSuppliersQuery): Promise<SuppliersListResponse> {
+  async list(q: ListSuppliersQuery, branchId: string): Promise<SuppliersListResponse> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
     const sort = resolveSort(
@@ -43,6 +47,7 @@ export class SuppliersService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .skip(offset)
       .take(limit);
+    applyBranchFilter(qb, 's', branchId);
 
     if (q.q) {
       const search = `%${q.q.toLowerCase()}%`;
@@ -58,14 +63,16 @@ export class SuppliersService {
     return { items: items.map(toSupplierResponse), total, limit, offset };
   }
 
-  async findById(id: string): Promise<SupplierResponse> {
+  async findById(id: string, branchId: string): Promise<SupplierResponse> {
     const s = await this.loadById(id);
+    assertSameBranch(s.branchId, branchId);
     return toSupplierResponse(s);
   }
 
-  async create(dto: CreateSupplierDto): Promise<SupplierResponse> {
-    if (dto.rnc) await this.assertRncAvailable(dto.rnc);
+  async create(dto: CreateSupplierDto, branchId: string): Promise<SupplierResponse> {
+    if (dto.rnc) await this.assertRncAvailable(dto.rnc, branchId);
     const entity = this.repo.create({
+      branchId,
       tradeName: dto.tradeName.trim(),
       legalName: dto.legalName?.trim() || null,
       rnc: dto.rnc?.trim() || null,
@@ -80,10 +87,11 @@ export class SuppliersService {
     return toSupplierResponse(saved);
   }
 
-  async update(id: string, dto: UpdateSupplierDto): Promise<SupplierResponse> {
+  async update(id: string, dto: UpdateSupplierDto, branchId: string): Promise<SupplierResponse> {
     const current = await this.loadById(id);
+    assertSameBranch(current.branchId, branchId);
     if (dto.rnc !== undefined && dto.rnc !== current.rnc) {
-      if (dto.rnc) await this.assertRncAvailable(dto.rnc, id);
+      if (dto.rnc) await this.assertRncAvailable(dto.rnc, branchId, id);
       current.rnc = dto.rnc?.trim() || null;
     }
     if (dto.tradeName !== undefined) current.tradeName = dto.tradeName.trim();
@@ -99,8 +107,9 @@ export class SuppliersService {
     return toSupplierResponse(saved);
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, branchId: string): Promise<void> {
     const s = await this.loadById(id);
+    assertSameBranch(s.branchId, branchId);
     await this.repo.softRemove(s);
   }
 
@@ -110,10 +119,15 @@ export class SuppliersService {
     return s;
   }
 
-  private async assertRncAvailable(rnc: string, excludeId?: string): Promise<void> {
+  private async assertRncAvailable(
+    rnc: string,
+    branchId: string,
+    excludeId?: string,
+  ): Promise<void> {
     const qb = this.repo
       .createQueryBuilder('s')
       .where('s.rnc = :rnc', { rnc })
+      .andWhere('s.branchId = :branchId', { branchId })
       .andWhere('s.deletedAt IS NULL');
     if (excludeId) qb.andWhere('s.id <> :id', { id: excludeId });
     const exists = await qb.getOne();

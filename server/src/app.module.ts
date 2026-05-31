@@ -6,6 +6,8 @@ import { validateEnv } from './config/env.validation';
 import { HealthModule } from './modules/health/health.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { BranchContextModule } from './common/branch/branch-context.module';
 import { CashSessionsModule } from './modules/cash-sessions/cash-sessions.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ConfigModule as BusinessConfigModule } from './modules/config/config.module';
@@ -38,8 +40,10 @@ import { PersistenceModule } from './common/persistence/persistence.module';
     TypeOrmModule.forRootAsync(typeOrmAsyncConfig),
     PersistenceModule,
     AuditModule, // @Global — exporta AuditService a todos los demás módulos
+    BranchContextModule, // @Global — resuelve la sucursal activa por request
     HealthModule,
     AuthModule,
+    BranchesModule,
     UsersModule,
     RbacModule,
     CategoriesModule,

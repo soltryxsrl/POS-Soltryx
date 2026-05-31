@@ -37,6 +37,7 @@ export class ProductPricingAdapterTypeOrm implements ProductPricingPort {
     }
     return rows.map((p) => ({
       id: p.id,
+      branchId: p.branchId,
       name: p.name,
       sku: p.sku,
       salePrice: p.salePrice,

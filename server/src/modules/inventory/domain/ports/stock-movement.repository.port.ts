@@ -20,6 +20,7 @@ export interface SaveStockMovementInput {
 export interface ListStockMovementsInput {
   productId?: string;
   type?: StockMovementType;
+  branchId?: string;
   from?: Date;
   to?: Date;
   limit?: number;

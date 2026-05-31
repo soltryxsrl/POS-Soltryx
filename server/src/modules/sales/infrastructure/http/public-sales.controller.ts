@@ -39,7 +39,7 @@ export class PublicSalesController {
     const customer = sale.customerId
       ? await this.customers.findOne({ where: { id: sale.customerId } })
       : null;
-    const business = await this.settings.get();
+    const business = await this.settings.getForBranch(sale.branchId);
     // Nombres configurados de las formas de pago (para reflejar renombres en el
     // recibo público, que no tiene acceso al catálogo vía API autenticada).
     const methods = await this.sales.manager.find(PaymentMethodOrmEntity);

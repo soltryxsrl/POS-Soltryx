@@ -12,6 +12,7 @@ import {
   CurrentUser,
   type CurrentUserPayload,
 } from '../../../auth/infrastructure/http/current-user.decorator';
+import { ActiveBranch } from '../../../../common/branch/active-branch.decorator';
 import { Roles } from '../../../auth/infrastructure/http/roles.decorator';
 import { AdjustStockUseCase } from '../../application/use-cases/adjust-stock.use-case';
 import { GetStockHistoryUseCase } from '../../application/use-cases/get-stock-history.use-case';
@@ -50,10 +51,11 @@ export class InventoryController {
   }
 
   @Get('movements')
-  listMovements(@Query() q: ListMovementsQuery) {
+  listMovements(@Query() q: ListMovementsQuery, @ActiveBranch() branchId: string) {
     return this.history.execute({
       productId: q.productId,
       type: q.type,
+      branchId,
       from: q.from ? new Date(q.from) : undefined,
       to: q.to ? new Date(q.to) : undefined,
       limit: q.limit,

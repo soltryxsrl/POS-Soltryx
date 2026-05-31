@@ -12,6 +12,7 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ActiveBranch } from '../../../../common/branch/active-branch.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
@@ -57,7 +58,10 @@ export class SalesController {
 
   @Post('preview-totals')
   @Roles('ADMIN', 'MANAGER', 'CASHIER')
-  previewTotals(@Body() body: PreviewSaleTotalsRequestDto) {
+  previewTotals(
+    @Body() body: PreviewSaleTotalsRequestDto,
+    @ActiveBranch() branchId: string,
+  ) {
     return this.handle(() =>
       this.preview.execute({
         items: body.items.map((i) => ({
@@ -71,6 +75,7 @@ export class SalesController {
         })),
         orderDiscount: body.orderDiscount,
         tipTotal: body.tipTotal,
+        branchId,
       }),
     );
   }
@@ -112,7 +117,11 @@ export class SalesController {
   }
 
   @Get()
-  async list(@Query() q: ListSalesQuery, @CurrentUser() user: CurrentUserPayload) {
+  async list(
+    @Query() q: ListSalesQuery,
+    @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
+  ) {
     const restrictToSelf = !user.roles.includes('ADMIN') && !user.roles.includes('MANAGER');
     return this.listUC.execute({
       q: q.q,
@@ -120,6 +129,7 @@ export class SalesController {
       paymentMethod: q.paymentMethod,
       cashSessionId: q.cashSessionId,
       userId: restrictToSelf ? user.id : q.userId,
+      branchId,
       from: q.from ? new Date(q.from) : undefined,
       to: q.to ? new Date(q.to) : undefined,
       limit: q.limit,
@@ -130,8 +140,8 @@ export class SalesController {
   }
 
   @Get(':id')
-  findById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.handle(() => this.get.execute(id));
+  findById(@Param('id', ParseUUIDPipe) id: string, @ActiveBranch() branchId: string) {
+    return this.handle(() => this.get.execute(id, branchId));
   }
 
   @Post(':id/cancel')
@@ -140,9 +150,10 @@ export class SalesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CancelSaleRequestDto,
     @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
   ) {
     return this.handle(() =>
-      this.cancel.execute({ saleId: id, reason: body.reason, userId: user.id }),
+      this.cancel.execute({ saleId: id, reason: body.reason, userId: user.id, branchId }),
     );
   }
 

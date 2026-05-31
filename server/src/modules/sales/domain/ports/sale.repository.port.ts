@@ -74,6 +74,7 @@ export interface ListSalesFilter {
   paymentMethod?: PaymentMethod;
   cashSessionId?: string;
   userId?: string;
+  branchId?: string;
   from?: Date;
   to?: Date;
   limit?: number;

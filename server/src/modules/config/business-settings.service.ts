@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { BranchOrmEntity } from '../branches/branch.orm-entity';
 import { BusinessSettingsOrmEntity } from './business-settings.orm-entity';
 
 export type TaxRegime = 'ORDINARIO' | 'RST';
@@ -52,7 +53,29 @@ export class BusinessSettingsService {
   constructor(
     @InjectRepository(BusinessSettingsOrmEntity)
     private readonly repo: Repository<BusinessSettingsOrmEntity>,
+    @InjectRepository(BranchOrmEntity)
+    private readonly branches: Repository<BranchOrmEntity>,
   ) {}
+
+  /**
+   * Datos del negocio para el RECIBO de una sucursal: parte del singleton global
+   * (legalName, footerNote, logo, régimen, etc.) y superpone nombre/RNC/dirección/
+   * teléfono de la sucursal cuando están definidos. Así cada local emite con su
+   * propio encabezado fiscal sin duplicar la configuración global.
+   */
+  async getForBranch(branchId: string | null): Promise<BusinessInfo> {
+    const info = await this.get();
+    if (!branchId) return info;
+    const branch = await this.branches.findOne({ where: { id: branchId } });
+    if (!branch) return info;
+    return {
+      ...info,
+      name: branch.name || info.name,
+      rnc: branch.rnc || info.rnc,
+      address: branch.address || info.address,
+      phone: branch.phone || info.phone,
+    };
+  }
 
   async get(): Promise<BusinessInfo> {
     const row = await this.repo.findOne({ where: { id: SINGLETON_ID } });

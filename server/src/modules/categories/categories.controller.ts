@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ActiveBranch } from '../../common/branch/active-branch.decorator';
 import { Roles } from '../auth/infrastructure/http/roles.decorator';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -22,31 +23,38 @@ export class CategoriesController {
   constructor(private readonly service: CategoriesService) {}
 
   @Get()
-  list(@Query() q: ListCategoriesQuery) {
-    return this.service.list(q);
+  list(@Query() q: ListCategoriesQuery, @ActiveBranch() branchId: string) {
+    return this.service.list(q, branchId);
   }
 
   @Get(':id')
-  findById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findById(id);
+  findById(@Param('id', ParseUUIDPipe) id: string, @ActiveBranch() branchId: string) {
+    return this.service.findById(id, branchId);
   }
 
   @Post()
   @Roles('ADMIN', 'MANAGER')
-  create(@Body() dto: CreateCategoryDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateCategoryDto, @ActiveBranch() branchId: string) {
+    return this.service.create(dto, branchId);
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'MANAGER')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCategoryDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCategoryDto,
+    @ActiveBranch() branchId: string,
+  ) {
+    return this.service.update(id, dto, branchId);
   }
 
   @Delete(':id')
   @Roles('ADMIN', 'MANAGER')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    await this.service.softDelete(id);
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ActiveBranch() branchId: string,
+  ): Promise<void> {
+    await this.service.softDelete(id, branchId);
   }
 }

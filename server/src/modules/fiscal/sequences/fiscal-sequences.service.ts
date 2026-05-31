@@ -12,6 +12,7 @@ import {
   type UnitOfWork,
   type TransactionContext,
 } from '../../../common/persistence/unit-of-work.port';
+import { assertSameBranch } from '../../../common/branch/branch-scope.util';
 import { FiscalDocTypeOrmEntity } from '../doc-types/fiscal-doc-type.orm-entity';
 import { FiscalSequenceOrmEntity } from './fiscal-sequence.orm-entity';
 import type { CreateFiscalSequenceRequestDto } from './dto/create-sequence.request-dto';
@@ -79,45 +80,55 @@ export class FiscalSequencesService {
     private readonly docTypes: Repository<FiscalDocTypeOrmEntity>,
   ) {}
 
-  async list(filter?: { docType?: string; activeOnly?: boolean }): Promise<FiscalSequenceResponse[]> {
+  async list(filter: {
+    docType?: string;
+    activeOnly?: boolean;
+    branchId: string;
+  }): Promise<FiscalSequenceResponse[]> {
     const qb = this.repo
       .createQueryBuilder('s')
+      .where('s.branchId = :branchId', { branchId: filter.branchId })
       .orderBy('s.isActive', 'DESC')
       .addOrderBy('s.docType', 'ASC')
       .addOrderBy('s.createdAt', 'DESC');
-    if (filter?.docType) qb.andWhere('s.docType = :dt', { dt: filter.docType });
-    if (filter?.activeOnly) qb.andWhere('s.isActive = true');
+    if (filter.docType) qb.andWhere('s.docType = :dt', { dt: filter.docType });
+    if (filter.activeOnly) qb.andWhere('s.isActive = true');
     const rows = await qb.getMany();
     return rows.map(toResponse);
   }
 
-  async findById(id: string): Promise<FiscalSequenceResponse> {
+  async findById(id: string, branchId: string): Promise<FiscalSequenceResponse> {
     const row = await this.repo.findOne({ where: { id } });
     if (!row) throw new NotFoundException(`Secuencia ${id} no encontrada`);
+    assertSameBranch(row.branchId, branchId);
     return toResponse(row);
   }
 
-  async create(dto: CreateFiscalSequenceRequestDto): Promise<FiscalSequenceResponse> {
+  async create(
+    dto: CreateFiscalSequenceRequestDto,
+    branchId: string,
+  ): Promise<FiscalSequenceResponse> {
     await this.assertDocTypeExists(dto.docType);
     if (dto.rangeTo < dto.rangeFrom) {
       throw new BadRequestException('rangeTo debe ser >= rangeFrom');
     }
 
     return this.uow.run(async ({ manager }) => {
-      // Desactivar cualquier secuencia activa previa del mismo (docType, prefix)
-      // — el índice único parcial uq_fiscal_sequences_doc_type_prefix así lo exige.
+      // Desactivar la secuencia activa previa del mismo (branch, docType, prefix)
+      // — el índice único parcial uq_fiscal_sequences_branch_doc_type_prefix lo exige.
       await manager
         .createQueryBuilder()
         .update(FiscalSequenceOrmEntity)
         .set({ isActive: false })
-        .where('doc_type = :dt AND prefix = :p AND is_active = true', {
-          dt: dto.docType,
-          p: dto.prefix,
-        })
+        .where(
+          'branch_id = :branchId AND doc_type = :dt AND prefix = :p AND is_active = true',
+          { branchId, dt: dto.docType, p: dto.prefix },
+        )
         .execute();
 
       const saved = await manager.save(
         manager.create(FiscalSequenceOrmEntity, {
+          branchId,
           docType: dto.docType,
           prefix: dto.prefix,
           rangeFrom: String(dto.rangeFrom),
@@ -134,27 +145,31 @@ export class FiscalSequencesService {
   async renew(
     docType: string,
     dto: RenewFiscalSequenceRequestDto,
+    branchId: string,
   ): Promise<FiscalSequenceResponse> {
     await this.assertDocTypeExists(docType);
     if (dto.rangeTo < dto.rangeFrom) {
       throw new BadRequestException('rangeTo debe ser >= rangeFrom');
     }
-    // Si no se pasa prefix, reusamos el del rango activo (o último si ninguno activo).
+    // Si no se pasa prefix, reusamos el del rango activo de ESTA sucursal.
     const previous = await this.repo
       .createQueryBuilder('s')
-      .where('s.docType = :dt', { dt: docType })
+      .where('s.docType = :dt AND s.branchId = :branchId', { dt: docType, branchId })
       .orderBy('s.isActive', 'DESC')
       .addOrderBy('s.createdAt', 'DESC')
       .getOne();
     const prefix = dto.prefix ?? previous?.prefix ?? docType;
 
-    return this.create({
-      docType,
-      prefix,
-      rangeFrom: dto.rangeFrom,
-      rangeTo: dto.rangeTo,
-      validUntil: dto.validUntil,
-    });
+    return this.create(
+      {
+        docType,
+        prefix,
+        rangeFrom: dto.rangeFrom,
+        rangeTo: dto.rangeTo,
+        validUntil: dto.validUntil,
+      },
+      branchId,
+    );
   }
 
   /**
@@ -162,14 +177,23 @@ export class FiscalSequencesService {
    * misma transacción del caller. Usar SIEMPRE desde dentro de un `uow.run()`.
    * Lanza si la secuencia no existe / está agotada / venció.
    */
-  async getNextNCF(ctx: TransactionContext, docType: string): Promise<NextNcfResult> {
+  async getNextNCF(
+    ctx: TransactionContext,
+    branchId: string | null,
+    docType: string,
+  ): Promise<NextNcfResult> {
+    if (!branchId) throw new FiscalSequenceExhaustedError(docType);
     const repo = ctx.manager.getRepository(FiscalSequenceOrmEntity);
 
-    // Lock pesimista — evita carrera entre cajeros concurrentes.
+    // Lock pesimista — evita carrera entre cajeros concurrentes de la MISMA
+    // sucursal. Cajeros de sucursales distintas usan filas activas distintas.
     const seq = await repo
       .createQueryBuilder('s')
       .setLock('pessimistic_write')
-      .where('s.docType = :dt AND s.isActive = true', { dt: docType })
+      .where('s.docType = :dt AND s.isActive = true AND s.branchId = :branchId', {
+        dt: docType,
+        branchId,
+      })
       .orderBy('s.createdAt', 'DESC')
       .getOne();
 

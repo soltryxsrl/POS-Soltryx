@@ -18,6 +18,7 @@ function toDomain(u: UserOrmEntity): AuthUser {
     fullName: u.fullName,
     passwordHash: u.passwordHash,
     isActive: u.isActive,
+    branchId: u.branchId,
     roles: roles.map((r) => r.code),
     permissions: [...permissions],
   };

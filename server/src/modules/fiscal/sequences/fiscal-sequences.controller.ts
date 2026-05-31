@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ActiveBranch } from '../../../common/branch/active-branch.decorator';
 import { RequirePermissions } from '../../auth/infrastructure/http/permissions.decorator';
 import { CreateFiscalSequenceRequestDto } from './dto/create-sequence.request-dto';
 import { RenewFiscalSequenceRequestDto } from './dto/renew-sequence.request-dto';
@@ -26,25 +27,27 @@ export class FiscalSequencesController {
   @Get()
   @RequirePermissions('fiscal.sequences.read')
   list(
+    @ActiveBranch() branchId: string,
     @Query('docType') docType?: string,
     @Query('activeOnly') activeOnly?: string,
   ) {
     return this.service.list({
       docType,
       activeOnly: activeOnly === 'true',
+      branchId,
     });
   }
 
   @Get(':id')
   @RequirePermissions('fiscal.sequences.read')
-  findById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findById(id);
+  findById(@Param('id', ParseUUIDPipe) id: string, @ActiveBranch() branchId: string) {
+    return this.service.findById(id, branchId);
   }
 
   @Post()
   @RequirePermissions('fiscal.sequences.manage')
-  create(@Body() dto: CreateFiscalSequenceRequestDto) {
-    return this.handle(() => this.service.create(dto));
+  create(@Body() dto: CreateFiscalSequenceRequestDto, @ActiveBranch() branchId: string) {
+    return this.handle(() => this.service.create(dto, branchId));
   }
 
   /**
@@ -56,8 +59,9 @@ export class FiscalSequencesController {
   renew(
     @Param('docType') docType: string,
     @Body() dto: RenewFiscalSequenceRequestDto,
+    @ActiveBranch() branchId: string,
   ) {
-    return this.handle(() => this.service.renew(docType, dto));
+    return this.handle(() => this.service.renew(docType, dto, branchId));
   }
 
   private async handle<T>(fn: () => Promise<T>): Promise<T> {

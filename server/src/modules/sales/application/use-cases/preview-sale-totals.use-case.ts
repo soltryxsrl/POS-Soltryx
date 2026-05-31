@@ -37,6 +37,8 @@ export interface PreviewSaleTotalsInput {
   }>;
   orderDiscount?: string;
   tipTotal?: string;
+  /** Sucursal activa: para evaluar solo promociones de esa sucursal. */
+  branchId: string;
 }
 
 export interface AppliedPromotion {
@@ -169,6 +171,7 @@ export class PreviewSaleTotalsUseCase {
       });
 
       const promoResult = await this.promotions.evaluate({
+        branchId: input.branchId,
         lines: lines
           .filter((l) => l.productId !== null)
           .map((l) => ({

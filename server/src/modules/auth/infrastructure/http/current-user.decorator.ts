@@ -5,6 +5,8 @@ export interface CurrentUserPayload {
   username: string;
   roles: string[];
   permissions: string[];
+  /** Sucursal HOME del usuario (de su JWT). Null para ADMIN sin sucursal. */
+  branchId: string | null;
 }
 
 /**

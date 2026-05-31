@@ -55,7 +55,7 @@ function completedSale(over: Record<string, unknown> = {}) {
     id: 'sale-1',
     status: 'COMPLETED',
     saleNumber: 'V-0001',
-    branchId: null,
+    branchId: 'br-1',
     customerId: null,
     subtotal: '100.00',
     taxTotal: '18.00',
@@ -88,7 +88,12 @@ function simpleItem(over: Record<string, unknown> = {}) {
   };
 }
 
-const input = { saleId: 'sale-1', reason: 'Error de cobro', userId: 'user-1' };
+const input = {
+  saleId: 'sale-1',
+  reason: 'Error de cobro',
+  userId: 'user-1',
+  branchId: 'br-1',
+};
 
 describe('CancelSaleUseCase (integración)', () => {
   it('rechaza si la venta no existe', async () => {

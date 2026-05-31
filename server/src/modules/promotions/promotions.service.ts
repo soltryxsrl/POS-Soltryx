@@ -7,6 +7,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import {
+  applyBranchFilter,
+  assertSameBranch,
+} from '../../common/branch/branch-scope.util';
+import {
   PromotionOrmEntity,
   PromotionType,
 } from './promotion.orm-entity';
@@ -30,7 +34,7 @@ export class PromotionsService {
     private readonly repo: Repository<PromotionOrmEntity>,
   ) {}
 
-  async list(q: ListPromotionsQuery = {}): Promise<PromotionsListResponse> {
+  async list(q: ListPromotionsQuery, branchId: string): Promise<PromotionsListResponse> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
     const sort = resolveSort(
@@ -53,6 +57,7 @@ export class PromotionsService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .take(limit)
       .skip(offset);
+    applyBranchFilter(qb, 'p', branchId);
 
     if (q.q) {
       qb.andWhere('LOWER(p.name) LIKE :term', { term: `%${q.q.toLowerCase()}%` });
@@ -84,14 +89,15 @@ export class PromotionsService {
     return { items: rows.map(toPromotionResponse), total };
   }
 
-  async findById(id: string): Promise<PromotionResponse> {
-    const p = await this.load(id);
+  async findById(id: string, branchId: string): Promise<PromotionResponse> {
+    const p = await this.load(id, branchId);
     return toPromotionResponse(p);
   }
 
-  async create(dto: CreatePromotionDto): Promise<PromotionResponse> {
+  async create(dto: CreatePromotionDto, branchId: string): Promise<PromotionResponse> {
     this.assertConsistency(dto);
     const entity = this.repo.create({
+      branchId,
       name: dto.name.trim(),
       description: dto.description?.trim() || null,
       type: dto.type,
@@ -112,8 +118,8 @@ export class PromotionsService {
     return toPromotionResponse(saved);
   }
 
-  async update(id: string, dto: UpdatePromotionDto): Promise<PromotionResponse> {
-    const current = await this.load(id);
+  async update(id: string, dto: UpdatePromotionDto, branchId: string): Promise<PromotionResponse> {
+    const current = await this.load(id, branchId);
     const merged = { ...current, ...dto } as PromotionOrmEntity;
     this.assertConsistency({
       type: (dto.type ?? current.type) as PromotionType,
@@ -143,14 +149,15 @@ export class PromotionsService {
     return toPromotionResponse(saved);
   }
 
-  async softDelete(id: string): Promise<void> {
-    const p = await this.load(id);
+  async softDelete(id: string, branchId: string): Promise<void> {
+    const p = await this.load(id, branchId);
     await this.repo.softRemove(p);
   }
 
-  private async load(id: string): Promise<PromotionOrmEntity> {
+  private async load(id: string, branchId?: string): Promise<PromotionOrmEntity> {
     const p = await this.repo.findOne({ where: { id } });
     if (!p) throw new NotFoundException(`Promoción ${id} no encontrada`);
+    if (branchId) assertSameBranch(p.branchId, branchId);
     return p;
   }
 

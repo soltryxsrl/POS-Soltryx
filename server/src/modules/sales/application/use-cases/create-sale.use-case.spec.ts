@@ -7,6 +7,7 @@ import {
   DiscountOverrideRequiredError,
   OpenItemInvalidError,
   PaymentInsufficientError,
+  ProductNotForSaleError,
   SaleHasNoItemsError,
   SaleHasNoPaymentsError,
 } from '../../domain/errors/sale.errors';
@@ -202,6 +203,59 @@ describe('CreateSaleUseCase (integración)', () => {
         baseInput({ payments: [{ method: PaymentMethod.CASH, amount: '100.00' }] }),
       ),
     ).rejects.toThrow(PaymentInsufficientError);
+  });
+
+  it('anti-IDOR: rechaza un producto de OTRA sucursal (branchId distinto al de la venta)', async () => {
+    const m = makeMocks();
+    // La venta es de la sucursal B1; el producto pertenece a B2.
+    m.sessionValidator.validateOpen.mockResolvedValueOnce({
+      id: 'sess-1',
+      cashRegisterId: 'cr-1',
+      openedById: 'user-1',
+      branchId: 'B1',
+    });
+    m.pricing.findManyForSale.mockResolvedValueOnce([
+      {
+        id: 'p1',
+        branchId: 'B2',
+        name: 'Producto ajeno',
+        sku: 'SKU1',
+        salePrice: '100.00',
+        taxRate: '18.00',
+        isActive: true,
+        isKit: false,
+        kitComponents: [],
+        hasVariants: false,
+      },
+    ]);
+    await expect(makeUseCase(m).execute(baseInput())).rejects.toThrow(ProductNotForSaleError);
+    expect(m.saleRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('acepta un producto de la MISMA sucursal de la venta', async () => {
+    const m = makeMocks();
+    m.sessionValidator.validateOpen.mockResolvedValueOnce({
+      id: 'sess-1',
+      cashRegisterId: 'cr-1',
+      openedById: 'user-1',
+      branchId: 'B1',
+    });
+    m.pricing.findManyForSale.mockResolvedValueOnce([
+      {
+        id: 'p1',
+        branchId: 'B1',
+        name: 'Producto propio',
+        sku: 'SKU1',
+        salePrice: '100.00',
+        taxRate: '18.00',
+        isActive: true,
+        isKit: false,
+        kitComponents: [],
+        hasVariants: false,
+      },
+    ]);
+    const sale = await makeUseCase(m).execute(baseInput());
+    expect(sale.id).toBe('sale-1');
   });
 
   it('rechaza si la sesión de caja no está abierta', async () => {

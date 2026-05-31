@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../../common/persistence/unit-of-work.port';
+import { assertSameBranch } from '../../../../common/branch/branch-scope.util';
 import { AuditService } from '../../../audit/audit.service';
 import { CustomerAccountService } from '../../../customer-account/customer-account.service';
 import { FiscalDocumentOrmEntity } from '../../../fiscal/documents/fiscal-document.orm-entity';
@@ -30,6 +31,7 @@ export interface CancelSaleInput {
   saleId: string;
   reason: string;
   userId: string;
+  branchId: string;
 }
 
 @Injectable()
@@ -48,6 +50,7 @@ export class CancelSaleUseCase {
   async execute(input: CancelSaleInput): Promise<Sale> {
     const sale = await this.saleRepo.findById(input.saleId);
     if (!sale) throw new SaleNotFoundError(input.saleId);
+    assertSameBranch(sale.branchId, input.branchId);
     if (sale.status !== SaleStatus.COMPLETED) {
       throw new SaleNotCancellableError(sale.id, sale.status);
     }

@@ -159,6 +159,16 @@ export class CreateSaleUseCase {
         ),
       ];
       const products = await this.pricing.findManyForSale(ctx, productIds);
+      // Anti-IDOR: cada producto debe pertenecer a la sucursal de la venta. El
+      // cliente solo muestra los de la sucursal, pero la API no debe confiar en
+      // eso (un request manipulado podría inyectar productos de otra sucursal).
+      if (session.branchId) {
+        for (const p of products) {
+          if (p.branchId !== session.branchId) {
+            throw new ProductNotForSaleError(p.id, 'no pertenece a esta sucursal');
+          }
+        }
+      }
       const byId = new Map(products.map((p) => [p.id, p]));
       const variantIds = [
         ...new Set(input.items.map((i) => i.variantId).filter((v): v is string => !!v)),
@@ -250,6 +260,7 @@ export class CreateSaleUseCase {
       // 2.5) Evaluar promociones activas. Devuelve descuentos a sumar a las
       //      líneas (sobre el manual del cajero) y/o al descuento de orden.
       const promoResult = await this.promotions.evaluate({
+        branchId: session.branchId,
         lines: lines
           .filter((l) => l.productId !== null)
           .map((l) => ({

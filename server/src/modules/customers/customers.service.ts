@@ -7,6 +7,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import {
+  applyBranchFilter,
+  assertSameBranch,
+} from '../../common/branch/branch-scope.util';
 import { CustomerOrmEntity } from './customer.orm-entity';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { ListCustomersQuery } from './dto/list-customers.query';
@@ -24,7 +28,7 @@ export class CustomersService {
     private readonly repo: Repository<CustomerOrmEntity>,
   ) {}
 
-  async list(q: ListCustomersQuery): Promise<CustomersListResponse> {
+  async list(q: ListCustomersQuery, branchId: string): Promise<CustomersListResponse> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
 
@@ -46,6 +50,7 @@ export class CustomersService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .skip(offset)
       .take(limit);
+    applyBranchFilter(qb, 'c', branchId);
 
     if (q.q) {
       const search = `%${q.q.toLowerCase()}%`;
@@ -61,17 +66,19 @@ export class CustomersService {
     return { items: items.map(toCustomerResponse), total, limit, offset };
   }
 
-  async findById(id: string): Promise<CustomerResponse> {
+  async findById(id: string, branchId: string): Promise<CustomerResponse> {
     const c = await this.loadById(id);
+    assertSameBranch(c.branchId, branchId);
     return toCustomerResponse(c);
   }
 
-  async create(dto: CreateCustomerDto): Promise<CustomerResponse> {
+  async create(dto: CreateCustomerDto, branchId: string): Promise<CustomerResponse> {
     if (dto.document) {
       this.assertDocumentFormat(dto.documentType ?? null, dto.document);
-      await this.assertDocumentAvailable(dto.documentType ?? null, dto.document);
+      await this.assertDocumentAvailable(dto.documentType ?? null, dto.document, branchId);
     }
     const entity = this.repo.create({
+      branchId,
       fullName: dto.fullName.trim(),
       documentType: dto.documentType ?? null,
       document: dto.document?.trim() || null,
@@ -84,14 +91,15 @@ export class CustomersService {
     return toCustomerResponse(saved);
   }
 
-  async update(id: string, dto: UpdateCustomerDto): Promise<CustomerResponse> {
+  async update(id: string, dto: UpdateCustomerDto, branchId: string): Promise<CustomerResponse> {
     const current = await this.loadById(id);
+    assertSameBranch(current.branchId, branchId);
 
     if (dto.document !== undefined && dto.document !== current.document) {
       if (dto.document) {
         const effectiveType = dto.documentType ?? current.documentType;
         this.assertDocumentFormat(effectiveType, dto.document);
-        await this.assertDocumentAvailable(effectiveType, dto.document, id);
+        await this.assertDocumentAvailable(effectiveType, dto.document, branchId, id);
       }
       current.document = dto.document?.trim() || null;
     }
@@ -106,8 +114,9 @@ export class CustomersService {
     return toCustomerResponse(saved);
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, branchId: string): Promise<void> {
     const c = await this.loadById(id);
+    assertSameBranch(c.branchId, branchId);
     await this.repo.softRemove(c);
   }
 
@@ -145,11 +154,13 @@ export class CustomersService {
   private async assertDocumentAvailable(
     documentType: string | null,
     document: string,
+    branchId: string,
     excludeId?: string,
   ): Promise<void> {
     const qb = this.repo
       .createQueryBuilder('c')
       .where('c.document = :doc', { doc: document })
+      .andWhere('c.branchId = :branchId', { branchId })
       .andWhere('c.deletedAt IS NULL');
     if (documentType) qb.andWhere('c.documentType = :dt', { dt: documentType });
     if (excludeId) qb.andWhere('c.id <> :id', { id: excludeId });

@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import { BranchesService } from '../branches/branches.service';
 import {
   PASSWORD_HASHER,
   type PasswordHasher,
@@ -28,6 +29,7 @@ export class UsersService {
     @InjectRepository(UserOrmEntity) private readonly users: Repository<UserOrmEntity>,
     @InjectRepository(RoleOrmEntity) private readonly roles: Repository<RoleOrmEntity>,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    private readonly branches: BranchesService,
   ) {}
 
   async list(q: ListUsersQuery): Promise<UsersListResponse> {
@@ -93,6 +95,7 @@ export class UsersService {
     await this.assertUsernameAvailable(dto.username);
 
     const roles = await this.loadRoles(dto.roleIds ?? []);
+    const branchId = await this.resolveBranchForRoles(dto.branchId ?? null, roles);
     const passwordHash = await this.hasher.hash(dto.password);
 
     const entity = this.users.create({
@@ -101,6 +104,7 @@ export class UsersService {
       fullName: dto.fullName.trim(),
       passwordHash,
       isActive: dto.isActive ?? true,
+      branchId,
       roles,
     });
     const saved = await this.users.save(entity);
@@ -122,6 +126,13 @@ export class UsersService {
     if (typeof dto.isActive === 'boolean') current.isActive = dto.isActive;
     if (dto.password) current.passwordHash = await this.hasher.hash(dto.password);
     if (dto.roleIds) current.roles = await this.loadRoles(dto.roleIds);
+
+    // Sucursal: revalidar si cambió la sucursal o los roles (no-admin requiere sucursal).
+    if (dto.branchId !== undefined) {
+      current.branchId = await this.resolveBranchForRoles(dto.branchId ?? null, current.roles);
+    } else if (dto.roleIds) {
+      current.branchId = await this.resolveBranchForRoles(current.branchId, current.roles);
+    }
 
     const saved = await this.users.save(current);
     return toUserResponse(saved);
@@ -177,5 +188,29 @@ export class UsersService {
     if (excludeId) qb.andWhere('u.id <> :id', { id: excludeId });
     const exists = await qb.getOne();
     if (exists) throw new ConflictException(`Username "${username}" ya está en uso`);
+  }
+
+  /**
+   * Regla de sucursal: los usuarios sin rol ADMIN deben tener una sucursal
+   * (es su sucursal HOME). ADMIN puede no tener (opera todas con el selector).
+   * Valida que la sucursal exista y esté activa.
+   */
+  private async resolveBranchForRoles(
+    branchId: string | null,
+    roles: RoleOrmEntity[],
+  ): Promise<string | null> {
+    const isAdmin = roles.some((r) => r.code === 'ADMIN');
+    if (!branchId) {
+      if (!isAdmin) {
+        throw new ConflictException(
+          'Los usuarios sin rol ADMIN deben tener una sucursal asignada',
+        );
+      }
+      return null;
+    }
+    if (!(await this.branches.isActiveBranch(branchId))) {
+      throw new NotFoundException(`Sucursal ${branchId} no existe o está inactiva`);
+    }
+    return branchId;
   }
 }

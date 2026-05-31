@@ -107,7 +107,10 @@ export class ReturnsService {
     return rows.map((r) => toResponse(r, sale?.saleNumber ?? null));
   }
 
-  async list(q: ListReturnsQuery): Promise<{ items: SaleReturnResponse[]; total: number }> {
+  async list(
+    q: ListReturnsQuery,
+    branchId: string,
+  ): Promise<{ items: SaleReturnResponse[]; total: number }> {
     const limit = q.limit ?? 50;
     const offset = q.offset ?? 0;
     const sort = resolveSort(
@@ -134,6 +137,7 @@ export class ReturnsService {
         term: `%${q.q.toLowerCase()}%`,
       });
     }
+    qb.andWhere('r.branchId = :branchId', { branchId });
     if (q.saleId) qb.andWhere('r.saleId = :sid', { sid: q.saleId });
     if (q.userId) qb.andWhere('r.userId = :uid', { uid: q.userId });
     if (q.refundMethod) qb.andWhere('r.refundMethod = :rm', { rm: q.refundMethod });

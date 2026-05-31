@@ -54,8 +54,9 @@ export class ReportsService {
    * Resumen completo del día (timezone-aware: usa la zona de la conexión).
    * Por defecto: hoy en la TZ de la app.
    */
-  async dailySummary(date: string): Promise<DailySalesSummary> {
-    // Sumas globales (solo COMPLETED), conteo de canceladas aparte
+  async dailySummary(date: string, branchId: string | null): Promise<DailySalesSummary> {
+    // branchId null = CONSOLIDADO (todas las sucursales). El patrón
+    // `$2::uuid IS NULL OR ... = $2` filtra por sucursal o no, según el param.
     const [agg]: Array<{
       sales_count: string;
       subtotal: string | null;
@@ -70,16 +71,18 @@ export class ReportsService {
               COALESCE(SUM(total), 0)::text AS total
        FROM sales
        WHERE status = 'COMPLETED'
+         AND ($2::uuid IS NULL OR branch_id = $2)
          AND created_at::date = $1::date`,
-      [date],
+      [date, branchId],
     );
 
     const [cancelledRow]: Array<{ cancelled_count: number }> = await this.ds.query(
       `SELECT COUNT(*)::int AS cancelled_count
        FROM sales
        WHERE status = 'CANCELLED'
+         AND ($2::uuid IS NULL OR branch_id = $2)
          AND created_at::date = $1::date`,
-      [date],
+      [date, branchId],
     );
 
     const byMethod: Array<{ method: string; count: number; total: string }> =
@@ -90,11 +93,12 @@ export class ReportsService {
          FROM payments p
          JOIN sales s ON s.id = p.sale_id
          WHERE s.status = 'COMPLETED'
+           AND ($2::uuid IS NULL OR s.branch_id = $2)
            AND s.created_at::date = $1::date
            AND p.status = 'COMPLETED'
          GROUP BY p.method
          ORDER BY total DESC`,
-        [date],
+        [date, branchId],
       );
 
     const byUser: Array<{
@@ -112,10 +116,11 @@ export class ReportsService {
        FROM sales s
        JOIN users u ON u.id = s.user_id
        WHERE s.status = 'COMPLETED'
+         AND ($2::uuid IS NULL OR s.branch_id = $2)
          AND s.created_at::date = $1::date
        GROUP BY s.user_id, u.username, u.full_name
        ORDER BY total DESC`,
-      [date],
+      [date, branchId],
     );
 
     return {
@@ -141,7 +146,12 @@ export class ReportsService {
     };
   }
 
-  async topProducts(from: string, to: string, limit = 10): Promise<TopProduct[]> {
+  async topProducts(
+    from: string,
+    to: string,
+    limit: number,
+    branchId: string | null,
+  ): Promise<TopProduct[]> {
     const rows: Array<{
       product_id: string;
       name: string;
@@ -157,11 +167,12 @@ export class ReportsService {
        FROM sale_items si
        JOIN sales s ON s.id = si.sale_id
        WHERE s.status = 'COMPLETED'
+         AND ($4::uuid IS NULL OR s.branch_id = $4)
          AND s.created_at::date BETWEEN $1::date AND $2::date
        GROUP BY si.product_id
        ORDER BY revenue DESC
        LIMIT $3`,
-      [from, to, limit],
+      [from, to, limit, branchId],
     );
     return rows.map((r) => ({
       productId: r.product_id,
@@ -172,7 +183,7 @@ export class ReportsService {
     }));
   }
 
-  async lowStock(): Promise<LowStockProduct[]> {
+  async lowStock(branchId: string | null): Promise<LowStockProduct[]> {
     const rows: Array<{
       id: string;
       name: string;
@@ -186,10 +197,12 @@ export class ReportsService {
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.is_active = true
+         AND ($1::uuid IS NULL OR p.branch_id = $1)
          AND p.deleted_at IS NULL
          AND p.min_stock > 0
          AND p.stock <= p.min_stock
        ORDER BY (p.stock - p.min_stock) ASC, p.name ASC`,
+      [branchId],
     );
     return rows.map((r) => ({
       id: r.id,
@@ -201,7 +214,7 @@ export class ReportsService {
     }));
   }
 
-  async salesByMethod(from: string, to: string): Promise<SalesByMethod[]> {
+  async salesByMethod(from: string, to: string, branchId: string | null): Promise<SalesByMethod[]> {
     const rows: Array<{ method: string; count: number; total: string }> =
       await this.ds.query(
         `SELECT p.method::text AS method,
@@ -211,10 +224,11 @@ export class ReportsService {
          JOIN sales s ON s.id = p.sale_id
          WHERE s.status = 'COMPLETED'
            AND p.status = 'COMPLETED'
+           AND ($3::uuid IS NULL OR s.branch_id = $3)
            AND s.created_at::date BETWEEN $1::date AND $2::date
          GROUP BY p.method
          ORDER BY total DESC`,
-        [from, to],
+        [from, to, branchId],
       );
     return rows.map((r) => ({
       method: r.method,
@@ -223,7 +237,7 @@ export class ReportsService {
     }));
   }
 
-  async sessionsByUser(from: string, to: string): Promise<SessionsByUser[]> {
+  async sessionsByUser(from: string, to: string, branchId: string | null): Promise<SessionsByUser[]> {
     const rows: Array<{
       user_id: string;
       username: string;
@@ -241,10 +255,11 @@ export class ReportsService {
        FROM cash_sessions cs
        JOIN users u ON u.id = cs.opened_by_id
        LEFT JOIN sales s ON s.cash_session_id = cs.id
-       WHERE cs.opened_at::date BETWEEN $1::date AND $2::date
+       WHERE ($3::uuid IS NULL OR cs.branch_id = $3)
+         AND cs.opened_at::date BETWEEN $1::date AND $2::date
        GROUP BY u.id, u.username, u.full_name
        ORDER BY total_sold DESC`,
-      [from, to],
+      [from, to, branchId],
     );
     return rows.map((r) => ({
       userId: r.user_id,

@@ -10,6 +10,7 @@ export interface AuthUser {
   readonly fullName: string;
   readonly passwordHash: string;
   readonly isActive: boolean;
+  readonly branchId: string | null; // sucursal HOME (null = ADMIN sin sucursal)
   readonly roles: ReadonlyArray<string>; // códigos de rol (ADMIN, MANAGER, CASHIER)
   readonly permissions: ReadonlyArray<string>; // permisos efectivos (unión de roles)
 }
@@ -22,6 +23,7 @@ export interface AuthUserPublic {
   email: string;
   username: string;
   fullName: string;
+  branchId: string | null;
   roles: string[];
   permissions: string[];
 }
@@ -32,6 +34,7 @@ export function toPublic(user: AuthUser): AuthUserPublic {
     email: user.email,
     username: user.username,
     fullName: user.fullName,
+    branchId: user.branchId,
     roles: [...user.roles],
     permissions: [...user.permissions],
   };

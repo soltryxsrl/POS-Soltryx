@@ -75,6 +75,8 @@ export interface ListFiscalDocumentsParams {
   to?: string;
   limit?: number;
   offset?: number;
+  /** Sucursal activa: solo se listan los comprobantes de esa sucursal. */
+  branchId: string;
 }
 
 export interface FiscalDocumentListItem {
@@ -115,6 +117,7 @@ export class FiscalDocumentsService {
     const offset = params.offset ?? 0;
     const qb = this.docs
       .createQueryBuilder('d')
+      .where('d.branchId = :branchId', { branchId: params.branchId })
       .orderBy('d.issueDate', 'DESC')
       .addOrderBy('d.createdAt', 'DESC')
       .take(limit)
@@ -196,7 +199,7 @@ export class FiscalDocumentsService {
       );
     }
 
-    const next = await this.sequences.getNextNCF(ctx, docType.code);
+    const next = await this.sequences.getNextNCF(ctx, input.branchId, docType.code);
 
     const repo = ctx.manager.getRepository(FiscalDocumentOrmEntity);
     const itemsRepo = ctx.manager.getRepository(FiscalDocumentItemOrmEntity);
@@ -284,7 +287,7 @@ export class FiscalDocumentsService {
     // garantiza atomicidad entre getNextNCF + insert (concurrent-safe).
     return this.docs.manager.transaction(async (manager) => {
       const ctx = { manager };
-      const next = await this.sequences.getNextNCF(ctx, docType.code);
+      const next = await this.sequences.getNextNCF(ctx, input.branchId, docType.code);
 
       const repo = manager.getRepository(FiscalDocumentOrmEntity);
       const itemsRepo = manager.getRepository(FiscalDocumentItemOrmEntity);

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { assertSameBranch } from '../../../../common/branch/branch-scope.util';
 import { UNIT_OF_WORK, type UnitOfWork } from '../../../../common/persistence/unit-of-work.port';
 import { QueryFailedError } from 'typeorm';
 import type {
@@ -27,6 +28,8 @@ export interface OpenCashSessionInput {
   openingDenominations?: DenominationCounts | null;
   notes?: string | null;
   openedById: string;
+  /** Sucursal activa del usuario: la caja debe pertenecer a ella. */
+  activeBranchId: string;
 }
 
 @Injectable()
@@ -54,6 +57,8 @@ export class OpenCashSessionUseCase {
     const register = await this.registers.findById(input.cashRegisterId);
     if (!register) throw new CashRegisterNotFoundError(input.cashRegisterId);
     if (!register.isActive) throw new CashRegisterInactiveError(register.id);
+    // La caja debe pertenecer a la sucursal activa del usuario.
+    assertSameBranch(register.branchId, input.activeBranchId);
 
     const existing = await this.sessions.findActiveForRegister(register.id);
     if (existing) throw new CashSessionAlreadyOpenError(register.id, existing.id);

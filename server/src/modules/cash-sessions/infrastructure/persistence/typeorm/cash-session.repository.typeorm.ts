@@ -127,6 +127,7 @@ export class CashSessionRepositoryTypeOrm implements CashSessionRepository {
     if (filter.cashRegisterId)
       qb.andWhere('s.cash_register_id = :cr', { cr: filter.cashRegisterId });
     if (filter.openedById) qb.andWhere('s.opened_by_id = :u', { u: filter.openedById });
+    if (filter.branchId) qb.andWhere('s.branch_id = :branchId', { branchId: filter.branchId });
     if (filter.from) qb.andWhere('s.opened_at >= :from', { from: filter.from });
     if (filter.to) qb.andWhere('s.opened_at <= :to', { to: filter.to });
     const [items, total] = await qb.getManyAndCount();

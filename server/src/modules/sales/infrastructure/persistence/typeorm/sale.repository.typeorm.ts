@@ -283,6 +283,7 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
     if (filter.cashSessionId)
       qb.andWhere('s.cashSessionId = :cs', { cs: filter.cashSessionId });
     if (filter.userId) qb.andWhere('s.userId = :u', { u: filter.userId });
+    if (filter.branchId) qb.andWhere('s.branchId = :branchId', { branchId: filter.branchId });
     if (filter.from) qb.andWhere('s.createdAt >= :from', { from: filter.from });
     if (filter.to) qb.andWhere('s.createdAt <= :to', { to: filter.to });
     const [items, total] = await qb.getManyAndCount();
