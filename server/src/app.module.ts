@@ -23,6 +23,7 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
+import { StockCountsModule } from './modules/stock-counts/stock-counts.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { TaxTypesModule } from './modules/tax-types/tax-types.module';
 import { RbacModule } from './modules/rbac/rbac.module';
@@ -61,6 +62,7 @@ import { PersistenceModule } from './common/persistence/persistence.module';
     PurchasesModule,
     ReturnsModule,
     StockTransfersModule,
+    StockCountsModule,
     FiscalModule,
     PromotionsModule,
     CurrenciesModule,
