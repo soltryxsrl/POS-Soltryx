@@ -454,6 +454,10 @@ function PaymentMethodsChart({
     color:
       METHOD_PALETTE[m.method]?.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
   }));
+  // Los % y barras se calculan sobre la SUMA de los métodos (no el total de
+  // ventas) para que siempre sumen 100% y la barra nunca se desborde, aunque la
+  // data difiera del total por redondeos.
+  const methodsTotal = data.reduce((s, m) => s + Number(m.total), 0);
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
@@ -468,7 +472,7 @@ function PaymentMethodsChart({
         {data.map((m, i) => {
           const meta = METHOD_PALETTE[m.method];
           const color = meta?.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length];
-          const pct = total > 0 ? (Number(m.total) / total) * 100 : 0;
+          const pct = methodsTotal > 0 ? (Number(m.total) / methodsTotal) * 100 : 0;
           return (
             <li key={m.method} className="space-y-1">
               <div className="flex items-center gap-2 text-xs">
@@ -485,7 +489,7 @@ function PaymentMethodsChart({
               </div>
               <BarRow
                 value={Number(m.total)}
-                max={total}
+                max={methodsTotal}
                 className="h-1"
               />
               <div className="flex justify-between text-[10px] text-muted-foreground">

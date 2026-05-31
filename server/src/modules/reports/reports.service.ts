@@ -156,6 +156,26 @@ export class ReportsService {
         [date, branchId],
       );
 
+    // El monto por método suma p.amount (lo TENDIDO). En efectivo eso incluye el
+    // vuelto, así que la suma de métodos excede el total de ventas. Calculamos el
+    // vuelto total (solo el efectivo da vuelto) para descontarlo del efectivo y
+    // que los métodos reconcilien con el total de ventas.
+    const [changeRow]: Array<{ change: string }> = await this.ds.query(
+      `SELECT COALESCE(SUM(GREATEST(0, paid - total)), 0)::text AS change
+       FROM (
+         SELECT s.total, SUM(p.amount) AS paid
+         FROM sales s
+         JOIN payments p ON p.sale_id = s.id
+         WHERE s.status = 'COMPLETED'
+           AND ($2::uuid IS NULL OR s.branch_id = $2)
+           AND s.created_at::date = $1::date
+           AND p.status = 'COMPLETED'
+         GROUP BY s.id, s.total
+       ) t`,
+      [date, branchId],
+    );
+    const cashChange = Number(changeRow?.change ?? 0);
+
     const byUser: Array<{
       user_id: string;
       username: string;
@@ -186,11 +206,17 @@ export class ReportsService {
       discountTotal: agg?.discount_total ?? '0.00',
       taxTotal: agg?.tax_total ?? '0.00',
       total: agg?.total ?? '0.00',
-      byMethod: byMethod.map((r) => ({
-        method: r.method,
-        count: Number(r.count),
-        total: r.total,
-      })),
+      byMethod: byMethod
+        .map((r) => ({
+          method: r.method,
+          count: Number(r.count),
+          // El efectivo se neta del vuelto; los demás métodos no dan vuelto.
+          total:
+            r.method === 'CASH'
+              ? Math.max(0, Number(r.total) - cashChange).toFixed(2)
+              : r.total,
+        }))
+        .sort((a, b) => Number(b.total) - Number(a.total)),
       byUser: byUser.map((r) => ({
         userId: r.user_id,
         username: r.username,
@@ -285,11 +311,33 @@ export class ReportsService {
          ORDER BY total DESC`,
         [from, to, branchId],
       );
-    return rows.map((r) => ({
-      method: r.method,
-      count: Number(r.count),
-      total: r.total,
-    }));
+    // p.amount incluye el vuelto en efectivo → descontamos el vuelto del efectivo
+    // para que los métodos reconcilien con el total vendido (solo efectivo da vuelto).
+    const [changeRow]: Array<{ change: string }> = await this.ds.query(
+      `SELECT COALESCE(SUM(GREATEST(0, paid - total)), 0)::text AS change
+       FROM (
+         SELECT s.total, SUM(p.amount) AS paid
+         FROM sales s
+         JOIN payments p ON p.sale_id = s.id
+         WHERE s.status = 'COMPLETED'
+           AND p.status = 'COMPLETED'
+           AND ($3::uuid IS NULL OR s.branch_id = $3)
+           AND s.created_at::date BETWEEN $1::date AND $2::date
+         GROUP BY s.id, s.total
+       ) t`,
+      [from, to, branchId],
+    );
+    const cashChange = Number(changeRow?.change ?? 0);
+    return rows
+      .map((r) => ({
+        method: r.method,
+        count: Number(r.count),
+        total:
+          r.method === 'CASH'
+            ? Math.max(0, Number(r.total) - cashChange).toFixed(2)
+            : r.total,
+      }))
+      .sort((a, b) => Number(b.total) - Number(a.total));
   }
 
   async sessionsByUser(from: string, to: string, branchId: string | null): Promise<SessionsByUser[]> {
