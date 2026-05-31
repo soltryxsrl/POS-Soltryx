@@ -134,8 +134,10 @@ export class RegisterStockMovementUseCase implements StockMovementRecorder {
       case StockMovementType.PURCHASE:
       case StockMovementType.RETURN:
       case StockMovementType.CANCELLED_SALE:
+      case StockMovementType.TRANSFER_IN:
         return absQty; // entra stock (+)
       case StockMovementType.SALE:
+      case StockMovementType.TRANSFER_OUT:
         return `-${absQty}`; // sale stock (-)
       default: {
         const _exhaustive: never = type;
