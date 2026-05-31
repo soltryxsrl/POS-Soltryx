@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Coins, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import {
   DataTable,
@@ -144,13 +144,6 @@ export function CurrenciesTable() {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-        <Coins className="mr-1.5 inline h-3.5 w-3.5 align-text-bottom" />
-        La <strong>moneda base</strong> es el peso dominicano (DOP). Toda venta
-        se totaliza en DOP. Las demás monedas se aceptan como medio de pago y
-        se convierten automáticamente usando la tasa configurada.
-      </div>
-
       <DataTable<Currency>
         columns={columns}
         rows={sort.sorted}
