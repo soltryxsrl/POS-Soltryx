@@ -12,6 +12,15 @@ export const reportsKey = {
     ['reports', 'by-method', params] as const,
   byUser: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'by-user', params] as const,
+  valuation: (branchId?: string) => ['reports', 'valuation', branchId ?? null] as const,
+  margins: (params: { from?: string; to?: string; limit?: number; branchId?: string }) =>
+    ['reports', 'margins', params] as const,
+  slowMovers: (params: { days?: number; limit?: number; branchId?: string }) =>
+    ['reports', 'slow-movers', params] as const,
+  byCategory: (params: { from?: string; to?: string; branchId?: string }) =>
+    ['reports', 'by-category', params] as const,
+  returns: (params: { from?: string; to?: string; branchId?: string }) =>
+    ['reports', 'returns-analysis', params] as const,
 };
 
 export function useDailySales(date: string, branchId?: string) {
@@ -48,5 +57,44 @@ export function useSessionsByUser(params: { from?: string; to?: string; branchId
   return useQuery({
     queryKey: reportsKey.byUser(params),
     queryFn: () => reportsApiHttp.sessionsByUser(params),
+  });
+}
+
+export function useInventoryValuation(branchId?: string) {
+  return useQuery({
+    queryKey: reportsKey.valuation(branchId),
+    queryFn: () => reportsApiHttp.inventoryValuation(branchId),
+  });
+}
+
+export function useProductMargins(
+  params: { from?: string; to?: string; limit?: number; branchId?: string } = {},
+) {
+  return useQuery({
+    queryKey: reportsKey.margins(params),
+    queryFn: () => reportsApiHttp.productMargins(params),
+  });
+}
+
+export function useSlowMovers(
+  params: { days?: number; limit?: number; branchId?: string } = {},
+) {
+  return useQuery({
+    queryKey: reportsKey.slowMovers(params),
+    queryFn: () => reportsApiHttp.slowMovers(params),
+  });
+}
+
+export function useSalesByCategory(params: { from?: string; to?: string; branchId?: string } = {}) {
+  return useQuery({
+    queryKey: reportsKey.byCategory(params),
+    queryFn: () => reportsApiHttp.salesByCategory(params),
+  });
+}
+
+export function useReturnsAnalysis(params: { from?: string; to?: string; branchId?: string } = {}) {
+  return useQuery({
+    queryKey: reportsKey.returns(params),
+    queryFn: () => reportsApiHttp.returnsAnalysis(params),
   });
 }

@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import {
+  InventoryValuationCard,
+  ProductMarginsTable,
+  ReturnsAnalysisCard,
+  SalesByCategoryTable,
+  SlowMoversTable,
+} from '@/features/reports/ui/components/AnalysisReports';
 import { DailySummaryCards } from '@/features/reports/ui/components/DailySummaryCards';
 import { LowStockTable } from '@/features/reports/ui/components/LowStockTable';
 import { TopProductsTable } from '@/features/reports/ui/components/TopProductsTable';
@@ -75,6 +82,19 @@ export default function ReportsPage() {
           <TopProductsTable from={from} to={to} limit={10} branchId={branchId} />
           <LowStockTable branchId={branchId} />
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ProductMarginsTable from={from} to={to} branchId={branchId} />
+          <SalesByCategoryTable from={from} to={to} branchId={branchId} />
+        </div>
+
+        <ReturnsAnalysisCard from={from} to={to} branchId={branchId} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Inventario</h2>
+        <InventoryValuationCard branchId={branchId} />
+        <SlowMoversTable days={30} branchId={branchId} />
       </section>
     </div>
   );
