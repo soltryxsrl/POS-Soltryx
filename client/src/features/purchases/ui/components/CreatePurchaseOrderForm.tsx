@@ -12,6 +12,7 @@ import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { Textarea } from '@/shared/ui/controls/Textarea';
+import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { useFiscalDocTypes } from '@/features/fiscal/application/hooks/use-fiscal';
 import { useProducts } from '@/features/products/application/hooks/use-products';
 import { useSuppliers } from '@/features/suppliers/application/hooks/use-suppliers';
@@ -452,23 +453,9 @@ function ProductPicker({
   const products = useProducts({ q: q || undefined, limit: 30 });
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-20"
-    >
-      <div className="w-full max-w-xl rounded-2xl border bg-card p-4 shadow-xl">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Buscar producto</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
-          >
-            ×
-          </button>
-        </div>
-        <div className="relative my-3">
+    <MaintenanceShell open onClose={onClose} title="Buscar producto" size="xl">
+      <div className="space-y-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             autoFocus
@@ -520,7 +507,7 @@ function ProductPicker({
           </ul>
         </div>
       </div>
-    </div>
+    </MaintenanceShell>
   );
 }
 

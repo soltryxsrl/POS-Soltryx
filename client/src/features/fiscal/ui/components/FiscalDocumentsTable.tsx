@@ -7,8 +7,11 @@ import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Button } from '@/shared/ui/controls/Button';
+import { FormField } from '@/shared/ui/controls/FormField';
+import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
+import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import {
   DataTable,
   useTableQueryState,
@@ -63,37 +66,42 @@ function VoidButton({ doc }: { doc: FiscalDocumentListItem }) {
         Anular
       </Button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setOpen(false)}
+        <MaintenanceShell
+          open
+          onClose={() => setOpen(false)}
+          title="Anular comprobante"
+          size="sm"
         >
-          <div
-            className="w-80 rounded-xl border border-border bg-card p-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-semibold">Anular comprobante</h3>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{doc.ncf}</p>
-            <label className="mt-3 block text-xs font-medium text-muted-foreground">
-              Tipo de anulación (608)
-            </label>
-            <Select value={tipo} onChange={(e) => setTipo(e.target.value)} className="mt-1">
-              {TIPO_ANULACION.map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
-            {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setOpen(false)}>
+          <div className="space-y-4">
+            <p className="font-mono text-xs text-muted-foreground">{doc.ncf}</p>
+            <FormField label="Tipo de anulación (608)">
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                {TIPO_ANULACION.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            {err && <p className="text-xs text-destructive">{err}</p>}
+            <FormFooter>
+              <Button
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={voidDoc.isPending}
+              >
                 Cancelar
               </Button>
-              <Button variant="destructive" onClick={onConfirm} disabled={voidDoc.isPending}>
+              <Button
+                variant="destructive"
+                onClick={onConfirm}
+                disabled={voidDoc.isPending}
+              >
                 {voidDoc.isPending ? 'Anulando…' : 'Anular'}
               </Button>
-            </div>
+            </FormFooter>
           </div>
-        </div>
+        </MaintenanceShell>
       )}
     </>
   );
