@@ -11,6 +11,8 @@ export interface ProductStockSnapshot {
 export interface VariantStockSnapshot {
   variantId: string;
   productId: string;
+  /** Sucursal de la variante (denormalizada = la del producto padre). */
+  branchId: string | null;
   stock: string;
 }
 

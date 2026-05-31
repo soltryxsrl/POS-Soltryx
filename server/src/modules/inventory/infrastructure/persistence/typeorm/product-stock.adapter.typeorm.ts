@@ -46,6 +46,7 @@ export class ProductStockAdapterTypeOrm implements ProductStockPort {
     return {
       variantId: row.id,
       productId: row.productId,
+      branchId: row.branchId,
       stock: row.stock,
     };
   }

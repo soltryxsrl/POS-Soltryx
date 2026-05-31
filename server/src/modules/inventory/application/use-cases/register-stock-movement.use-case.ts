@@ -63,7 +63,9 @@ export class RegisterStockMovementUseCase implements StockMovementRecorder {
         }
       }
       const saved = await this.movementRepo.save(ctx, {
-        branchId: input.branchId ?? null,
+        // La variante hereda la sucursal del padre (denormalizada). Caer a null
+        // viola el NOT NULL de stock_movements.branch_id (regresión multi-sucursal).
+        branchId: input.branchId ?? variantSnap.branchId,
         productId: input.productId,
         variantId: input.variantId,
         type: input.type,
