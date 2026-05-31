@@ -46,6 +46,61 @@ export interface SessionsByUser {
   totalSold: string;
 }
 
+export interface InventoryValuation {
+  skusWithStock: number;
+  totalUnits: string;
+  totalCost: string;
+  totalRetail: string;
+  /** Margen potencial = retail - costo (si se vendiera todo a precio de lista). */
+  potentialMargin: string;
+  byCategory: Array<{
+    categoryId: string | null;
+    categoryName: string;
+    skus: number;
+    totalCost: string;
+    totalRetail: string;
+  }>;
+}
+
+export interface ProductMargin {
+  productId: string;
+  name: string;
+  sku: string;
+  unitsSold: string;
+  revenue: string;
+  /** Costo aproximado = unidades × costo ACTUAL del producto (no histórico). */
+  cost: string;
+  margin: string;
+  marginPct: string;
+}
+
+export interface SlowMover {
+  id: string;
+  name: string;
+  sku: string;
+  stock: string;
+  costPrice: string;
+  /** Capital inmovilizado = stock × costo. */
+  tiedUpCost: string;
+  categoryName: string | null;
+  lastSoldAt: string | null;
+}
+
+export interface CategorySales {
+  categoryId: string | null;
+  categoryName: string;
+  unitsSold: string;
+  revenue: string;
+}
+
+export interface ReturnsAnalysis {
+  count: number;
+  total: string;
+  taxTotal: string;
+  byMethod: Array<{ refundMethod: string; count: number; total: string }>;
+  byReason: Array<{ reason: string; count: number; total: string }>;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
@@ -270,4 +325,258 @@ export class ReportsService {
       totalSold: r.total_sold,
     }));
   }
+
+  /** Valuación del inventario ACTUAL (a costo y a precio de lista) + por categoría. */
+  async inventoryValuation(branchId: string | null): Promise<InventoryValuation> {
+    const [agg]: Array<{
+      skus: string;
+      units: string;
+      cost: string;
+      retail: string;
+    }> = await this.ds.query(
+      `SELECT COUNT(*) FILTER (WHERE p.stock > 0)::int AS skus,
+              COALESCE(SUM(p.stock), 0)::text AS units,
+              ROUND(COALESCE(SUM(p.stock * p.cost_price), 0), 2)::text AS cost,
+              ROUND(COALESCE(SUM(p.stock * p.sale_price), 0), 2)::text AS retail
+       FROM products p
+       WHERE p.deleted_at IS NULL AND p.is_active = true
+         AND ($1::uuid IS NULL OR p.branch_id = $1)`,
+      [branchId],
+    );
+    const byCategory: Array<{
+      category_id: string | null;
+      category_name: string | null;
+      skus: number;
+      cost: string;
+      retail: string;
+    }> = await this.ds.query(
+      `SELECT c.id AS category_id, c.name AS category_name,
+              COUNT(*) FILTER (WHERE p.stock > 0)::int AS skus,
+              ROUND(COALESCE(SUM(p.stock * p.cost_price), 0), 2)::text AS cost,
+              ROUND(COALESCE(SUM(p.stock * p.sale_price), 0), 2)::text AS retail
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.deleted_at IS NULL AND p.is_active = true
+         AND ($1::uuid IS NULL OR p.branch_id = $1)
+       GROUP BY c.id, c.name
+       ORDER BY cost DESC`,
+      [branchId],
+    );
+    const cost = agg?.cost ?? '0.00';
+    const retail = agg?.retail ?? '0.00';
+    return {
+      skusWithStock: agg?.skus ? Number(agg.skus) : 0,
+      totalUnits: agg?.units ?? '0.000',
+      totalCost: cost,
+      totalRetail: retail,
+      potentialMargin: subtractDecimals(retail, cost),
+      byCategory: byCategory.map((r) => ({
+        categoryId: r.category_id,
+        categoryName: r.category_name ?? '(Sin categoría)',
+        skus: Number(r.skus),
+        totalCost: r.cost,
+        totalRetail: r.retail,
+      })),
+    };
+  }
+
+  /**
+   * Margen por producto sobre las ventas del rango. El costo usa el costo ACTUAL
+   * del producto (no hay snapshot histórico de costo; ver backlog FIFO).
+   */
+  async productMargins(
+    from: string,
+    to: string,
+    limit: number,
+    branchId: string | null,
+  ): Promise<ProductMargin[]> {
+    const rows: Array<{
+      product_id: string;
+      name: string;
+      sku: string;
+      units: string;
+      revenue: string;
+      cost: string;
+    }> = await this.ds.query(
+      `SELECT si.product_id,
+              MAX(si.product_name_snapshot) AS name,
+              MAX(si.product_sku_snapshot)  AS sku,
+              COALESCE(SUM(si.quantity), 0)::text AS units,
+              ROUND(COALESCE(SUM(si.total), 0), 2)::text    AS revenue,
+              ROUND(COALESCE(SUM(si.quantity * COALESCE(p.cost_price, 0)), 0), 2)::text AS cost
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+       LEFT JOIN products p ON p.id = si.product_id
+       WHERE si.product_id IS NOT NULL
+         AND s.created_at::date BETWEEN $1::date AND $2::date
+         AND ($4::uuid IS NULL OR s.branch_id = $4)
+       GROUP BY si.product_id
+       ORDER BY (COALESCE(SUM(si.total), 0) - COALESCE(SUM(si.quantity * COALESCE(p.cost_price, 0)), 0)) DESC
+       LIMIT $3`,
+      [from, to, limit, branchId],
+    );
+    return rows.map((r) => {
+      const revenue = r.revenue;
+      const cost = r.cost;
+      const margin = subtractDecimals(revenue, cost);
+      const rev = parseFloat(revenue);
+      const marginPct = rev > 0 ? ((parseFloat(margin) / rev) * 100).toFixed(2) : '0.00';
+      return {
+        productId: r.product_id,
+        name: r.name,
+        sku: r.sku,
+        unitsSold: r.units,
+        revenue,
+        cost,
+        margin,
+        marginPct,
+      };
+    });
+  }
+
+  /** Productos con stock que NO se han vendido en los últimos `days` días. */
+  async slowMovers(
+    days: number,
+    limit: number,
+    branchId: string | null,
+  ): Promise<SlowMover[]> {
+    const rows: Array<{
+      id: string;
+      name: string;
+      sku: string;
+      stock: string;
+      cost_price: string;
+      category_name: string | null;
+      last_sold_at: string | null;
+    }> = await this.ds.query(
+      `SELECT p.id, p.name, p.sku, p.stock::text, p.cost_price::text,
+              c.name AS category_name,
+              (SELECT MAX(s.created_at)
+                 FROM sale_items si JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+                WHERE si.product_id = p.id) AS last_sold_at
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.deleted_at IS NULL AND p.is_active = true AND p.stock > 0
+         AND ($3::uuid IS NULL OR p.branch_id = $3)
+         AND NOT EXISTS (
+           SELECT 1 FROM sale_items si
+           JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+           WHERE si.product_id = p.id
+             AND s.created_at >= now() - make_interval(days => $1)
+         )
+       ORDER BY last_sold_at ASC NULLS FIRST, (p.stock * p.cost_price) DESC
+       LIMIT $2`,
+      [days, limit, branchId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      sku: r.sku,
+      stock: r.stock,
+      costPrice: r.cost_price,
+      tiedUpCost: multiplyDecimals(r.stock, r.cost_price),
+      categoryName: r.category_name,
+      lastSoldAt: r.last_sold_at ? new Date(r.last_sold_at).toISOString() : null,
+    }));
+  }
+
+  /** Ventas (ingresos) por categoría en el rango. */
+  async salesByCategory(
+    from: string,
+    to: string,
+    branchId: string | null,
+  ): Promise<CategorySales[]> {
+    const rows: Array<{
+      category_id: string | null;
+      category_name: string | null;
+      units: string;
+      revenue: string;
+    }> = await this.ds.query(
+      `SELECT c.id AS category_id, c.name AS category_name,
+              COALESCE(SUM(si.quantity), 0)::text AS units,
+              COALESCE(SUM(si.total), 0)::text AS revenue
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+       LEFT JOIN products p ON p.id = si.product_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE s.created_at::date BETWEEN $1::date AND $2::date
+         AND ($3::uuid IS NULL OR s.branch_id = $3)
+       GROUP BY c.id, c.name
+       ORDER BY revenue DESC`,
+      [from, to, branchId],
+    );
+    return rows.map((r) => ({
+      categoryId: r.category_id,
+      categoryName: r.category_name ?? '(Sin categoría)',
+      unitsSold: r.units,
+      revenue: r.revenue,
+    }));
+  }
+
+  /** Análisis de devoluciones del rango: volumen, por método y por razón. */
+  async returnsAnalysis(
+    from: string,
+    to: string,
+    branchId: string | null,
+  ): Promise<ReturnsAnalysis> {
+    const [agg]: Array<{ count: number; total: string; tax: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS count,
+              COALESCE(SUM(total), 0)::text AS total,
+              COALESCE(SUM(tax_total), 0)::text AS tax
+       FROM sale_returns
+       WHERE created_at::date BETWEEN $1::date AND $2::date
+         AND ($3::uuid IS NULL OR branch_id = $3)`,
+      [from, to, branchId],
+    );
+    const byMethod: Array<{ refund_method: string; count: number; total: string }> =
+      await this.ds.query(
+        `SELECT refund_method, COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
+         FROM sale_returns
+         WHERE created_at::date BETWEEN $1::date AND $2::date
+           AND ($3::uuid IS NULL OR branch_id = $3)
+         GROUP BY refund_method
+         ORDER BY total DESC`,
+        [from, to, branchId],
+      );
+    const byReason: Array<{ reason: string | null; count: number; total: string }> =
+      await this.ds.query(
+        `SELECT COALESCE(NULLIF(TRIM(reason), ''), '(Sin razón)') AS reason,
+                COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
+         FROM sale_returns
+         WHERE created_at::date BETWEEN $1::date AND $2::date
+           AND ($3::uuid IS NULL OR branch_id = $3)
+         GROUP BY 1
+         ORDER BY count DESC`,
+        [from, to, branchId],
+      );
+    return {
+      count: agg?.count ? Number(agg.count) : 0,
+      total: agg?.total ?? '0.00',
+      taxTotal: agg?.tax ?? '0.00',
+      byMethod: byMethod.map((r) => ({
+        refundMethod: r.refund_method,
+        count: Number(r.count),
+        total: r.total,
+      })),
+      byReason: byReason.map((r) => ({
+        reason: r.reason ?? '(Sin razón)',
+        count: Number(r.count),
+        total: r.total,
+      })),
+    };
+  }
+}
+
+/** Resta de decimales "a.bb" en centavos, devuelve "a.bb" (admite negativos). */
+function subtractDecimals(a: string, b: string): string {
+  const cents = Math.round(parseFloat(a) * 100) - Math.round(parseFloat(b) * 100);
+  const sign = cents < 0 ? '-' : '';
+  const abs = Math.abs(cents);
+  return `${sign}${Math.trunc(abs / 100)}.${(abs % 100).toString().padStart(2, '0')}`;
+}
+
+/** Multiplica stock (3 dp) × costo (2 dp) → monto "a.bb". */
+function multiplyDecimals(qty: string, price: string): string {
+  const cents = Math.round(parseFloat(qty) * parseFloat(price) * 100);
+  return `${Math.trunc(cents / 100)}.${(cents % 100).toString().padStart(2, '0')}`;
 }

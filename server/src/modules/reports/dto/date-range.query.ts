@@ -31,6 +31,14 @@ export class DateRangeQuery {
   @Max(100)
   limit?: number = 10;
 
+  /** Días sin venta para "lento movimiento" (slow-movers). Default 30. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days?: number = 30;
+
   /** Sucursal a consultar; `all` = consolidado (solo con permiso branches.switch). */
   @IsOptional()
   @IsString()

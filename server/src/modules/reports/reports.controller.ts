@@ -70,6 +70,62 @@ export class ReportsController {
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
     return this.service.sessionsByUser(from, to, scope);
   }
+
+  @Get('inventory/valuation')
+  inventoryValuation(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.inventoryValuation(scope);
+  }
+
+  @Get('products/margins')
+  productMargins(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.productMargins(from, to, q.limit ?? 20, scope);
+  }
+
+  @Get('products/slow-movers')
+  slowMovers(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.slowMovers(q.days ?? 30, q.limit ?? 50, scope);
+  }
+
+  @Get('sales/by-category')
+  salesByCategory(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.salesByCategory(from, to, scope);
+  }
+
+  @Get('returns/analysis')
+  returnsAnalysis(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.returnsAnalysis(from, to, scope);
+  }
 }
 
 function today(): string {
