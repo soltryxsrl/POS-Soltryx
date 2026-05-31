@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { Building2, Copy, Pencil, Plus, Power, Wallet, X } from 'lucide-react';
+import { Building2, Copy, Eye, Pencil, Plus, Power, Wallet } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
+import { Fab } from '@/shared/ui/controls/Fab';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
@@ -15,84 +16,24 @@ import {
 import {
   useBranches,
   useCloneCatalog,
-  useCreateBranch,
   useUpdateBranch,
 } from '../../application/hooks/use-branches';
 import { useActiveBranchStore } from '../../application/stores/active-branch.store';
 import type { Branch, CloneCatalogResult } from '../../domain/types';
-
-/** Deriva un código interno desde el nombre (mayúsculas, sin acentos, _). */
-function codeFromName(name: string): string {
-  const base = name
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/_{2,}/g, '_');
-  if (!base) return 'SUC';
-  return /^[A-Z]/.test(base) ? base : `S_${base}`;
-}
+import { BranchFormDialog } from './BranchFormDialog';
 
 export function BranchesManager() {
   const canCreate = useHasPermission('branches.create');
   const canManage = useHasPermission('branches.update');
   const branches = useBranches({ limit: 100 });
-  const create = useCreateBranch();
-  const [name, setName] = useState('');
-  const [rnc, setRnc] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const onCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      await create.mutateAsync({
-        code: codeFromName(name),
-        name: name.trim(),
-        rnc: rnc.trim() || undefined,
-      });
-      setName('');
-      setRnc('');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  };
+  const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Branch | null>(null);
+  const [viewing, setViewing] = useState<Branch | null>(null);
 
   const items = branches.data?.items ?? [];
 
   return (
     <div className="space-y-4">
-      {canCreate && (
-        <form
-          onSubmit={onCreate}
-          className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
-        >
-          <FormField label="Nueva sucursal" required>
-            <Input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Sucursal Norte"
-              className="w-56"
-            />
-          </FormField>
-          <FormField label="RNC (opcional)">
-            <Input
-              value={rnc}
-              onChange={(e) => setRnc(e.target.value)}
-              placeholder="RNC"
-              className="w-40"
-            />
-          </FormField>
-          <Button type="submit" disabled={create.isPending || !name.trim()}>
-            <Plus className="h-4 w-4" />
-            {create.isPending ? 'Creando...' : 'Crear sucursal'}
-          </Button>
-          {error && <p className="w-full text-sm text-destructive">{error}</p>}
-        </form>
-      )}
-
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -113,7 +54,13 @@ export function BranchesManager() {
               </tr>
             )}
             {items.map((b) => (
-              <BranchRow key={b.id} branch={b} canManage={canManage} />
+              <BranchRow
+                key={b.id}
+                branch={b}
+                canManage={canManage}
+                onView={() => setViewing(b)}
+                onEdit={() => setEditing(b)}
+              />
             ))}
           </tbody>
         </table>
@@ -122,43 +69,35 @@ export function BranchesManager() {
       <CloneCatalogSection />
 
       <CashRegistersSection />
+
+      {canCreate && (
+        <Fab label="Nueva sucursal" onClick={() => setShowCreate(true)} />
+      )}
+      {showCreate && <BranchFormDialog onClose={() => setShowCreate(false)} />}
+      {editing && (
+        <BranchFormDialog branch={editing} onClose={() => setEditing(null)} />
+      )}
+      {viewing && (
+        <BranchFormDialog branch={viewing} readOnly onClose={() => setViewing(null)} />
+      )}
     </div>
   );
 }
 
-/** Fila de sucursal con edición inline (nombre/RNC/dirección/teléfono) y activar/desactivar. */
-function BranchRow({ branch, canManage }: { branch: Branch; canManage: boolean }) {
+/** Fila de sucursal (solo lectura) con acciones Ver / Editar / activar-desactivar. */
+function BranchRow({
+  branch,
+  canManage,
+  onView,
+  onEdit,
+}: {
+  branch: Branch;
+  canManage: boolean;
+  onView: () => void;
+  onEdit: () => void;
+}) {
   const update = useUpdateBranch(branch.id);
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(branch.name);
-  const [rnc, setRnc] = useState(branch.rnc ?? '');
-  const [address, setAddress] = useState(branch.address ?? '');
-  const [phone, setPhone] = useState(branch.phone ?? '');
   const [error, setError] = useState<string | null>(null);
-
-  const startEdit = () => {
-    setName(branch.name);
-    setRnc(branch.rnc ?? '');
-    setAddress(branch.address ?? '');
-    setPhone(branch.phone ?? '');
-    setError(null);
-    setEditing(true);
-  };
-
-  const onSave = async () => {
-    setError(null);
-    try {
-      await update.mutateAsync({
-        name: name.trim(),
-        rnc: rnc.trim() || undefined,
-        address: address.trim() || undefined,
-        phone: phone.trim() || undefined,
-      });
-      setEditing(false);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  };
 
   const onToggleActive = async () => {
     setError(null);
@@ -168,33 +107,6 @@ function BranchRow({ branch, canManage }: { branch: Branch; canManage: boolean }
       setError(getErrorMessage(err));
     }
   };
-
-  if (editing) {
-    return (
-      <tr className="bg-muted/20">
-        <td className="px-4 py-3">
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="w-48" />
-        </td>
-        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{branch.code}</td>
-        <td className="px-4 py-3">
-          <Input value={rnc} onChange={(e) => setRnc(e.target.value)} placeholder="RNC" className="w-32" />
-        </td>
-        <td className="px-4 py-3" colSpan={2}>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Dirección" className="w-40" />
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" className="w-32" />
-            <Button type="button" onClick={onSave} disabled={update.isPending || !name.trim()}>
-              {update.isPending ? 'Guardando...' : 'Guardar'}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          {error && <p className="mt-1 text-right text-xs text-destructive">{error}</p>}
-        </td>
-      </tr>
-    );
-  }
 
   return (
     <tr className="hover:bg-muted/30">
@@ -219,20 +131,38 @@ function BranchRow({ branch, canManage }: { branch: Branch; canManage: boolean }
       </td>
       {canManage && (
         <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1.5">
-            <Button type="button" variant="ghost" onClick={startEdit} title="Editar">
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
+          <div className="flex items-center justify-end gap-0.5">
+            <button
               type="button"
-              variant="ghost"
+              title="Ver"
+              aria-label="Ver"
+              onClick={onView}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Eye className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Editar"
+              aria-label="Editar"
+              onClick={onEdit}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               onClick={onToggleActive}
               disabled={update.isPending}
               title={branch.isActive ? 'Desactivar' : 'Activar'}
-              className={branch.isActive ? 'text-amber-600' : 'text-emerald-600'}
+              aria-label={branch.isActive ? 'Desactivar' : 'Activar'}
+              className={
+                'rounded-md p-1.5 transition hover:bg-muted disabled:opacity-50 ' +
+                (branch.isActive ? 'text-amber-600' : 'text-emerald-600')
+              }
             >
               <Power className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
           {error && <p className="mt-1 text-right text-xs text-destructive">{error}</p>}
         </td>
