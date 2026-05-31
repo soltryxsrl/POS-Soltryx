@@ -1,15 +1,27 @@
 import 'reflect-metadata';
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { SentryExceptionFilter } from './common/observability/sentry-exception.filter';
+import { initSentry } from './common/observability/sentry';
 import type { AppEnv } from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
   const config = app.get(ConfigService<AppEnv, true>);
+
+  // Observabilidad: activa Sentry si hay DSN (no-op en local). Reporta 5xx.
+  const sentryOn = initSentry({
+    dsn: config.get('SENTRY_DSN', { infer: true }),
+    environment: config.get('NODE_ENV', { infer: true }),
+    tracesSampleRate: config.get('SENTRY_TRACES_SAMPLE_RATE', { infer: true }),
+  });
+  if (sentryOn) Logger.log('Sentry habilitado', 'Observability');
+  const { httpAdapter } = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new SentryExceptionFilter(httpAdapter));
 
   // Detrás del proxy de Railway/Vercel: confía en X-Forwarded-* para que
   // `req.ip` y la detección de HTTPS (cookies secure) funcionen bien.

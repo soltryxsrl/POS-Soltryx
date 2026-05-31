@@ -26,6 +26,10 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  // Observabilidad (opcional): si SENTRY_DSN está vacío, Sentry queda inactivo.
+  SENTRY_DSN: z.string().default(''),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
   COOKIE_DOMAIN: z.string().default(''),
   COOKIE_SECURE: z
