@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import { assertSameBranch } from '../../common/branch/branch-scope.util';
 import {
   UNIT_OF_WORK,
   type UnitOfWork,
@@ -20,7 +21,9 @@ import {
   type StockMovementRecorder,
 } from '../inventory/domain/ports/stock-movement-recorder.port';
 import { CashSessionOrmEntity } from '../cash-sessions/infrastructure/persistence/typeorm/cash-session.orm-entity';
+import { CashMovementOrmEntity } from '../cash-sessions/infrastructure/persistence/typeorm/cash-movement.orm-entity';
 import { CashSessionStatus } from '../cash-sessions/domain/value-objects/cash-session-status';
+import { CashMovementType } from '../cash-sessions/domain/value-objects/cash-movement-type';
 import {
   PRODUCT_PRICING_PORT,
   type ProductPricingPort,
@@ -195,22 +198,34 @@ export class ReturnsService {
   async create(
     dto: CreateReturnRequestDto,
     userId: string,
+    branchId: string,
   ): Promise<SaleReturnResponse> {
     const sale = await this.sales.findOne({ where: { id: dto.saleId } });
     if (!sale) throw new NotFoundException(`Venta ${dto.saleId} no encontrada`);
+    // Anti-IDOR: solo se devuelve de ventas de la sucursal activa.
+    assertSameBranch(sale.branchId, branchId);
     if (sale.status !== SaleStatus.COMPLETED) {
       throw new ConflictException(
         `Solo se puede devolver de ventas en estado COMPLETED (actual: ${sale.status})`,
       );
     }
 
-    // Sesión activa para asociar la devolución (refund de cash sale del turno).
-    const session = await this.cashSessions.findOne({
-      where: { status: CashSessionStatus.OPEN },
-    });
+    // Sesión de caja ABIERTA de la sucursal activa para asociar la devolución
+    // (y, si el reembolso es CASH, descontarla del arqueo de ESE turno). Se
+    // prefiere la sesión propia del cajero; si no tiene una abierta, la más
+    // reciente de la sucursal. NO debe tomar una sesión de otra sucursal.
+    const session =
+      (await this.cashSessions.findOne({
+        where: { status: CashSessionStatus.OPEN, branchId, openedById: userId },
+        order: { openedAt: 'DESC' },
+      })) ??
+      (await this.cashSessions.findOne({
+        where: { status: CashSessionStatus.OPEN, branchId },
+        order: { openedAt: 'DESC' },
+      }));
     if (!session) {
       throw new ConflictException(
-        'Necesitas una sesión de caja abierta para registrar devoluciones',
+        'Necesitas una sesión de caja abierta en esta sucursal para registrar devoluciones',
       );
     }
 
@@ -408,6 +423,20 @@ export class ReturnsService {
             branchId: sale.branchId,
           });
         }
+      }
+
+      // CASH: el dinero SALE del cajón → registra un PAID_OUT en la sesión para
+      // que el arqueo descuente el reembolso del efectivo esperado (si no, la
+      // caja aparecería corta por el monto devuelto). CARD/TRANSFER no tocan el
+      // cajón; STORE_CREDIT/ACCOUNT se manejan en el ledger del cliente abajo.
+      if (dto.refundMethod === RefundMethod.CASH) {
+        await m.insert(CashMovementOrmEntity, {
+          cashSessionId: session.id,
+          type: CashMovementType.PAID_OUT,
+          amount: fromCents(totalC),
+          reason: `Devolución ${returnNumber} (venta ${sale.saleNumber})`,
+          userId,
+        });
       }
 
       // STORE_CREDIT: crea un REVERSAL en el ledger del cliente (a favor).

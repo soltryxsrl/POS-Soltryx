@@ -62,7 +62,8 @@ export class ReturnsController {
   create(
     @Body() dto: CreateReturnRequestDto,
     @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
   ) {
-    return this.service.create(dto, user.id);
+    return this.service.create(dto, user.id, branchId);
   }
 }
