@@ -7,6 +7,7 @@ import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
+import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { useAdminRoles } from '../../application/hooks/use-admin-roles';
 import {
@@ -166,25 +167,9 @@ export function UsersTable() {
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-80"
       />
-      <Chip
-        label="Activos"
-        active={table.filterDraft.isActive === 'true'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'true' ? undefined : 'true',
-          )
-        }
-      />
-      <Chip
-        label="Inactivos"
-        active={table.filterDraft.isActive === 'false'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'false' ? undefined : 'false',
-          )
-        }
+      <StatusFilter
+        value={table.filterDraft.isActive}
+        onChange={(v) => table.setFilter('isActive', v)}
       />
       <Select
         value={table.filterDraft.roleId ?? ''}
@@ -242,30 +227,6 @@ export function UsersTable() {
         <Fab label="Nuevo usuario" onClick={() => setFormState({ mode: 'create' })} />
       </Can>
     </>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? 'rounded-md border border-brand-from/60 bg-brand-from/10 px-2.5 py-1.5 text-xs font-medium text-foreground'
-          : 'rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground'
-      }
-    >
-      {label}
-    </button>
   );
 }
 

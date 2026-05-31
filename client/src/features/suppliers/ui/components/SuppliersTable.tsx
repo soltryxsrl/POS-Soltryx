@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Eye, Pencil, Trash2, X } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
+import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
+import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { useDeleteSupplier, useSuppliers } from '../../application/hooks/use-suppliers';
@@ -125,25 +127,9 @@ export function SuppliersTable() {
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-80"
       />
-      <Chip
-        label="Activos"
-        active={table.filterDraft.isActive === 'true'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'true' ? undefined : 'true',
-          )
-        }
-      />
-      <Chip
-        label="Inactivos"
-        active={table.filterDraft.isActive === 'false'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'false' ? undefined : 'false',
-          )
-        }
+      <StatusFilter
+        value={table.filterDraft.isActive}
+        onChange={(v) => table.setFilter('isActive', v)}
       />
       {hasFilters && (
         <button
@@ -154,14 +140,6 @@ export function SuppliersTable() {
           <X className="h-3 w-3" /> Limpiar
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => setShowCreate(true)}
-        className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        <Plus className="h-4 w-4" />
-        Nuevo proveedor
-      </button>
     </div>
   );
 
@@ -217,30 +195,8 @@ export function SuppliersTable() {
           onClose={() => setDeleting(null)}
         />
       )}
-    </>
-  );
-}
 
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        active
-          ? 'rounded-md border border-brand-from/60 bg-brand-from/10 px-2.5 py-1.5 text-xs font-medium text-foreground'
-          : 'rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground'
-      }
-    >
-      {label}
-    </button>
+      <Fab label="Nuevo proveedor" onClick={() => setShowCreate(true)} />
+    </>
   );
 }

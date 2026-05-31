@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
+import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { useCategories } from '@/features/categories/application/hooks/use-categories';
 import { useProducts, useRemoveProduct } from '../../application/hooks/use-products';
@@ -207,25 +208,9 @@ export function ProductsTable() {
           )
         }
       />
-      <Chip
-        label="Activos"
-        active={table.filterDraft.isActive === 'true'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'true' ? undefined : 'true',
-          )
-        }
-      />
-      <Chip
-        label="Inactivos"
-        active={table.filterDraft.isActive === 'false'}
-        onClick={() =>
-          table.setFilter(
-            'isActive',
-            table.filterDraft.isActive === 'false' ? undefined : 'false',
-          )
-        }
+      <StatusFilter
+        value={table.filterDraft.isActive}
+        onChange={(v) => table.setFilter('isActive', v)}
       />
       <Select
         value={table.filterDraft.categoryId ?? ''}
