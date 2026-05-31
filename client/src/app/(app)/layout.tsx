@@ -40,6 +40,7 @@ import { useActiveSessionMine } from '@/features/cash/application/hooks/use-cash
 import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
 import { BranchSwitcher } from '@/features/branches/ui/components/BranchSwitcher';
 import { POSHeader } from '@/features/sales/ui/components/POSHeader';
+import { OfflineSyncBadge } from '@/features/sales/ui/components/OfflineSyncBadge';
 import { cn } from '@/shared/lib/cn';
 import { VisualSettingsDialog } from '@/shared/ui/preferences/VisualSettingsDialog';
 
@@ -345,11 +346,10 @@ function PosShell({ children }: { children: ReactNode }) {
           <BrandLogo />
         </Link>
         <BranchSwitcher className="ml-1 flex-shrink-0" />
-        {activeSession.data && (
-          <div className="ml-auto min-w-0">
-            <POSHeader session={activeSession.data} />
-          </div>
-        )}
+        <div className="ml-auto flex min-w-0 items-center gap-3">
+          <OfflineSyncBadge />
+          {activeSession.data && <POSHeader session={activeSession.data} />}
+        </div>
       </header>
 
       {/* Contenido a pantalla completa */}
@@ -394,6 +394,11 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-tint via-background to-brand-soft">
+      {/* Indicador global de sincronización offline (también monta el motor de
+          drenado de la cola mientras se navega fuera del POS). */}
+      <div className="pointer-events-none fixed right-6 top-6 z-40">
+        <OfflineSyncBadge />
+      </div>
       <div className="flex gap-5 p-5">
         <Sidebar
           collapsed={collapsed}

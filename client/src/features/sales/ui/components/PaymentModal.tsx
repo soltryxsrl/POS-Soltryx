@@ -14,6 +14,7 @@ import { Input } from '@/shared/ui/controls/Input';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { cn } from '@/shared/lib/cn';
 import { useOnlineStatus } from '@/shared/lib/use-online-status';
+import { getActiveBranchIdFromStore } from '@/features/branches/application/stores/active-branch.store';
 import { useCurrencies } from '@/features/currencies/application/hooks/use-currencies';
 import {
   useBusinessInfo,
@@ -28,6 +29,7 @@ import { computeCartTotals } from '../../application/math/totals';
 import { useCartStore } from '../../application/stores/cart.store';
 import { useCreateSale, useSale } from '../../application/hooks/use-sales';
 import { usePreviewTotals } from '../../application/hooks/use-preview-totals';
+import { enqueueSale } from '../../application/offline/sale-offline-queue';
 import { ManagerOverrideDialog } from './ManagerOverrideDialog';
 import { Receipt } from './Receipt';
 import { printReceipt } from './printReceipt';
@@ -195,6 +197,8 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
     saleId: string;
     totalPaid: string;
     change: string;
+    /** true si la venta se guardó offline (sin saleId): no hay recibo aún. */
+    queued?: boolean;
   } | null>(null);
   // Si el server responde 403 DISCOUNT_OVERRIDE_REQUIRED guardamos los datos
   // para abrir el dialog de credenciales de manager y reintentar.
@@ -204,6 +208,14 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
     thresholdPct?: number;
   } | null>(null);
   const [overrideError, setOverrideError] = useState<string | null>(null);
+  // Clave de idempotencia estable para ESTE intento de cobro. Se reutiliza en el
+  // retry de override y al encolar offline, y se reenvía igual al sincronizar —
+  // así el server deduplica y nunca se cobra dos veces. Se limpia tras cerrar.
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const ensureIdempotencyKey = (): string => {
+    if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID();
+    return idempotencyKeyRef.current;
+  };
 
   const totalCents = toCents(totals.total);
   const paidCents = useMemo(
@@ -302,6 +314,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
   ): CreateSaleInput => ({
     cashSessionId,
     customerId: customer?.id,
+    idempotencyKey: ensureIdempotencyKey(),
     ...(fiscalDocTypeCode ? { fiscalDocTypeCode } : {}),
     orderDiscount: Number(orderDiscount) > 0 ? orderDiscount : undefined,
     tipTotal: Number(tipTotal) > 0 ? tipTotal : undefined,
@@ -332,12 +345,40 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
     ...(overrideCredentials ? { overrideCredentials } : {}),
   });
 
+  // Guarda la venta en la cola offline y muestra el panel de "guardada offline".
+  const queueOffline = async (payload: CreateSaleInput) => {
+    await enqueueSale(payload, getActiveBranchIdFromStore());
+    idempotencyKeyRef.current = null;
+    clear();
+    setOverrideNeeded(null);
+    setOverrideError(null);
+    setSuccess({
+      saleId: '',
+      totalPaid: fromCents(paidCents),
+      change,
+      queued: true,
+    });
+    if (hasCash) void printer.openDrawer(false).catch(() => {});
+  };
+
   const submitSale = async (
     cleaned: TenderRow[],
     overrideCredentials?: { emailOrUsername: string; password: string },
   ) => {
+    const payload = buildPayload(cleaned, overrideCredentials);
+    // Las ventas FISCALES (con NCF) nunca se encolan offline: el NCF debe
+    // reservarse en línea o dos terminales chocarían la secuencia. Solo las
+    // ventas no fiscales (recibo) pueden cobrarse sin conexión.
+    const canQueueOffline = !payload.fiscalDocTypeCode;
+
+    // Sin conexión confirmada → encola directo (evita esperar el timeout del fetch).
+    if (canQueueOffline && typeof navigator !== 'undefined' && !navigator.onLine) {
+      await queueOffline(payload);
+      return;
+    }
     try {
-      const sale = await createSale.mutateAsync(buildPayload(cleaned, overrideCredentials));
+      const sale = await createSale.mutateAsync(payload);
+      idempotencyKeyRef.current = null;
       clear();
       setOverrideNeeded(null);
       setOverrideError(null);
@@ -373,6 +414,13 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
       // dialog abierto con el mensaje y permitimos reintentar.
       if (overrideCredentials && err instanceof HttpClientError && err.status === 401) {
         setOverrideError(getErrorMessage(err));
+        return;
+      }
+      // Falla de RED (no es un error del API): la conexión se cayó durante el
+      // fetch. Para ventas no fiscales, encolamos offline y avisamos. La clave de
+      // idempotencia evita doble cobro si la venta sí llegó al server.
+      if (canQueueOffline && !(err instanceof HttpClientError)) {
+        await queueOffline(payload);
         return;
       }
       setError(getErrorMessage(err));
@@ -414,6 +462,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
   };
 
   const handleNewSale = () => {
+    idempotencyKeyRef.current = null;
     setSuccess(null);
     onClose();
   };
@@ -428,11 +477,12 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
 
   if (success) {
     const changeNum = Number(success.change);
+    const queued = success.queued ?? false;
     return (
       <MaintenanceShell
         open
         onClose={handleNewSale}
-        title="Venta cobrada"
+        title={queued ? 'Venta guardada offline' : 'Venta cobrada'}
         size="xl"
         forceMode="drawer"
       >
@@ -448,7 +498,9 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-foreground">
-                  Venta procesada correctamente
+                  {queued
+                    ? 'Venta guardada sin conexión'
+                    : 'Venta procesada correctamente'}
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Total cobrado:{' '}
@@ -456,6 +508,12 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
                     {formatMoney(success.totalPaid)}
                   </strong>
                 </p>
+                {queued && (
+                  <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                    Se sincronizará automáticamente al recuperar la conexión. El
+                    recibo quedará disponible una vez procesada.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -471,6 +529,13 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
             )}
           </div>
 
+          {queued ? (
+            <Button type="button" size="lg" onClick={handleNewSale}>
+              <ShoppingBag className="h-4 w-4" />
+              Nueva venta
+            </Button>
+          ) : (
+          <>
           <div className="grid gap-2">
             <Button type="button" size="lg" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
@@ -549,6 +614,8 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
             >
               <ReceiptLetter sale={successSale.data} />
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -812,8 +879,9 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
 
         {!online && (
           <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-            Sin conexión. Reconecta para cobrar — el carrito y los pagos
-            ingresados se mantienen.
+            {fiscalDocTypeCode
+              ? 'Sin conexión. Los comprobantes fiscales (NCF) requieren conexión. Elige “Sin comprobante fiscal” para guardar la venta offline y sincronizarla al reconectar.'
+              : 'Sin conexión. La venta se guardará localmente y se sincronizará automáticamente al reconectar. El carrito se mantiene.'}
           </p>
         )}
 
@@ -823,13 +891,19 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
           </Button>
           <Button
             type="submit"
-            disabled={createSale.isPending || remainingCents > 0 || !online}
-            title={online ? undefined : 'Sin conexión: no puedes cobrar'}
+            disabled={createSale.isPending || remainingCents > 0 || (!online && !!fiscalDocTypeCode)}
+            title={
+              !online && fiscalDocTypeCode
+                ? 'Sin conexión: los comprobantes fiscales no se pueden emitir offline'
+                : undefined
+            }
           >
             {createSale.isPending
               ? 'Procesando...'
-              : !online
+              : !online && fiscalDocTypeCode
               ? 'Sin conexión'
+              : !online
+              ? 'Guardar venta (offline)'
               : 'Confirmar venta'}
           </Button>
         </FormFooter>

@@ -137,6 +137,11 @@ export interface CreateSaleInput {
     emailOrUsername: string;
     password: string;
   };
+  /**
+   * Clave de idempotencia (UUID). El POS la genera por venta; si la venta se
+   * encola offline y luego se reenvía, el server la usa para no duplicar el cobro.
+   */
+  idempotencyKey?: string;
 }
 
 export interface ListSalesParams {
