@@ -253,7 +253,7 @@ export function CreatePurchaseOrderForm() {
                   value={isrRetentionType}
                   onChange={(e) => setIsrRetentionType(e.target.value)}
                 >
-                  <option value="">— N/A —</option>
+                  <option value="">No aplica</option>
                   <option value="01">01 Alquileres</option>
                   <option value="02">02 Honorarios por servicios</option>
                   <option value="03">03 Otras rentas</option>
@@ -541,7 +541,7 @@ function FiscalDocTypeSelect({
   );
   return (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">— No fiscal —</option>
+      <option value="">Sin comprobante fiscal</option>
       {purchaseTypes.map((t) => (
         <option key={t.code} value={t.code}>
           {t.code} — {t.name}

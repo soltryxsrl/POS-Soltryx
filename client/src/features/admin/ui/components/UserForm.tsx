@@ -136,7 +136,7 @@ export function UserForm({ user, onSuccess, onCancel }: Props) {
           onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
           className="w-full rounded-xl border border-border/60 bg-background/60 px-3.5 py-2.5 text-sm outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
         >
-          <option value="">— Sin sucursal (solo ADMIN) —</option>
+          <option value="">Sin sucursal (solo ADMIN)</option>
           {branches.data?.items.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}

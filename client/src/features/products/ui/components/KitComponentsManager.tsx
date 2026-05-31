@@ -113,7 +113,7 @@ export function KitComponentsManager({ productId }: Props) {
               onChange={(e) => updateRow(idx, { productId: e.target.value })}
               className="rounded-lg border border-border bg-background px-2 py-2 text-sm"
             >
-              <option value="">— Selecciona componente —</option>
+              <option value="">Seleccione componente</option>
               {candidates.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} · {p.sku}
