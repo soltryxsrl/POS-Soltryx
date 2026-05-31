@@ -7,11 +7,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import { AuditService } from '../audit/audit.service';
 import { BranchesService } from '../branches/branches.service';
 import {
   PASSWORD_HASHER,
   type PasswordHasher,
 } from '../auth/domain/ports/password-hasher.port';
+import {
+  REFRESH_TOKEN_REPOSITORY,
+  type RefreshTokenRepository,
+} from '../auth/domain/ports/refresh-token.repository.port';
 import { RoleOrmEntity } from '../auth/infrastructure/persistence/typeorm/role.orm-entity';
 import { UserOrmEntity } from '../auth/infrastructure/persistence/typeorm/user.orm-entity';
 import type { CreateUserDto } from './dto/create-user.dto';
@@ -29,8 +34,19 @@ export class UsersService {
     @InjectRepository(UserOrmEntity) private readonly users: Repository<UserOrmEntity>,
     @InjectRepository(RoleOrmEntity) private readonly roles: Repository<RoleOrmEntity>,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    @Inject(REFRESH_TOKEN_REPOSITORY)
+    private readonly refreshRepo: RefreshTokenRepository,
+    private readonly audit: AuditService,
     private readonly branches: BranchesService,
   ) {}
+
+  /** Actor que ejecuta la acción (para auditoría). */
+  private static actorFrom(actor?: { id: string; username?: string }): {
+    actorUserId: string | null;
+    actorName: string | null;
+  } {
+    return { actorUserId: actor?.id ?? null, actorName: actor?.username ?? null };
+  }
 
   async list(q: ListUsersQuery): Promise<UsersListResponse> {
     const limit = q.limit ?? 50;
@@ -90,7 +106,10 @@ export class UsersService {
     return toUserResponse(u);
   }
 
-  async create(dto: CreateUserDto): Promise<UserResponse> {
+  async create(
+    dto: CreateUserDto,
+    actor?: { id: string; username?: string },
+  ): Promise<UserResponse> {
     await this.assertEmailAvailable(dto.email);
     await this.assertUsernameAvailable(dto.username);
 
@@ -108,11 +127,24 @@ export class UsersService {
       roles,
     });
     const saved = await this.users.save(entity);
+    void this.audit.record({
+      ...UsersService.actorFrom(actor),
+      action: 'users.created',
+      entityType: 'user',
+      entityId: saved.id,
+      payload: { username: saved.username, email: saved.email, roleIds: dto.roleIds ?? [] },
+    });
     return toUserResponse(saved);
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<UserResponse> {
+  async update(
+    id: string,
+    dto: UpdateUserDto,
+    actor?: { id: string; username?: string },
+  ): Promise<UserResponse> {
     const current = await this.loadById(id);
+    const wasActive = current.isActive;
+    const prevRoleIds = current.roles.map((r) => r.id).sort();
 
     if (dto.email && dto.email.toLowerCase() !== current.email.toLowerCase()) {
       await this.assertEmailAvailable(dto.email, id);
@@ -135,15 +167,57 @@ export class UsersService {
     }
 
     const saved = await this.users.save(current);
+
+    // Si se desactivó, o cambiaron roles/clave, revocamos sus refresh tokens para
+    // que el cambio surta efecto al próximo refresh (sin esperar 7 días).
+    const deactivated = wasActive && saved.isActive === false;
+    const rolesChanged =
+      !!dto.roleIds && JSON.stringify(prevRoleIds) !== JSON.stringify(saved.roles.map((r) => r.id).sort());
+    if (deactivated || rolesChanged || dto.password) {
+      await this.refreshRepo.revokeAllForUser(id, new Date());
+    }
+
+    void this.audit.record({
+      ...UsersService.actorFrom(actor),
+      action: deactivated ? 'users.deactivated' : 'users.updated',
+      entityType: 'user',
+      entityId: id,
+      payload: {
+        username: saved.username,
+        changed: {
+          email: dto.email !== undefined,
+          username: dto.username !== undefined,
+          fullName: dto.fullName !== undefined,
+          isActive: typeof dto.isActive === 'boolean' ? saved.isActive : undefined,
+          password: !!dto.password,
+          roles: rolesChanged,
+          branch: dto.branchId !== undefined,
+        },
+      },
+    });
     return toUserResponse(saved);
   }
 
-  async softDelete(id: string, actingUserId: string): Promise<void> {
+  async softDelete(
+    id: string,
+    actingUserId: string,
+    actorName?: string,
+  ): Promise<void> {
     if (id === actingUserId) {
       throw new ConflictException('No puedes eliminar tu propio usuario');
     }
     const u = await this.loadById(id);
     await this.users.softRemove(u);
+    // Un usuario eliminado no debe poder seguir operando: revoca sus tokens.
+    await this.refreshRepo.revokeAllForUser(id, new Date());
+    void this.audit.record({
+      actorUserId: actingUserId || null,
+      actorName: actorName ?? null,
+      action: 'users.deleted',
+      entityType: 'user',
+      entityId: id,
+      payload: { username: u.username },
+    });
   }
 
   // --- helpers ---

@@ -10,6 +10,10 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import {
+  CurrentUser,
+  type CurrentUserPayload,
+} from '../auth/infrastructure/http/current-user.decorator';
 import { RequirePermissions } from '../auth/infrastructure/http/permissions.decorator';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -33,20 +37,27 @@ export class RolesController {
 
   @Post()
   @RequirePermissions('roles.create')
-  create(@Body() dto: CreateRoleDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateRoleDto, @CurrentUser() current: CurrentUserPayload | undefined) {
+    return this.service.create(dto, current);
   }
 
   @Patch(':id')
   @RequirePermissions('roles.update')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateRoleDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRoleDto,
+    @CurrentUser() current: CurrentUserPayload | undefined,
+  ) {
+    return this.service.update(id, dto, current);
   }
 
   @Delete(':id')
   @RequirePermissions('roles.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    await this.service.softDelete(id);
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() current: CurrentUserPayload | undefined,
+  ): Promise<void> {
+    await this.service.softDelete(id, current);
   }
 }

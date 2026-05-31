@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import { AuditService } from '../../../audit/audit.service';
 import { toPublic } from '../../domain/entities/auth-user.entity';
 import {
   InvalidCredentialsError,
@@ -31,16 +32,39 @@ export class LoginUseCase {
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     @Inject(TOKEN_ISSUER) private readonly tokens: TokenIssuer,
     @Inject(REFRESH_TOKEN_REPOSITORY) private readonly refreshRepo: RefreshTokenRepository,
+    private readonly audit: AuditService,
   ) {}
+
+  /** Registra un intento de login fallido (fire-and-forget). */
+  private auditFailure(input: LoginInput, reason: string, userId: string | null): void {
+    void this.audit.record({
+      actorUserId: userId,
+      action: 'auth.login.failed',
+      entityType: 'user',
+      entityId: userId,
+      payload: { emailOrUsername: input.emailOrUsername, reason },
+      ip: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
+    });
+  }
 
   async execute(input: LoginInput): Promise<AuthSessionOutput> {
     const user = await this.users.findByEmailOrUsername(input.emailOrUsername);
-    if (!user) throw new InvalidCredentialsError();
+    if (!user) {
+      this.auditFailure(input, 'user_not_found', null);
+      throw new InvalidCredentialsError();
+    }
 
     const ok = await this.hasher.verify(input.password, user.passwordHash);
-    if (!ok) throw new InvalidCredentialsError();
+    if (!ok) {
+      this.auditFailure(input, 'bad_password', user.id);
+      throw new InvalidCredentialsError();
+    }
 
-    if (!user.isActive) throw new UserInactiveError();
+    if (!user.isActive) {
+      this.auditFailure(input, 'inactive', user.id);
+      throw new UserInactiveError();
+    }
 
     const issued = await this.tokens.issue({
       sub: user.id,
@@ -60,6 +84,16 @@ export class LoginUseCase {
     });
 
     await this.users.markLogin(user.id, new Date());
+
+    void this.audit.record({
+      actorUserId: user.id,
+      actorName: user.username,
+      action: 'auth.login.success',
+      entityType: 'user',
+      entityId: user.id,
+      ip: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
+    });
 
     return {
       user: toPublic(user),

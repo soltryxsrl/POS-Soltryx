@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { AuditService } from '../audit/audit.service';
 import { PermissionOrmEntity } from '../auth/infrastructure/persistence/typeorm/permission.orm-entity';
 import { RoleOrmEntity } from '../auth/infrastructure/persistence/typeorm/role.orm-entity';
 import { UserOrmEntity } from '../auth/infrastructure/persistence/typeorm/user.orm-entity';
@@ -15,6 +16,8 @@ import type { UpdateRoleDto } from './dto/update-role.dto';
 
 const SYSTEM_ROLE_CODES = new Set(['ADMIN']);
 
+type Actor = { id: string; username?: string } | undefined;
+
 @Injectable()
 export class RolesService {
   constructor(
@@ -22,6 +25,7 @@ export class RolesService {
     @InjectRepository(PermissionOrmEntity)
     private readonly permissions: Repository<PermissionOrmEntity>,
     @InjectRepository(UserOrmEntity) private readonly users: Repository<UserOrmEntity>,
+    private readonly audit: AuditService,
   ) {}
 
   async list(): Promise<RoleResponse[]> {
@@ -42,7 +46,7 @@ export class RolesService {
     return toRoleResponse(r, counts.get(r.id) ?? 0);
   }
 
-  async create(dto: CreateRoleDto): Promise<RoleResponse> {
+  async create(dto: CreateRoleDto, actor?: Actor): Promise<RoleResponse> {
     const code = dto.code.toUpperCase();
     const existing = await this.roles.findOne({ where: { code } });
     if (existing) throw new ConflictException(`Ya existe un rol con código "${code}"`);
@@ -56,11 +60,20 @@ export class RolesService {
       permissions,
     });
     const saved = await this.roles.save(entity);
+    void this.audit.record({
+      actorUserId: actor?.id ?? null,
+      actorName: actor?.username ?? null,
+      action: 'roles.created',
+      entityType: 'role',
+      entityId: saved.id,
+      payload: { code: saved.code, name: saved.name, permissionIds: dto.permissionIds ?? [] },
+    });
     return toRoleResponse(saved, 0);
   }
 
-  async update(id: string, dto: UpdateRoleDto): Promise<RoleResponse> {
+  async update(id: string, dto: UpdateRoleDto, actor?: Actor): Promise<RoleResponse> {
     const current = await this.loadById(id);
+    const prevPerms = current.permissions.map((p) => p.id).sort();
 
     if (dto.name) current.name = dto.name.trim();
     if (dto.description !== undefined) {
@@ -71,11 +84,22 @@ export class RolesService {
     }
 
     const saved = await this.roles.save(current);
+    const permsChanged =
+      !!dto.permissionIds &&
+      JSON.stringify(prevPerms) !== JSON.stringify(saved.permissions.map((p) => p.id).sort());
+    void this.audit.record({
+      actorUserId: actor?.id ?? null,
+      actorName: actor?.username ?? null,
+      action: 'roles.updated',
+      entityType: 'role',
+      entityId: saved.id,
+      payload: { code: saved.code, permissionsChanged: permsChanged },
+    });
     const counts = await this.userCountsByRole([saved.id]);
     return toRoleResponse(saved, counts.get(saved.id) ?? 0);
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, actor?: Actor): Promise<void> {
     const current = await this.loadById(id);
     if (SYSTEM_ROLE_CODES.has(current.code)) {
       throw new ForbiddenException(`El rol "${current.code}" no puede eliminarse`);
@@ -87,6 +111,14 @@ export class RolesService {
       );
     }
     await this.roles.softRemove(current);
+    void this.audit.record({
+      actorUserId: actor?.id ?? null,
+      actorName: actor?.username ?? null,
+      action: 'roles.deleted',
+      entityType: 'role',
+      entityId: id,
+      payload: { code: current.code },
+    });
   }
 
   // --- helpers ---

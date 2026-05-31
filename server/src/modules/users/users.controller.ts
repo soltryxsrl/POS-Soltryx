@@ -39,14 +39,18 @@ export class UsersController {
 
   @Post()
   @RequirePermissions('users.create')
-  create(@Body() dto: CreateUserDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateUserDto, @CurrentUser() current: CurrentUserPayload | undefined) {
+    return this.service.create(dto, current);
   }
 
   @Patch(':id')
   @RequirePermissions('users.update')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() current: CurrentUserPayload | undefined,
+  ) {
+    return this.service.update(id, dto, current);
   }
 
   @Delete(':id')
@@ -56,6 +60,6 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() current: CurrentUserPayload | undefined,
   ): Promise<void> {
-    await this.service.softDelete(id, current?.id ?? '');
+    await this.service.softDelete(id, current?.id ?? '', current?.username);
   }
 }
