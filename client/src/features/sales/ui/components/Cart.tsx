@@ -366,9 +366,13 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
             type="button"
             size="lg"
             onClick={onCheckout}
-            disabled={!canCheckout || !online}
+            disabled={!canCheckout}
             className="h-full w-full text-base"
-            title={online ? 'Cobrar (F2)' : 'Sin conexión: no puedes cobrar'}
+            title={
+              online
+                ? 'Cobrar (F2)'
+                : 'Sin conexión: la venta no fiscal se guardará offline'
+            }
           >
             Cobrar
             <span className="ml-1 hidden rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider sm:inline">
