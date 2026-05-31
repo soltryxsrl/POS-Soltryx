@@ -193,6 +193,11 @@ test.describe.serial('POS — cola de ventas offline', () => {
     // Esta prueba verifica que si la venta se guarda offline, se intenta sincronizar,
     // y por alguna razón se reintenta (o se drena nuevamente), no crea duplicados.
 
+    // Snapshot determinista del stock ANTES de la venta offline: tras sincronizar
+    // debe bajar EXACTAMENTE 1 (un replay duplicado lo bajaría 2).
+    const snap = await api<{ stock: string }>(`/products/${productId}`);
+    const stockBefore = Number(snap.stock);
+
     await page.goto('/pos');
     await page.waitForLoadState('networkidle');
 
@@ -235,26 +240,15 @@ test.describe.serial('POS — cola de ventas offline', () => {
     const badge = page.locator('span').filter({ hasText: /por sincronizar/ });
     await expect(badge).toBeHidden({ timeout: 15_000 });
 
-    // Ir a /sales y verificar que hay exactamente UNA venta (no dos)
+    // Ir a /sales: la venta sincronizada debe listarse (auto-wait, robusto bajo carga).
     await page.goto('/sales');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('table tbody tr').first()).toBeVisible({
+      timeout: 15_000,
+    });
 
-    // Contar filas de ventas recientes — debe tener al menos 1 de nuestro test
-    const rows = await page.locator('table tbody tr').count();
-    expect(rows).toBeGreaterThan(0);
-
-    // Filtrar por el monto exacto (100 DOP) para verificar que es solo 1
-    const rowsWith100 = await page.locator('table tbody tr').filter({
-      has: page.getByText(/100\.00/),
-    }).count();
-    // Aunque podría haber otras ventas con ese monto, al menos sabemos que no
-    // se duplicó (si se hubiera duplicado habría 2+ líneas con el mismo idempotencyKey).
-    // Verificar via API es más confiable.
-    const sales = await api<{ items: Array<{ id: string; total: string }> }>(
-      '/sales?limit=50'
-    );
-    const ourSales = sales.items.filter((s) => s.total === '100.00');
-    // En este test, solo hemos cobrado 1 venta de 100. Si hay 2+, falla idempotencia.
-    expect(ourSales.length).toBeGreaterThanOrEqual(1);
+    // IDEMPOTENCIA (determinista): el stock del producto bajó EXACTAMENTE 1 desde
+    // el snapshot. Si el replay hubiera duplicado la venta, habría bajado 2.
+    const after = await api<{ stock: string }>(`/products/${productId}`);
+    expect(Number(after.stock)).toBe(stockBefore - 1);
   });
 });

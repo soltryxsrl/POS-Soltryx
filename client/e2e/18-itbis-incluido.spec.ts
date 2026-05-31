@@ -47,8 +47,8 @@ test.describe.serial('ITBIS incluido', () => {
       has: page.getByRole('heading', { name: /^Carrito/ }),
     });
     await expect(cart.getByText('E2E Precio Bruto')).toBeVisible();
-    // En modo incluido el carrito etiqueta el impuesto como incluido.
-    await expect(cart.getByText('ITBIS incluido', { exact: true })).toBeVisible();
+    // En modo incluido el carrito etiqueta el impuesto como "ITBIS incl."
+    await expect(cart.getByText(/ITBIS incl\./i).first()).toBeVisible();
 
     await page.getByRole('button', { name: /^Cobrar/ }).click();
     const dlg = page.getByRole('dialog');

@@ -84,6 +84,15 @@ test.describe.serial('POS — override dialog (cashier sin permiso)', () => {
     const cashierRole = roles.find((r) => r.code === 'CASHIER');
     if (!cashierRole) throw new Error('rol CASHIER no encontrado en el seed');
 
+    // Multi-sucursal: los usuarios sin rol ADMIN requieren sucursal asignada, y
+    // el cajero debe vivir en la MISMA sucursal que la caja que abrirá. La lista
+    // de cajas viene scopeada a la sucursal activa del admin, así que tomamos su
+    // sucursal de ahí.
+    const registers = await api<Array<{ id: string; branchId: string }>>('/cash-registers');
+    if (registers.length === 0) throw new Error('no cash registers');
+    const registerId = registers[0]!.id;
+    const branchId = registers[0]!.branchId;
+
     let existing: { items: Array<{ id: string; email: string }> };
     try {
       existing = await api('/users?limit=200');
@@ -93,9 +102,13 @@ test.describe.serial('POS — override dialog (cashier sin permiso)', () => {
     const found = existing.items?.find((u) => u.email === CASHIER_EMAIL);
     if (found) {
       cashierId = found.id;
-      // Reset la password por si la cambió otra corrida.
-      // No hay endpoint admin para resetear — confiamos en que sigue siendo
-      // CASHIER_PASSWORD desde la creación inicial. Si falla, borrarlo manualmente.
+      // Asegurar que la sucursal del cajero coincide con la de la caja: una
+      // corrida previa pudo crearlo en otra sucursal (→ 403 al abrir sesión).
+      // Reset la password no aplica (sigue siendo CASHIER_PASSWORD de origen).
+      await api(`/users/${cashierId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ branchId }),
+      });
     } else {
       const created = await api<{ id: string }>('/users', {
         method: 'POST',
@@ -105,6 +118,7 @@ test.describe.serial('POS — override dialog (cashier sin permiso)', () => {
           fullName: 'E2E Cashier Override',
           password: CASHIER_PASSWORD,
           roleIds: [cashierRole.id],
+          branchId,
         }),
       });
       cashierId = created.id;
@@ -119,10 +133,6 @@ test.describe.serial('POS — override dialog (cashier sin permiso)', () => {
     //    Si hay una activa abierta por otro usuario (típicamente admin de un
     //    test previo), la cerramos como admin antes de abrir una nueva como
     //    cashier. Esto deja al register libre.
-    const registers = await api<Array<{ id: string }>>('/cash-registers');
-    if (registers.length === 0) throw new Error('no cash registers');
-    const registerId = registers[0]!.id;
-
     let myCashier = await apiAs<{ id: string } | null>(
       cashierAccessToken,
       '/cash-sessions/active?mine=true',

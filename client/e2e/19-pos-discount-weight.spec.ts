@@ -41,10 +41,10 @@ test.describe.serial('Descuento en % y venta por peso', () => {
     // Cantidad por peso: 2.5
     await cart.getByLabel(/cantidad \(admite decimales/i).fill('2.5');
 
-    // Descuento de línea en %: togglear unidad y poner 10
-    await cart
-      .getByRole('button', { name: /cambiar unidad del descuento de la l[ií]nea/i })
-      .click();
+    // Descuento de línea en %: abrir el editor ("Desc."), cambiar la unidad a %
+    // y poner 10.
+    await cart.getByRole('button', { name: /^Desc\./ }).click();
+    await cart.getByRole('button', { name: '%', exact: true }).click();
     await cart.getByLabel(/descuento de la l[ií]nea en porcentaje/i).fill('10');
 
     // Cobrar (total esperado: 250 − 25 = 225.00)
