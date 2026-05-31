@@ -62,6 +62,31 @@ function groupByModule(perms: AdminPermission[]): Record<string, AdminPermission
   return out;
 }
 
+/** Nombre legible en español de cada módulo de permisos. */
+const MODULE_LABEL: Record<string, string> = {
+  account: 'Cuentas de cliente',
+  audit: 'Auditoría',
+  branches: 'Sucursales',
+  cash: 'Caja',
+  categories: 'Categorías',
+  currencies: 'Monedas',
+  customers: 'Clientes',
+  fiscal: 'Fiscal / DGII',
+  inventory: 'Inventario',
+  'payment-methods': 'Formas de pago',
+  products: 'Productos',
+  promotions: 'Promociones',
+  purchases: 'Compras',
+  reports: 'Reportes',
+  returns: 'Devoluciones',
+  roles: 'Roles',
+  sales: 'Ventas',
+  settings: 'Configuración',
+  suppliers: 'Proveedores',
+  'tax-types': 'Tipos de ITBIS',
+  users: 'Usuarios',
+};
+
 export function RoleForm({ role, onSuccess, onCancel }: Props) {
   const isEdit = !!role;
   const perms = useAdminPermissions();
@@ -194,8 +219,8 @@ export function RoleForm({ role, onSuccess, onCancel }: Props) {
                           isOpen ? 'rotate-0' : '-rotate-90',
                         )}
                       />
-                      <span className="text-sm font-semibold uppercase tracking-wide text-foreground">
-                        {mod}
+                      <span className="text-sm font-semibold tracking-wide text-foreground">
+                        {MODULE_LABEL[mod] ?? mod}
                       </span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                         {checkedCount}/{ids.length}
