@@ -42,6 +42,9 @@ export function CreatePurchaseOrderForm() {
   const [supplierNcf, setSupplierNcf] = useState('');
   const [supplierInvoiceDate, setSupplierInvoiceDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [itbisRetenido, setItbisRetenido] = useState('');
+  const [isrRetenido, setIsrRetenido] = useState('');
+  const [isrRetentionType, setIsrRetentionType] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -112,6 +115,9 @@ export function CreatePurchaseOrderForm() {
               supplierFiscalDocTypeCode,
               supplierNcf: supplierNcf.trim() || undefined,
               supplierInvoiceDate: supplierInvoiceDate || undefined,
+              itbisRetenido: itbisRetenido.trim() || undefined,
+              isrRetenido: isrRetenido.trim() || undefined,
+              isrRetentionType: isrRetentionType || undefined,
             }
           : {}),
         paymentMethod,
@@ -221,6 +227,45 @@ export function CreatePurchaseOrderForm() {
               <option value="OTHER">Otra</option>
             </Select>
           </FormField>
+          {supplierFiscalDocTypeCode && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <FormField
+                label="ITBIS retenido"
+                hint="Solo si eres agente de retención."
+              >
+                <Input
+                  inputMode="decimal"
+                  value={itbisRetenido}
+                  onChange={(e) => setItbisRetenido(e.target.value)}
+                  placeholder="0.00"
+                />
+              </FormField>
+              <FormField label="ISR retenido">
+                <Input
+                  inputMode="decimal"
+                  value={isrRetenido}
+                  onChange={(e) => setIsrRetenido(e.target.value)}
+                  placeholder="0.00"
+                />
+              </FormField>
+              <FormField label="Tipo retención ISR">
+                <Select
+                  value={isrRetentionType}
+                  onChange={(e) => setIsrRetentionType(e.target.value)}
+                >
+                  <option value="">— N/A —</option>
+                  <option value="01">01 Alquileres</option>
+                  <option value="02">02 Honorarios por servicios</option>
+                  <option value="03">03 Otras rentas</option>
+                  <option value="04">04 Rentas presuntas</option>
+                  <option value="05">05 Intereses pagados a PJ</option>
+                  <option value="06">06 Intereses pagados a PF</option>
+                  <option value="07">07 Proveedores del Estado</option>
+                  <option value="08">08 Juegos telefónicos</option>
+                </Select>
+              </FormField>
+            </div>
+          )}
         </div>
 
         <FormField label="Notas" className="sm:col-span-2">

@@ -75,6 +75,23 @@ export class CreatePurchaseOrderRequestDto {
   @IsIn(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'OTHER'])
   paymentMethod?: string;
 
+  /** ITBIS retenido al proveedor (606 col 12). Solo si el negocio es agente de retención. */
+  @IsOptional()
+  @IsNumberString()
+  @Matches(MONEY, { message: 'itbisRetenido debe tener hasta 2 decimales' })
+  itbisRetenido?: string;
+
+  /** ISR retenido al proveedor (606 col 18 "Retención Renta"). */
+  @IsOptional()
+  @IsNumberString()
+  @Matches(MONEY, { message: 'isrRetenido debe tener hasta 2 decimales' })
+  isrRetenido?: string;
+
+  /** Tipo de retención en ISR (606 col 17): código DGII 01..08. */
+  @IsOptional()
+  @IsIn(['01', '02', '03', '04', '05', '06', '07', '08'])
+  isrRetentionType?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(1000)

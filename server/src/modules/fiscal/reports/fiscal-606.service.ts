@@ -70,6 +70,12 @@ export interface Fiscal606Row {
   totalFacturado: string;
   /** ITBIS facturado. */
   itbisFacturado: string;
+  /** ITBIS retenido (col 12). */
+  itbisRetenido: string;
+  /** Tipo de retención ISR (col 17): código DGII o vacío. */
+  isrRetentionType: string;
+  /** Monto retención renta / ISR retenido (col 18). */
+  isrRetenido: string;
   /** Código DGII de forma de pago (col 23): 01..07. */
   formaPago: string;
   // Helpers para UI (no van al TXT DGII).
@@ -193,6 +199,9 @@ export class Fiscal606Service {
         montoBienes: po.subtotal,
         totalFacturado: po.total,
         itbisFacturado: po.taxTotal,
+        itbisRetenido: po.itbisRetenido ?? '0.00',
+        isrRetentionType: po.isrRetentionType ?? '',
+        isrRetenido: po.isrRetenido ?? '0.00',
         formaPago: formaPago606(po.paymentMethod),
         purchaseOrderId: po.id,
         orderNumber: po.orderNumber,
@@ -223,6 +232,9 @@ export class Fiscal606Service {
         montoBienes: d.subtotal,
         totalFacturado: d.total,
         itbisFacturado: d.taxTotal,
+        itbisRetenido: '0.00',
+        isrRetentionType: '',
+        isrRetenido: '0.00',
         // Los standalone (compras informales / gastos menores) no capturan forma
         // de pago → efectivo por defecto.
         formaPago: '01',
@@ -292,13 +304,13 @@ export class Fiscal606Service {
           r.montoBienes,           // 9
           r.totalFacturado,        // 10
           r.itbisFacturado,        // 11
-          '0.00',                  // 12 ITBIS Retenido
+          r.itbisRetenido,         // 12 ITBIS Retenido
           '0.00',                  // 13 Proporcionalidad
           '0.00',                  // 14 Costo
           '0.00',                  // 15 Por adelantar
           '0.00',                  // 16 Percibido
-          '',                      // 17 Tipo retención ISR
-          '0.00',                  // 18 Retención Renta
+          r.isrRetentionType,      // 17 Tipo retención ISR
+          r.isrRetenido,           // 18 Retención Renta
           '0.00',                  // 19 ISR Percibido
           '0.00',                  // 20 Impuesto selectivo
           '0.00',                  // 21 Otros impuestos

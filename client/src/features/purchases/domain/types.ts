@@ -32,6 +32,10 @@ export interface PurchaseOrder {
   supplierInvoiceDate: string | null;
   /** Forma de pago al proveedor (CASH/TRANSFER/CARD/CREDIT/OTHER). Va al 606. */
   paymentMethod: string | null;
+  /** Retenciones (606): ITBIS retenido (col 12), ISR retenido (col 18), tipo ISR (col 17). */
+  itbisRetenido: MoneyDto;
+  isrRetenido: MoneyDto;
+  isrRetentionType: string | null;
   subtotal: MoneyDto;
   taxTotal: MoneyDto;
   total: MoneyDto;
@@ -63,6 +67,10 @@ export interface CreatePurchaseOrderInput {
   supplierInvoiceDate?: string;
   /** Forma de pago al proveedor (para la columna 23 del 606). */
   paymentMethod?: string;
+  /** Retenciones al proveedor (606): solo si el negocio es agente de retención. */
+  itbisRetenido?: string;
+  isrRetenido?: string;
+  isrRetentionType?: string;
   notes?: string;
   items: Array<{
     productId: string;

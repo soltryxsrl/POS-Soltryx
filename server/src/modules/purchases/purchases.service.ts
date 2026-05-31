@@ -60,6 +60,9 @@ export interface PurchaseOrderResponse {
   supplierNcf: string | null;
   supplierInvoiceDate: string | null;
   paymentMethod: string | null;
+  itbisRetenido: string;
+  isrRetenido: string;
+  isrRetentionType: string | null;
   subtotal: string;
   taxTotal: string;
   total: string;
@@ -251,6 +254,9 @@ export class PurchasesService {
         supplierNcf: dto.supplierNcf?.trim() || null,
         supplierInvoiceDate: dto.supplierInvoiceDate ?? null,
         paymentMethod: dto.paymentMethod ?? null,
+        itbisRetenido: dto.itbisRetenido ?? '0.00',
+        isrRetenido: dto.isrRetenido ?? '0.00',
+        isrRetentionType: dto.isrRetentionType ?? null,
         subtotal: fromCents(subtotalC),
         taxTotal: fromCents(taxC),
         total: fromCents(subtotalC + taxC),
@@ -492,6 +498,9 @@ function toResponse(
     supplierNcf: po.supplierNcf,
     supplierInvoiceDate: po.supplierInvoiceDate,
     paymentMethod: po.paymentMethod,
+    itbisRetenido: po.itbisRetenido,
+    isrRetenido: po.isrRetenido,
+    isrRetentionType: po.isrRetentionType,
     subtotal: po.subtotal,
     taxTotal: po.taxTotal,
     total: po.total,

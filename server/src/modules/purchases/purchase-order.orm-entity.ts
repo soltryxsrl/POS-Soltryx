@@ -76,6 +76,32 @@ export class PurchaseOrderOrmEntity {
   @Column({ name: 'payment_method', type: 'varchar', length: 16, nullable: true })
   paymentMethod!: string | null;
 
+  /** ITBIS retenido al proveedor (606 col 12). */
+  @Column({
+    name: 'itbis_retenido',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericString,
+  })
+  itbisRetenido!: string;
+
+  /** ISR retenido al proveedor (606 col 18 "Retención Renta"). */
+  @Column({
+    name: 'isr_retenido',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericString,
+  })
+  isrRetenido!: string;
+
+  /** Código DGII del tipo de retención en ISR (606 col 17): 01..08. */
+  @Column({ name: 'isr_retention_type', type: 'varchar', length: 2, nullable: true })
+  isrRetentionType!: string | null;
+
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0, transformer: numericString })
   subtotal!: string;
 
