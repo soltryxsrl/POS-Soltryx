@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import {
@@ -45,6 +46,13 @@ export function MaintenanceShell({
   const preferredMode = usePreferencesStore((s) => s.maintenanceMode);
   const mode = forceMode ?? preferredMode;
 
+  // Portamos el modal a <body> para que `fixed inset-0` cubra TODO el viewport.
+  // Si se renderiza dentro del árbol de la página, cualquier ancestro con
+  // transform/filter/backdrop-filter/container-type crea un bloque contenedor y
+  // el backdrop no llega hasta arriba. El guard `mounted` evita el mismatch SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   /**
    * Trackea dónde inició el mousedown para evitar que un arrastre que empieza
    * dentro del modal (ej. seleccionar texto en un input) y termina fuera dispare
@@ -74,10 +82,10 @@ export function MaintenanceShell({
     mouseDownOnBackdropRef.current = false;
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  if (mode === 'drawer') {
-    return (
+  const content =
+    mode === 'drawer' ? (
       <div
         className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-150"
         onMouseDown={handleBackdropMouseDown}
@@ -99,32 +107,31 @@ export function MaintenanceShell({
           <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
         </aside>
       </div>
-    );
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm animate-in fade-in duration-150"
-      onMouseDown={handleBackdropMouseDown}
-      onClick={handleBackdropClick}
-    >
+    ) : (
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        className={cn(
-          'relative flex w-full max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-brand-from/10',
-          'animate-in zoom-in-95 fade-in duration-200',
-          MODAL_SIZE[size],
-        )}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+        onMouseDown={handleBackdropMouseDown}
+        onClick={handleBackdropClick}
       >
-        <Header title={title} onClose={onClose} />
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            'relative flex w-full max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-brand-from/10',
+            'animate-in zoom-in-95 fade-in duration-200',
+            MODAL_SIZE[size],
+          )}
+        >
+          <Header title={title} onClose={onClose} />
+          <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        </div>
       </div>
-    </div>
-  );
+    );
+
+  return createPortal(content, document.body);
 }
 
 function Header({ title, onClose }: { title: string; onClose: () => void }) {

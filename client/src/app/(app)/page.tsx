@@ -460,7 +460,7 @@ function PaymentMethodsChart({
   const methodsTotal = data.reduce((s, m) => s + Number(m.total), 0);
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+    <div className="flex flex-col items-center gap-4">
       <DonutChart
         data={slices}
         size={160}
@@ -468,7 +468,7 @@ function PaymentMethodsChart({
         centerLabel="Total"
         centerValue={formatMoney(total)}
       />
-      <ul className="flex-1 space-y-2 self-stretch">
+      <ul className="w-full min-w-0 space-y-2">
         {data.map((m, i) => {
           const meta = METHOD_PALETTE[m.method];
           const color = meta?.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length];
@@ -477,13 +477,13 @@ function PaymentMethodsChart({
             <li key={m.method} className="space-y-1">
               <div className="flex items-center gap-2 text-xs">
                 <span
-                  className="h-2.5 w-2.5 rounded-sm"
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
                   style={{ backgroundColor: color }}
                 />
-                <span className="font-medium text-foreground">
+                <span className="min-w-0 truncate font-medium text-foreground">
                   {meta?.label ?? m.method}
                 </span>
-                <span className="ml-auto font-semibold text-foreground">
+                <span className="ml-auto shrink-0 whitespace-nowrap font-semibold tabular-nums text-foreground">
                   {formatMoney(m.total)}
                 </span>
               </div>
