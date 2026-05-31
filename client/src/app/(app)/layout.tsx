@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  ArrowLeftRight,
   BarChart3,
   Boxes,
   ChevronLeft,
@@ -69,6 +70,12 @@ const NAV_ITEMS: NavItem[] = [
     href: '/inventory',
     label: 'Inventario',
     icon: Boxes,
+    permissions: ['inventory.read'],
+  },
+  {
+    href: '/transferencias',
+    label: 'Transferencias',
+    icon: ArrowLeftRight,
     permissions: ['inventory.read'],
   },
   { href: '/cash', label: 'Caja', icon: Wallet, permissions: ['cash.read'] },
