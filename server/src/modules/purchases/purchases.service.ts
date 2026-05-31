@@ -59,6 +59,7 @@ export interface PurchaseOrderResponse {
   supplierFiscalDocTypeCode: string | null;
   supplierNcf: string | null;
   supplierInvoiceDate: string | null;
+  paymentMethod: string | null;
   subtotal: string;
   taxTotal: string;
   total: string;
@@ -249,6 +250,7 @@ export class PurchasesService {
         supplierFiscalDocTypeCode: dto.supplierFiscalDocTypeCode ?? null,
         supplierNcf: dto.supplierNcf?.trim() || null,
         supplierInvoiceDate: dto.supplierInvoiceDate ?? null,
+        paymentMethod: dto.paymentMethod ?? null,
         subtotal: fromCents(subtotalC),
         taxTotal: fromCents(taxC),
         total: fromCents(subtotalC + taxC),
@@ -466,6 +468,7 @@ function toResponse(
     supplierFiscalDocTypeCode: po.supplierFiscalDocTypeCode,
     supplierNcf: po.supplierNcf,
     supplierInvoiceDate: po.supplierInvoiceDate,
+    paymentMethod: po.paymentMethod,
     subtotal: po.subtotal,
     taxTotal: po.taxTotal,
     total: po.total,

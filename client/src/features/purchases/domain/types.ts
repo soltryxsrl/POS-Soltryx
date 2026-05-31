@@ -30,6 +30,8 @@ export interface PurchaseOrder {
   supplierNcf: string | null;
   /** Fecha del comprobante del proveedor (YYYY-MM-DD). */
   supplierInvoiceDate: string | null;
+  /** Forma de pago al proveedor (CASH/TRANSFER/CARD/CREDIT/OTHER). Va al 606. */
+  paymentMethod: string | null;
   subtotal: MoneyDto;
   taxTotal: MoneyDto;
   total: MoneyDto;
@@ -59,6 +61,8 @@ export interface CreatePurchaseOrderInput {
   supplierFiscalDocTypeCode?: string;
   supplierNcf?: string;
   supplierInvoiceDate?: string;
+  /** Forma de pago al proveedor (para la columna 23 del 606). */
+  paymentMethod?: string;
   notes?: string;
   items: Array<{
     productId: string;

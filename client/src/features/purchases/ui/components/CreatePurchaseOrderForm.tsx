@@ -41,6 +41,7 @@ export function CreatePurchaseOrderForm() {
   const [supplierFiscalDocTypeCode, setSupplierFiscalDocTypeCode] = useState('');
   const [supplierNcf, setSupplierNcf] = useState('');
   const [supplierInvoiceDate, setSupplierInvoiceDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -113,6 +114,7 @@ export function CreatePurchaseOrderForm() {
               supplierInvoiceDate: supplierInvoiceDate || undefined,
             }
           : {}),
+        paymentMethod,
         notes: notes.trim() || undefined,
         items: lines.map((l) => ({
           productId: l.productId,
@@ -207,6 +209,18 @@ export function CreatePurchaseOrderForm() {
               />
             </FormField>
           </div>
+          <FormField label="Forma de pago" className="mt-3 sm:max-w-xs">
+            <Select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+            >
+              <option value="CASH">Efectivo</option>
+              <option value="TRANSFER">Cheque / Transferencia / Depósito</option>
+              <option value="CARD">Tarjeta</option>
+              <option value="CREDIT">Compra a crédito</option>
+              <option value="OTHER">Otra</option>
+            </Select>
+          </FormField>
         </div>
 
         <FormField label="Notas" className="sm:col-span-2">

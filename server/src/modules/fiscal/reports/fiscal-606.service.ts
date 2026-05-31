@@ -21,6 +21,27 @@ function digits(s: string | null): string {
   return (s ?? '').replace(/\D+/g, '');
 }
 
+/**
+ * Mapea la forma de pago de la orden de compra al código DGII de la columna 23
+ * del 606. Null/desconocido → '01' (efectivo) por compatibilidad.
+ *   01 Efectivo · 02 Cheque/Transf/Depósito · 03 Tarjeta · 04 Crédito · 07 Otras
+ */
+function formaPago606(method: string | null): string {
+  switch (method) {
+    case 'TRANSFER':
+      return '02';
+    case 'CARD':
+      return '03';
+    case 'CREDIT':
+      return '04';
+    case 'OTHER':
+      return '07';
+    case 'CASH':
+    default:
+      return '01';
+  }
+}
+
 function ymd(dateStr: string): string {
   // Acepta YYYY-MM-DD y devuelve YYYYMMDD.
   return dateStr.replace(/-/g, '');
@@ -49,6 +70,8 @@ export interface Fiscal606Row {
   totalFacturado: string;
   /** ITBIS facturado. */
   itbisFacturado: string;
+  /** Código DGII de forma de pago (col 23): 01..07. */
+  formaPago: string;
   // Helpers para UI (no van al TXT DGII).
   purchaseOrderId: string;
   orderNumber: string;
@@ -170,6 +193,7 @@ export class Fiscal606Service {
         montoBienes: po.subtotal,
         totalFacturado: po.total,
         itbisFacturado: po.taxTotal,
+        formaPago: formaPago606(po.paymentMethod),
         purchaseOrderId: po.id,
         orderNumber: po.orderNumber,
         supplierName,
@@ -199,6 +223,9 @@ export class Fiscal606Service {
         montoBienes: d.subtotal,
         totalFacturado: d.total,
         itbisFacturado: d.taxTotal,
+        // Los standalone (compras informales / gastos menores) no capturan forma
+        // de pago → efectivo por defecto.
+        formaPago: '01',
         purchaseOrderId: d.id,
         orderNumber: d.ncf, // No hay PO; usamos el NCF como "número de referencia".
         supplierName: d.buyerName ?? 'Sin contraparte',
@@ -276,7 +303,7 @@ export class Fiscal606Service {
           '0.00',                  // 20 Impuesto selectivo
           '0.00',                  // 21 Otros impuestos
           '0.00',                  // 22 Propina (no aplica en compras)
-          '01',                    // 23 Forma de pago default
+          r.formaPago,             // 23 Forma de pago (de la orden de compra)
         ];
         return cols.join('|');
       })

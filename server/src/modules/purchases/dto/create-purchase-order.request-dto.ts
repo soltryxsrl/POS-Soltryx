@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsIn,
   IsNumberString,
   IsOptional,
   IsString,
@@ -68,6 +69,11 @@ export class CreatePurchaseOrderRequestDto {
   @IsOptional()
   @IsDateString()
   supplierInvoiceDate?: string;
+
+  /** Forma de pago al proveedor (para la columna "Forma de Pago" del 606). */
+  @IsOptional()
+  @IsIn(['CASH', 'TRANSFER', 'CARD', 'CREDIT', 'OTHER'])
+  paymentMethod?: string;
 
   @IsOptional()
   @IsString()

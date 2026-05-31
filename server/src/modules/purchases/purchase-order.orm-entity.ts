@@ -19,6 +19,17 @@ export const PurchaseOrderStatus = {
 export type PurchaseOrderStatus =
   (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
 
+/** Forma de pago al proveedor (mapea a la columna 23 del 606 DGII). */
+export const PurchasePaymentMethod = {
+  CASH: 'CASH', // 01 Efectivo
+  TRANSFER: 'TRANSFER', // 02 Cheque / Transferencia / Depósito
+  CARD: 'CARD', // 03 Tarjeta de crédito/débito
+  CREDIT: 'CREDIT', // 04 Compra a crédito
+  OTHER: 'OTHER', // 07 Otras formas
+} as const;
+export type PurchasePaymentMethod =
+  (typeof PurchasePaymentMethod)[keyof typeof PurchasePaymentMethod];
+
 @Entity({ name: 'purchase_orders' })
 @Index('ix_po_status_created_at', ['status', 'createdAt'])
 export class PurchaseOrderOrmEntity {
@@ -60,6 +71,10 @@ export class PurchaseOrderOrmEntity {
   /** Fecha del comprobante del proveedor (YYYY-MM-DD). Va al 606. */
   @Column({ name: 'supplier_invoice_date', type: 'date', nullable: true })
   supplierInvoiceDate!: string | null;
+
+  /** Forma de pago (CASH/TRANSFER/CARD/CREDIT/OTHER). Null = efectivo en el 606. */
+  @Column({ name: 'payment_method', type: 'varchar', length: 16, nullable: true })
+  paymentMethod!: string | null;
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0, transformer: numericString })
   subtotal!: string;
