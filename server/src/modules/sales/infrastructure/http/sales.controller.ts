@@ -89,6 +89,7 @@ export class SalesController {
         cashSessionId: body.cashSessionId,
         customerId: body.customerId,
         notes: body.notes,
+        idempotencyKey: body.idempotencyKey,
         userId: user.id,
         currentUserPermissions: user.permissions,
         overrideCredentials: body.overrideCredentials ?? null,

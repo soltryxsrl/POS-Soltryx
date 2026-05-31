@@ -64,6 +64,8 @@ export interface CreateSaleInput {
   cashSessionId: string;
   customerId?: string | null;
   notes?: string | null;
+  /** Clave de idempotencia (POS offline): si ya existe una venta con ella, se devuelve esa. */
+  idempotencyKey?: string | null;
   userId: string;
   /** Permisos del usuario que está iniciando la venta (para override checks). */
   currentUserPermissions: ReadonlyArray<string>;
@@ -135,6 +137,12 @@ export class CreateSaleUseCase {
   ) {}
 
   async execute(input: CreateSaleInput): Promise<Sale> {
+    // Idempotencia (POS offline): si la cola reintenta una venta ya registrada,
+    // devolvemos la existente en vez de duplicar el cobro/stock.
+    if (input.idempotencyKey) {
+      const existing = await this.saleRepo.findByIdempotencyKey(input.idempotencyKey);
+      if (existing) return existing;
+    }
     if (input.items.length === 0) throw new SaleHasNoItemsError();
     if (input.payments.length === 0) throw new SaleHasNoPaymentsError();
 
@@ -420,6 +428,7 @@ export class CreateSaleUseCase {
         notes: input.notes ?? null,
         discountAuthorizedById,
         discountAuthorizedBySnapshot,
+        idempotencyKey: input.idempotencyKey ?? null,
         items: computed.lines.map((l, idx) => {
           const original = linesWithPromo[idx];
           if (!original) throw new Error('line index mismatch');

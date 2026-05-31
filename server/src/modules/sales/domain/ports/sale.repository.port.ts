@@ -26,6 +26,8 @@ export interface InsertSaleInput {
   discountAuthorizedById: string | null;
   /** Snapshot del nombre del autorizador al momento de la venta. */
   discountAuthorizedBySnapshot: string | null;
+  /** Clave de idempotencia (POS offline). Null si la venta no la trae. */
+  idempotencyKey?: string | null;
   items: Array<{
     productId: string | null;
     variantId?: string | null;
@@ -94,6 +96,8 @@ export interface SaleRepository {
   insert(ctx: TransactionContext, input: InsertSaleInput): Promise<Sale>;
   markCancelled(ctx: TransactionContext, saleId: string, patch: CancelSalePatch): Promise<Sale>;
   findById(id: string): Promise<Sale | null>;
+  /** Busca una venta por su clave de idempotencia (POS offline). */
+  findByIdempotencyKey(key: string): Promise<Sale | null>;
   /** Carga sale + items (sin payments) — usado por cancel para emitir reversals de stock. */
   findItemsForCancellation(ctx: TransactionContext, saleId: string): Promise<SaleItem[]>;
   /** Lookup payments para una sale (paginación interna no aplica). */

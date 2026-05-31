@@ -99,6 +99,10 @@ export class SaleOrmEntity {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
+  /** Clave de idempotencia (POS offline) — única; evita duplicar al sincronizar. */
+  @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
+  idempotencyKey!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

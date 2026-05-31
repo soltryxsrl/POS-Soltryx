@@ -103,6 +103,11 @@ export class CreateSaleRequestDto {
   @IsUUID()
   cashSessionId!: string;
 
+  /** Clave de idempotencia (POS offline) para no duplicar al sincronizar la cola. */
+  @IsOptional()
+  @IsUUID()
+  idempotencyKey?: string;
+
   @IsOptional()
   @IsUUID()
   customerId?: string;

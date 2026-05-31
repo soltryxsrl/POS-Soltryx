@@ -151,6 +151,7 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
       notes: input.notes,
       discountAuthorizedById: input.discountAuthorizedById,
       discountAuthorizedBySnapshot: input.discountAuthorizedBySnapshot,
+      idempotencyKey: input.idempotencyKey ?? null,
     });
     const savedSale = await salesRepo.save(sale);
 
@@ -213,6 +214,11 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
     });
     if (!refreshed) throw new Error(`Sale ${saleId} disappeared after cancel`);
     return saleToDomain(refreshed);
+  }
+
+  async findByIdempotencyKey(key: string): Promise<Sale | null> {
+    const r = await this.sales.findOne({ where: { idempotencyKey: key }, select: { id: true } });
+    return r ? this.findById(r.id) : null;
   }
 
   async findById(id: string): Promise<Sale | null> {

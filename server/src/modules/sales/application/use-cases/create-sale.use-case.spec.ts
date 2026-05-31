@@ -55,6 +55,7 @@ function makeMocks() {
         id: 'sale-1',
         ...input,
       })),
+      findByIdempotencyKey: jest.fn().mockResolvedValue(null),
     },
     stockRecorder: { record: jest.fn().mockResolvedValue(undefined) },
     userReader: { findById: jest.fn(), findByEmailOrUsername: jest.fn() },
@@ -203,6 +204,15 @@ describe('CreateSaleUseCase (integración)', () => {
         baseInput({ payments: [{ method: PaymentMethod.CASH, amount: '100.00' }] }),
       ),
     ).rejects.toThrow(PaymentInsufficientError);
+  });
+
+  it('idempotencia: si ya existe una venta con la clave, la devuelve sin volver a insertar', async () => {
+    const m = makeMocks();
+    m.saleRepo.findByIdempotencyKey.mockResolvedValueOnce({ id: 'sale-existing' });
+    const sale = await makeUseCase(m).execute(baseInput({ idempotencyKey: 'key-1' }));
+    expect(sale.id).toBe('sale-existing');
+    expect(m.saleRepo.insert).not.toHaveBeenCalled();
+    expect(m.stockRecorder.record).not.toHaveBeenCalled();
   });
 
   it('anti-IDOR: rechaza un producto de OTRA sucursal (branchId distinto al de la venta)', async () => {
