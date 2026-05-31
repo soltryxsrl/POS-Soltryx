@@ -1,19 +1,26 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, X } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { Input } from '@/shared/ui/controls/Input';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
-import { useSuppliers } from '../../application/hooks/use-suppliers';
+import { useDeleteSupplier, useSuppliers } from '../../application/hooks/use-suppliers';
 import type { Supplier } from '../../domain/types';
 import { SupplierFormDialog } from './SupplierFormDialog';
 
 const FILTER_KEYS = ['q', 'isActive'] as const;
 
 export function SuppliersTable() {
+  const { user } = useAuth();
+  const canDelete = !!user && user.permissions.includes('suppliers.delete');
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
+  const [viewing, setViewing] = useState<Supplier | null>(null);
+  const [deleting, setDeleting] = useState<Supplier | null>(null);
+  const del = useDeleteSupplier();
 
   const table = useTableQueryState({
     defaultSort: 'tradeName',
@@ -71,18 +78,41 @@ export function SuppliersTable() {
         header: '',
         align: 'right',
         render: (s) => (
-          <button
-            type="button"
-            onClick={() => setEditing(s)}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
-          </button>
+          <div className="flex items-center justify-end gap-0.5">
+            <button
+              type="button"
+              title="Ver"
+              aria-label="Ver"
+              onClick={() => setViewing(s)}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Eye className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Editar"
+              aria-label="Editar"
+              onClick={() => setEditing(s)}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                title="Eliminar"
+                aria-label="Eliminar"
+                onClick={() => setDeleting(s)}
+                className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         ),
       },
     ],
-    [],
+    [canDelete],
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
@@ -161,6 +191,31 @@ export function SuppliersTable() {
       {showCreate && <SupplierFormDialog onClose={() => setShowCreate(false)} />}
       {editing && (
         <SupplierFormDialog supplier={editing} onClose={() => setEditing(null)} />
+      )}
+      {viewing && (
+        <SupplierFormDialog
+          supplier={viewing}
+          readOnly
+          onClose={() => setViewing(null)}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar proveedor"
+          message={
+            <>
+              ¿Eliminar <strong>{deleting.tradeName}</strong>? Se quitará del
+              catálogo; el histórico de compras no se borra.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={del.isPending}
+          onConfirm={() =>
+            del.mutate(deleting.id, { onSuccess: () => setDeleting(null) })
+          }
+          onClose={() => setDeleting(null)}
+        />
       )}
     </>
   );

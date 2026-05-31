@@ -17,11 +17,13 @@ import type { Supplier } from '../../domain/types';
 
 interface Props {
   supplier?: Supplier;
+  /** Solo lectura (acción "Ver"): inputs deshabilitados y sin botón Guardar. */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved?: (s: Supplier) => void;
 }
 
-export function SupplierFormDialog({ supplier, onClose, onSaved }: Props) {
+export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Props) {
   const isEdit = !!supplier;
   const create = useCreateSupplier();
   const update = useUpdateSupplier(supplier?.id ?? '__new__');
@@ -78,10 +80,11 @@ export function SupplierFormDialog({ supplier, onClose, onSaved }: Props) {
     <MaintenanceShell
       open
       onClose={onClose}
-      title={isEdit ? 'Editar proveedor' : 'Nuevo proveedor'}
+      title={readOnly ? 'Proveedor' : isEdit ? 'Editar proveedor' : 'Nuevo proveedor'}
       size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4">
+        <fieldset disabled={readOnly} className="contents">
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Nombre comercial" required>
             <Input
@@ -168,20 +171,30 @@ export function SupplierFormDialog({ supplier, onClose, onSaved }: Props) {
           </label>
         )}
 
+        </fieldset>
+
         {error && (
           <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
             {error}
           </p>
         )}
 
-        <FormFooter>
-          <Button variant="outline" onClick={onClose} disabled={pending}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear proveedor'}
-          </Button>
-        </FormFooter>
+        {readOnly ? (
+          <FormFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cerrar
+            </Button>
+          </FormFooter>
+        ) : (
+          <FormFooter>
+            <Button variant="outline" onClick={onClose} disabled={pending}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear proveedor'}
+            </Button>
+          </FormFooter>
+        )}
       </form>
     </MaintenanceShell>
   );
