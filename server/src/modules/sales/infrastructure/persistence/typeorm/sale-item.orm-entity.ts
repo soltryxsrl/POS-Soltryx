@@ -70,6 +70,17 @@ export class SaleItemOrmEntity {
   @Column({ type: 'numeric', precision: 12, scale: 2, transformer: numericString })
   total!: string;
 
+  /** Costo unitario vigente al vender (promedio móvil). Para margen histórico exacto. */
+  @Column({
+    name: 'unit_cost_snapshot',
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    transformer: numericString,
+  })
+  unitCostSnapshot!: string | null;
+
   /**
    * Si esta línea era un producto-kit al venderse, snapshot de la receta usada.
    * Permite que la cancelación/devolución reverse exactamente lo que se descontó,

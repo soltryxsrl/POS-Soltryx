@@ -168,6 +168,7 @@ export class SaleRepositoryTypeOrm implements SaleRepository {
         taxRate: i.taxRate,
         taxTotal: i.taxTotal,
         total: i.total,
+        unitCostSnapshot: i.unitCostSnapshot ?? null,
         kitComponentsSnapshot: i.kitComponentsSnapshot ?? null,
         notes: i.notes ?? null,
       }),

@@ -38,6 +38,8 @@ export interface InsertSaleInput {
     taxRate: string;
     taxTotal: string;
     total: string;
+    /** Costo unitario vigente al vender (para margen histórico exacto). */
+    unitCostSnapshot?: string | null;
     /** Receta del kit al momento de la venta (null si no era kit). */
     kitComponentsSnapshot?: Array<{
       componentProductId: string;

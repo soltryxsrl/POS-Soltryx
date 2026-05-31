@@ -435,6 +435,9 @@ export class CreateSaleUseCase {
             taxRate: l.taxRate,
             taxTotal: l.taxTotal,
             total: l.lineTotal,
+            // COGS: costo unitario vigente (promedio móvil) del producto al vender.
+            // Variantes usan el costo del padre; kits usan el costo propio del kit.
+            unitCostSnapshot: l.productId ? (byId.get(l.productId)?.costPrice ?? null) : null,
             kitComponentsSnapshot: original.isKit
               ? original.kitComponents.map((c) => ({
                   componentProductId: c.componentProductId,

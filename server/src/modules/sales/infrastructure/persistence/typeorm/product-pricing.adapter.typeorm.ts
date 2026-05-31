@@ -41,6 +41,7 @@ export class ProductPricingAdapterTypeOrm implements ProductPricingPort {
       name: p.name,
       sku: p.sku,
       salePrice: p.salePrice,
+      costPrice: p.costPrice,
       taxRate: p.taxRate,
       isActive: p.isActive && p.deletedAt === null,
       isKit: p.isKit,

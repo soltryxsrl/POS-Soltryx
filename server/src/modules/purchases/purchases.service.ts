@@ -328,7 +328,30 @@ export class PurchasesService {
         await itemsRepo.update({ id: it.id }, { receivedQuantity: newReceived });
 
         if (dto.updateProductCost !== false) {
-          await productsRepo.update({ id: it.productId }, { costPrice: it.unitCost });
+          // COSTO PROMEDIO MÓVIL: el recibo NO sobreescribe el costo, lo mezcla.
+          // Leemos el producto DESPUÉS del movimiento (el recorder lo dejó con
+          // FOR UPDATE hasta el commit → lectura consistente bajo concurrencia).
+          // stockAntes = stockNuevo - recibido. costoNuevo = (stockAntes*costoAntes
+          // + recibido*costoRecibido) / stockNuevo. Si no había stock positivo,
+          // el costo nuevo es simplemente el del recibo.
+          const prod = await productsRepo.findOne({
+            where: { id: it.productId },
+            select: { id: true, stock: true, costPrice: true },
+          });
+          if (prod) {
+            const newStock = parseFloat(prod.stock);
+            const oldStock = newStock - recvNow;
+            const oldCost = parseFloat(prod.costPrice);
+            const recvCost = parseFloat(it.unitCost);
+            const blended =
+              oldStock > 0 && newStock > 0
+                ? (oldStock * oldCost + recvNow * recvCost) / newStock
+                : recvCost;
+            await productsRepo.update(
+              { id: it.productId },
+              { costPrice: blended.toFixed(2) },
+            );
+          }
         }
       }
 

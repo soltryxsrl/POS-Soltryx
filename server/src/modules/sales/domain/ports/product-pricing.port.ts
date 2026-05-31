@@ -9,6 +9,8 @@ export interface ProductPricingSnapshot {
   name: string;
   sku: string;
   salePrice: string;
+  /** Costo unitario vigente (promedio móvil) — para snapshot de COGS en la venta. */
+  costPrice: string;
   taxRate: string;
   isActive: boolean;
   /** Si true, al venderlo el stock se descuenta de sus componentes. */

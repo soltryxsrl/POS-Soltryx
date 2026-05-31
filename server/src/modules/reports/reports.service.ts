@@ -381,8 +381,9 @@ export class ReportsService {
   }
 
   /**
-   * Margen por producto sobre las ventas del rango. El costo usa el costo ACTUAL
-   * del producto (no hay snapshot histórico de costo; ver backlog FIFO).
+   * Margen por producto sobre las ventas del rango. El costo usa el snapshot
+   * vigente al vender (`unit_cost_snapshot`, promedio móvil) y cae al costo
+   * ACTUAL del producto para ventas previas a esa columna.
    */
   async productMargins(
     from: string,
@@ -403,7 +404,7 @@ export class ReportsService {
               MAX(si.product_sku_snapshot)  AS sku,
               COALESCE(SUM(si.quantity), 0)::text AS units,
               ROUND(COALESCE(SUM(si.total), 0), 2)::text    AS revenue,
-              ROUND(COALESCE(SUM(si.quantity * COALESCE(p.cost_price, 0)), 0), 2)::text AS cost
+              ROUND(COALESCE(SUM(si.quantity * COALESCE(si.unit_cost_snapshot, p.cost_price, 0)), 0), 2)::text AS cost
        FROM sale_items si
        JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
        LEFT JOIN products p ON p.id = si.product_id
@@ -411,7 +412,7 @@ export class ReportsService {
          AND s.created_at::date BETWEEN $1::date AND $2::date
          AND ($4::uuid IS NULL OR s.branch_id = $4)
        GROUP BY si.product_id
-       ORDER BY (COALESCE(SUM(si.total), 0) - COALESCE(SUM(si.quantity * COALESCE(p.cost_price, 0)), 0)) DESC
+       ORDER BY (COALESCE(SUM(si.total), 0) - COALESCE(SUM(si.quantity * COALESCE(si.unit_cost_snapshot, p.cost_price, 0)), 0)) DESC
        LIMIT $3`,
       [from, to, limit, branchId],
     );
