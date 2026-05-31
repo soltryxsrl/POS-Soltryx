@@ -22,7 +22,7 @@ test.describe('Formas de pago (mantenimiento)', () => {
     });
   });
 
-  test('lista, togglea "pide referencia" y renombra (persiste en el catálogo)', async ({
+  test('lista y edita (referencia + nombre) vía el diálogo de acción', async ({
     page,
   }) => {
     await page.goto('/admin/formas-pago');
@@ -38,9 +38,23 @@ test.describe('Formas de pago (mantenimiento)', () => {
       page.getByText(/Crédito \(cuenta por cobrar\)/),
     ).toBeVisible();
 
-    // Toggle "pide referencia" de Tarjeta (Sí -> No), verificando API.
-    const tarjeta = page.getByRole('row').filter({ hasText: 'Tarjeta' });
-    await tarjeta.getByRole('button', { name: /^Sí$/ }).click();
+    // Abrir el diálogo de Tarjeta y apagar "Pide referencia" (Sí -> No).
+    await page
+      .getByRole('row')
+      .filter({ hasText: 'Tarjeta' })
+      .getByRole('button', { name: /editar/i })
+      .click();
+    const dlg = page.getByRole('dialog');
+    await expect(
+      dlg.getByRole('heading', { name: /editar forma de pago/i }),
+    ).toBeVisible();
+    await dlg
+      .locator('label')
+      .filter({ hasText: /pide referencia/i })
+      .locator('input[type="checkbox"]')
+      .uncheck();
+    await dlg.getByRole('button', { name: /^Actualizar$/ }).click();
+    await expect(dlg).toBeHidden();
     await expect
       .poll(async () => {
         const list = await api<PaymentMethod[]>('/payment-methods');
@@ -48,11 +62,19 @@ test.describe('Formas de pago (mantenimiento)', () => {
       })
       .toBe(false);
 
-    // Renombrar "Otro" -> "Cheque" con el input inline (guarda al perder foco).
-    const otro = page.getByRole('row').filter({ hasText: 'Otro' });
-    const nameInput = otro.locator('input').first();
-    await nameInput.fill('Cheque');
-    await nameInput.blur();
+    // Abrir el diálogo de "Otro" y renombrar a "Cheque".
+    await page
+      .getByRole('row')
+      .filter({ hasText: 'Otro' })
+      .getByRole('button', { name: /editar/i })
+      .click();
+    const dlg2 = page.getByRole('dialog');
+    await expect(
+      dlg2.getByRole('heading', { name: /editar forma de pago/i }),
+    ).toBeVisible();
+    await dlg2.getByRole('textbox').first().fill('Cheque');
+    await dlg2.getByRole('button', { name: /^Actualizar$/ }).click();
+    await expect(dlg2).toBeHidden();
     await expect
       .poll(async () => {
         const list = await api<PaymentMethod[]>('/payment-methods');
