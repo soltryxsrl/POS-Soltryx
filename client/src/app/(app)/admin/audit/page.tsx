@@ -26,11 +26,33 @@ interface AuditList {
   total: number;
 }
 
+// Etiquetas en español para cada acción auditable. El código técnico se sigue
+// mostrando en gris al lado (referencia), pero el título es legible.
 const ACTION_LABEL: Record<string, string> = {
+  'auth.login.success': 'Inicio de sesión',
+  'auth.login.failed': 'Intento de inicio fallido',
+  'users.created': 'Usuario creado',
+  'users.updated': 'Usuario actualizado',
+  'users.deactivated': 'Usuario desactivado',
+  'users.deleted': 'Usuario eliminado',
+  'roles.created': 'Rol creado',
+  'roles.updated': 'Rol actualizado',
+  'roles.deleted': 'Rol eliminado',
   'sales.cancel': 'Venta anulada',
   'sales.return': 'Devolución registrada',
-  'purchases.receive': 'Orden recibida',
-  'purchases.cancel': 'Orden cancelada',
+  'sales.discount.override': 'Descuento autorizado',
+  'promotions.applied': 'Promoción aplicada',
+  'purchases.receive': 'Orden de compra recibida',
+  'purchases.cancel': 'Orden de compra cancelada',
+};
+
+// Etiquetas legibles para el tipo de entidad afectada.
+const ENTITY_LABEL: Record<string, string> = {
+  user: 'Usuario',
+  role: 'Rol',
+  sale: 'Venta',
+  sale_return: 'Devolución',
+  purchase_order: 'Orden de compra',
 };
 
 export default function AuditPage() {
@@ -65,10 +87,28 @@ export default function AuditPage() {
           className="rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus:border-brand-from"
         >
           <option value="">Todas</option>
-          <option value="sales.cancel">Ventas anuladas</option>
-          <option value="sales.return">Devoluciones</option>
-          <option value="purchases.receive">Recepciones de compra</option>
-          <option value="purchases.cancel">Compras canceladas</option>
+          <optgroup label="Acceso">
+            <option value="auth.login.success">Inicios de sesión</option>
+            <option value="auth.login.failed">Intentos fallidos</option>
+          </optgroup>
+          <optgroup label="Ventas">
+            <option value="sales.cancel">Ventas anuladas</option>
+            <option value="sales.return">Devoluciones</option>
+            <option value="sales.discount.override">Descuentos autorizados</option>
+          </optgroup>
+          <optgroup label="Compras">
+            <option value="purchases.receive">Recepciones de compra</option>
+            <option value="purchases.cancel">Compras canceladas</option>
+          </optgroup>
+          <optgroup label="Usuarios y roles">
+            <option value="users.created">Usuarios creados</option>
+            <option value="users.updated">Usuarios actualizados</option>
+            <option value="users.deactivated">Usuarios desactivados</option>
+            <option value="users.deleted">Usuarios eliminados</option>
+            <option value="roles.created">Roles creados</option>
+            <option value="roles.updated">Roles actualizados</option>
+            <option value="roles.deleted">Roles eliminados</option>
+          </optgroup>
         </select>
       </div>
 
@@ -107,7 +147,8 @@ export default function AuditPage() {
                     <div className="text-[11px] text-muted-foreground">
                       {formatDateTime(e.createdAt)}
                       {e.actorName && ` · ${e.actorName}`}
-                      {e.entityType && ` · ${e.entityType}`}
+                      {e.entityType &&
+                        ` · ${ENTITY_LABEL[e.entityType] ?? e.entityType}`}
                     </div>
                   </div>
                   {isOpen ? (
