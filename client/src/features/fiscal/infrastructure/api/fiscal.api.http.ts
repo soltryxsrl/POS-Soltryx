@@ -6,6 +6,7 @@ import type {
   CreateFiscalSequenceInput,
   Fiscal606Response,
   Fiscal607Response,
+  Fiscal608Response,
   FiscalDocAppliesTo,
   FiscalDocType,
   FiscalDocumentListItem,
@@ -90,6 +91,23 @@ export const fiscalApiHttp = {
   download606Txt: async (from: string, to: string, branchId?: string): Promise<void> => {
     await downloadReportTxt('606', from, to, branchId);
   },
+
+  // Reporte 608 (comprobantes anulados). branchId='all' = consolidado.
+  get608: (from: string, to: string, branchId?: string) =>
+    http<Fiscal608Response>('/fiscal/reports/608', {
+      searchParams: { from, to, branchId },
+    }),
+
+  download608Txt: async (from: string, to: string, branchId?: string): Promise<void> => {
+    await downloadReportTxt('608', from, to, branchId);
+  },
+
+  // Anular un comprobante standalone (NCF quemado) → aparece en el 608.
+  voidDocument: (id: string, voidType: string) =>
+    http<unknown>(`/fiscal/documents/${id}/void`, {
+      method: 'POST',
+      body: { voidType },
+    }),
 };
 
 /**
@@ -97,7 +115,7 @@ export const fiscalApiHttp = {
  * el navegador. No usa `http()` porque la respuesta es texto crudo.
  */
 async function downloadReportTxt(
-  kind: '606' | '607',
+  kind: '606' | '607' | '608',
   from: string,
   to: string,
   branchId?: string,

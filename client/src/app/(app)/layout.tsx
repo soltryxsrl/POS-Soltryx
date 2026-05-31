@@ -137,6 +137,11 @@ const NAV_ITEMS: NavItem[] = [
         permissions: ['fiscal.reports.read'],
       },
       {
+        href: '/impuestos/informe-608',
+        label: 'Informe 608',
+        permissions: ['fiscal.reports.read'],
+      },
+      {
         href: '/impuestos/secuencias',
         label: 'Secuencias Fiscales',
         permissions: ['fiscal.sequences.read'],

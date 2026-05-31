@@ -158,3 +158,22 @@ export interface Fiscal606Response {
   rows: Fiscal606Row[];
   summary: Fiscal606Summary;
 }
+
+export interface Fiscal608Row {
+  ncf: string;
+  /** YYYYMMDD de la anulación. */
+  fechaAnulacion: string;
+  /** Tipo de anulación DGII (01..09). */
+  tipoAnulacion: string;
+  docType: string;
+  buyerName: string | null;
+}
+
+export interface Fiscal608Summary {
+  totalRows: number;
+}
+
+export interface Fiscal608Response {
+  rows: Fiscal608Row[];
+  summary: Fiscal608Summary;
+}

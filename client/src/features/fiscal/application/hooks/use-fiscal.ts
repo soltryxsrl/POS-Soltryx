@@ -103,6 +103,29 @@ export function useFiscal606(params: {
   });
 }
 
+export function useFiscal608(params: {
+  from: string;
+  to: string;
+  branchId?: string;
+  enabled?: boolean;
+}) {
+  return useQuery({
+    queryKey: ['fiscal', 'reports', '608', params.from, params.to, params.branchId ?? null] as const,
+    queryFn: () => fiscalApiHttp.get608(params.from, params.to, params.branchId),
+    enabled: params.enabled ?? !!(params.from && params.to),
+  });
+}
+
+/** Anula un comprobante; invalida documentos y reportes fiscales. */
+export function useVoidDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; voidType: string }) =>
+      fiscalApiHttp.voidDocument(input.id, input.voidType),
+    onSuccess: () => qc.invalidateQueries({ queryKey: fiscalKey.all }),
+  });
+}
+
 /**
  * Emite un comprobante standalone (E41/E43/B11/B13).
  * Invalida todos los queries `fiscal.*` para refrescar listas y reportes.

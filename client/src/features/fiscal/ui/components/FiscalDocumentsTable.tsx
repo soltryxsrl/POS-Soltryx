@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import { Button } from '@/shared/ui/controls/Button';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import {
@@ -12,11 +14,90 @@ import {
   useTableQueryState,
   type DataTableColumn,
 } from '@/shared/ui/data-table';
-import { useFiscalDocTypes, useFiscalDocuments } from '../../application/hooks/use-fiscal';
+import {
+  useFiscalDocTypes,
+  useFiscalDocuments,
+  useVoidDocument,
+} from '../../application/hooks/use-fiscal';
 import type {
   FiscalDocumentListItem,
   FiscalDocumentStatus,
 } from '../../domain/types';
+
+const TIPO_ANULACION: Array<{ code: string; label: string }> = [
+  { code: '01', label: '01 Deterioro de factura' },
+  { code: '02', label: '02 Errores de impresión' },
+  { code: '03', label: '03 Impresión defectuosa' },
+  { code: '04', label: '04 Duplicidad de factura' },
+  { code: '05', label: '05 Corrección de información' },
+  { code: '06', label: '06 Cambio de productos' },
+  { code: '07', label: '07 Devolución de productos' },
+  { code: '08', label: '08 Omisión de productos' },
+  { code: '09', label: '09 Errores en secuencia NCF' },
+];
+
+/** Botón para anular un comprobante standalone (NCF quemado → 608). */
+function VoidButton({ doc }: { doc: FiscalDocumentListItem }) {
+  const canVoid = useHasPermission('fiscal.sequences.manage');
+  const voidDoc = useVoidDocument();
+  const [open, setOpen] = useState(false);
+  const [tipo, setTipo] = useState('05');
+  const [err, setErr] = useState<string | null>(null);
+
+  // Solo comprobantes standalone (sin venta) y ISSUED se anulan vía 608.
+  if (!canVoid || doc.saleId || doc.status !== 'ISSUED') return null;
+
+  const onConfirm = async () => {
+    setErr(null);
+    try {
+      await voidDoc.mutateAsync({ id: doc.id, voidType: tipo });
+      setOpen(false);
+    } catch (e) {
+      setErr(getErrorMessage(e));
+    }
+  };
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)} title="Anular comprobante">
+        Anular
+      </Button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-80 rounded-xl border border-border bg-card p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold">Anular comprobante</h3>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{doc.ncf}</p>
+            <label className="mt-3 block text-xs font-medium text-muted-foreground">
+              Tipo de anulación (608)
+            </label>
+            <Select value={tipo} onChange={(e) => setTipo(e.target.value)} className="mt-1">
+              {TIPO_ANULACION.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+            {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={onConfirm} disabled={voidDoc.isPending}>
+                {voidDoc.isPending ? 'Anulando…' : 'Anular'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 const FILTER_KEYS = ['q', 'docType', 'status', 'from', 'to'] as const;
 
@@ -66,15 +147,18 @@ export function FiscalDocumentsTable() {
       {
         key: 'ncf',
         header: 'NCF',
-        render: (d) => (
-          <Link
-            href={`/sales/${d.saleId}`}
-            className="font-mono text-xs font-medium text-brand-from hover:underline"
-            title="Ir al detalle de la venta"
-          >
-            {d.ncf}
-          </Link>
-        ),
+        render: (d) =>
+          d.saleId ? (
+            <Link
+              href={`/sales/${d.saleId}`}
+              className="font-mono text-xs font-medium text-brand-from hover:underline"
+              title="Ir al detalle de la venta"
+            >
+              {d.ncf}
+            </Link>
+          ) : (
+            <span className="font-mono text-xs font-medium">{d.ncf}</span>
+          ),
       },
       {
         key: 'docType',
@@ -130,6 +214,12 @@ export function FiscalDocumentsTable() {
             {STATUS_LABEL[d.status]}
           </span>
         ),
+      },
+      {
+        key: 'actions',
+        header: '',
+        align: 'right',
+        render: (d) => <VoidButton doc={d} />,
       },
     ],
     [],
