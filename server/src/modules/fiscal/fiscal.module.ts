@@ -16,6 +16,7 @@ import { FISCAL_PROVIDER_PORT } from './documents/fiscal-provider.port';
 import { NoopFiscalProvider } from './documents/noop-fiscal-provider.adapter';
 import { Fiscal606Service } from './reports/fiscal-606.service';
 import { Fiscal607Service } from './reports/fiscal-607.service';
+import { Fiscal608Service } from './reports/fiscal-608.service';
 import { FiscalReportsController } from './reports/fiscal-reports.controller';
 import { FiscalSequenceOrmEntity } from './sequences/fiscal-sequence.orm-entity';
 import { FiscalSequencesController } from './sequences/fiscal-sequences.controller';
@@ -59,6 +60,7 @@ import { FiscalSequencesService } from './sequences/fiscal-sequences.service';
     FiscalDocumentsService,
     Fiscal607Service,
     Fiscal606Service,
+    Fiscal608Service,
     { provide: FISCAL_PROVIDER_PORT, useClass: NoopFiscalProvider },
   ],
   exports: [

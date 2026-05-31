@@ -89,6 +89,13 @@ export class FiscalDocumentOrmEntity {
   @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejectionReason!: string | null;
 
+  /** Anulación real del NCF (reporte 608). Tipo DGII 01..09. */
+  @Column({ name: 'voided_at', type: 'timestamptz', nullable: true })
+  voidedAt!: Date | null;
+
+  @Column({ name: 'void_type', type: 'varchar', length: 2, nullable: true })
+  voidType!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

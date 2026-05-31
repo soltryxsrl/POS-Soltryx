@@ -1,8 +1,23 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { IsIn } from 'class-validator';
 import { ActiveBranch } from '../../../common/branch/active-branch.decorator';
 import { RequirePermissions } from '../../auth/infrastructure/http/permissions.decorator';
 import { IssueStandaloneDocumentRequestDto } from './dto/issue-standalone-doc.request-dto';
 import { FiscalDocumentsService } from './fiscal-documents.service';
+
+class VoidDocumentRequestDto {
+  /** Tipo de anulación DGII (608): 01..09. */
+  @IsIn(['01', '02', '03', '04', '05', '06', '07', '08', '09'])
+  voidType!: string;
+}
 
 @Controller('fiscal/documents')
 export class FiscalDocumentsController {
@@ -62,5 +77,16 @@ export class FiscalDocumentsController {
         total: i.total,
       })),
     });
+  }
+
+  /** Anula un comprobante standalone (NCF quemado) → aparece en el 608. */
+  @Post(':id/void')
+  @RequirePermissions('fiscal.sequences.manage')
+  void(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: VoidDocumentRequestDto,
+    @ActiveBranch() branchId: string,
+  ) {
+    return this.service.voidDocument({ id, voidType: dto.voidType, branchId });
   }
 }

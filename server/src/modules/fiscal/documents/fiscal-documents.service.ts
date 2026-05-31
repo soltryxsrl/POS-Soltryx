@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
+import { assertSameBranch } from '../../../common/branch/branch-scope.util';
 import type { TransactionContext } from '../../../common/persistence/unit-of-work.port';
 import { FiscalDocTypeOrmEntity } from '../doc-types/fiscal-doc-type.orm-entity';
 import { FiscalSequencesService } from '../sequences/fiscal-sequences.service';
@@ -156,6 +157,39 @@ export class FiscalDocumentsService {
       })),
       total,
     };
+  }
+
+  /**
+   * Anula un comprobante (NCF quemado sin transacción) → reporte 608. Solo
+   * comprobantes STANDALONE (sin venta) e ISSUED: los de venta se "cancelan"
+   * anulando la venta (que emite nota de crédito y va al 607). Marca void_type
+   * + voided_at; a partir de ahí el doc se excluye del 606/607.
+   */
+  async voidDocument(input: {
+    id: string;
+    voidType: string;
+    branchId: string;
+  }): Promise<FiscalDocumentOrmEntity> {
+    const doc = await this.docs.findOne({ where: { id: input.id } });
+    if (!doc) throw new NotFoundException(`Comprobante ${input.id} no encontrado`);
+    assertSameBranch(doc.branchId, input.branchId);
+    if (doc.voidedAt) throw new ConflictException('El comprobante ya está anulado');
+    if (doc.status !== 'ISSUED') {
+      throw new ConflictException(
+        `Solo se puede anular un comprobante ISSUED (actual: ${doc.status})`,
+      );
+    }
+    if (doc.saleId) {
+      throw new BadRequestException(
+        'Para anular un comprobante de venta, cancela la venta (genera nota de crédito). El 608 es solo para comprobantes standalone.',
+      );
+    }
+    await this.docs.update(
+      { id: doc.id },
+      { voidedAt: new Date(), voidType: input.voidType },
+    );
+    const updated = await this.docs.findOne({ where: { id: doc.id } });
+    return updated!;
   }
 
   /**

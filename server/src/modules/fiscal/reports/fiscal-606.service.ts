@@ -148,6 +148,8 @@ export class Fiscal606Service {
         types: ['E41', 'E43', 'B11', 'B13'],
       })
       .andWhere('d.status <> :cancelled', { cancelled: 'CANCELLED' })
+      // Los comprobantes anulados (608) no van al 606.
+      .andWhere('d.voidedAt IS NULL')
       .orderBy('d.issueDate', 'ASC')
       .addOrderBy('d.createdAt', 'ASC')
       .getMany();

@@ -9,12 +9,14 @@ import {
 import { RequirePermissions } from '../../auth/infrastructure/http/permissions.decorator';
 import { Fiscal606Service } from './fiscal-606.service';
 import { Fiscal607Service } from './fiscal-607.service';
+import { Fiscal608Service } from './fiscal-608.service';
 
 @Controller('fiscal/reports')
 export class FiscalReportsController {
   constructor(
     private readonly fiscal607: Fiscal607Service,
     private readonly fiscal606: Fiscal606Service,
+    private readonly fiscal608: Fiscal608Service,
   ) {}
 
   /**
@@ -65,6 +67,32 @@ export class FiscalReportsController {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       return this.fiscal606.toTxt(rows);
+    }
+    return { rows, summary };
+  }
+
+  /**
+   * GET /api/fiscal/reports/608?from=YYYY-MM-DD&to=YYYY-MM-DD&format=json|txt
+   * Comprobantes ANULADOS (NCF quemados) en el rango.
+   */
+  @Get('608')
+  @RequirePermissions('fiscal.reports.read')
+  async report608(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('format') format: string | undefined,
+    @Query('branchId') branchScope: string | undefined,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const scope = resolveReportBranchScope(branchScope, branchId, user.permissions ?? []);
+    const { rows, summary } = await this.fiscal608.generate(from, to, scope);
+    if (format === 'txt') {
+      const fileName = `608_${from.replace(/-/g, '')}_${to.replace(/-/g, '')}.txt`;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      return this.fiscal608.toTxt(rows);
     }
     return { rows, summary };
   }

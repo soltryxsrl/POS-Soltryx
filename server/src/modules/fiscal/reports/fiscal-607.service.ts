@@ -151,6 +151,8 @@ export class Fiscal607Service {
       .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .andWhere('d.docType IN (:...types)', { types: SALE_TYPES })
       .andWhere('d.saleId IS NOT NULL')
+      // Los comprobantes anulados (608) no van al 607.
+      .andWhere('d.voidedAt IS NULL')
       .orderBy('d.issueDate', 'ASC')
       .addOrderBy('d.createdAt', 'ASC')
       .getMany();
