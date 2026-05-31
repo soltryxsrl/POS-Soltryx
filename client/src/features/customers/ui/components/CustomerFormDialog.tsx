@@ -109,7 +109,7 @@ export function CustomerFormDialog({ customer, onClose, onSaved }: Props) {
               value={documentType}
               onChange={(e) => setDocumentType(e.target.value as CustomerDocType | '')}
             >
-              <option value="">— Sin documento —</option>
+              <option value="">Sin documento</option>
               {DOC_TYPES.map((d) => (
                 <option key={d.value} value={d.value}>
                   {d.label}
@@ -121,9 +121,9 @@ export function CustomerFormDialog({ customer, onClose, onSaved }: Props) {
             label="Documento"
             hint={
               documentType === 'CEDULA'
-                ? '11 dígitos. Se valida con dígito verificador (algoritmo JCE).'
+                ? `${doc.replace(/\D/g, '').length}/11 dígitos`
                 : documentType === 'RNC'
-                  ? '9 dígitos. Se valida con dígito verificador (algoritmo DGII).'
+                  ? `${doc.replace(/\D/g, '').length}/9 dígitos`
                   : undefined
             }
           >

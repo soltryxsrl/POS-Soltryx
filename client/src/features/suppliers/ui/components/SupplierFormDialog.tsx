@@ -103,10 +103,7 @@ export function SupplierFormDialog({ supplier, onClose, onSaved }: Props) {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField
-            label="RNC"
-            hint="9 dígitos, validado con dígito verificador (algoritmo DGII)."
-          >
+          <FormField label="RNC" hint={`${rnc.replace(/\D/g, '').length}/9 dígitos`}>
             <Input
               value={rnc}
               onChange={(e) => setRnc(e.target.value)}
