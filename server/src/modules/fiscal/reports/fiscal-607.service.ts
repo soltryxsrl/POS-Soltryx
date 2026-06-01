@@ -137,16 +137,16 @@ export class Fiscal607Service {
       throw new BadRequestException('from no puede ser posterior a to');
     }
 
-    // Cota superior inclusiva: ajustamos al fin del día.
-    const fromDate = new Date(`${from}T00:00:00.000Z`);
-    const toDate = new Date(`${to}T23:59:59.999Z`);
-
     // Solo comprobantes de venta. Las compras (E41/E43/B11/B13) van al 606.
     const SALE_TYPES = ['B01', 'B02', 'B03', 'B04', 'E31', 'E32', 'E33', 'E34'];
 
     const docsRaw = await this.docs
       .createQueryBuilder('d')
-      .where('d.issueDate BETWEEN :from AND :to', { from: fromDate, to: toDate })
+      // Fecha del comprobante en hora local RD (UTC-4): el 607 es por mes local.
+      .where(
+        "(d.issueDate AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN :from AND :to",
+        { from, to },
+      )
       // branchId null = consolidado (todas las sucursales).
       .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .andWhere('d.docType IN (:...types)', { types: SALE_TYPES })

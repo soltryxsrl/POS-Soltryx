@@ -47,12 +47,15 @@ export class Fiscal608Service {
     if (from > to) {
       throw new BadRequestException('from no puede ser posterior a to');
     }
-    const fromDate = new Date(`${from}T00:00:00.000Z`);
-    const toDate = new Date(`${to}T23:59:59.999Z`);
-
     const docs = await this.docs
       .createQueryBuilder('d')
-      .where('d.voidedAt BETWEEN :from AND :to', { from: fromDate, to: toDate })
+      // Fecha de anulación en hora local RD (UTC-4), no UTC: si no, una anulación
+      // de la noche (que en UTC ya es el día siguiente) caería en el mes equivocado
+      // y el 608 mensual de la DGII quedaría incompleto.
+      .where(
+        "(d.voidedAt AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN :from AND :to",
+        { from, to },
+      )
       // branchId null = consolidado (todas las sucursales).
       .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .orderBy('d.voidedAt', 'ASC')

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { api } from './helpers/api';
+import { api, rdToday } from './helpers/api';
 
 /**
  * Fiscal 608 — Anular documento standalone y verificar en informe.
@@ -35,7 +35,7 @@ const COUNTERPARTY = 'E2E Proveedor Test 608';
 test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   let docId = '';
   let docNcf = '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = rdToday();
   const voidTypeCode = '05'; // Corrección de información
   const voidTypeLabel = '05 Corrección de información';
 

@@ -127,7 +127,7 @@ export class ReportsService {
        FROM sales
        WHERE status = 'COMPLETED'
          AND ($2::uuid IS NULL OR branch_id = $2)
-         AND created_at::date = $1::date`,
+         AND (created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date`,
       [date, branchId],
     );
 
@@ -136,7 +136,7 @@ export class ReportsService {
        FROM sales
        WHERE status = 'CANCELLED'
          AND ($2::uuid IS NULL OR branch_id = $2)
-         AND created_at::date = $1::date`,
+         AND (created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date`,
       [date, branchId],
     );
 
@@ -149,7 +149,7 @@ export class ReportsService {
          JOIN sales s ON s.id = p.sale_id
          WHERE s.status = 'COMPLETED'
            AND ($2::uuid IS NULL OR s.branch_id = $2)
-           AND s.created_at::date = $1::date
+           AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
            AND p.status = 'COMPLETED'
          GROUP BY p.method
          ORDER BY total DESC`,
@@ -168,7 +168,7 @@ export class ReportsService {
          JOIN payments p ON p.sale_id = s.id
          WHERE s.status = 'COMPLETED'
            AND ($2::uuid IS NULL OR s.branch_id = $2)
-           AND s.created_at::date = $1::date
+           AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
            AND p.status = 'COMPLETED'
          GROUP BY s.id, s.total
        ) t`,
@@ -192,7 +192,7 @@ export class ReportsService {
        JOIN users u ON u.id = s.user_id
        WHERE s.status = 'COMPLETED'
          AND ($2::uuid IS NULL OR s.branch_id = $2)
-         AND s.created_at::date = $1::date
+         AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
        GROUP BY s.user_id, u.username, u.full_name
        ORDER BY total DESC`,
       [date, branchId],
@@ -249,7 +249,7 @@ export class ReportsService {
        JOIN sales s ON s.id = si.sale_id
        WHERE s.status = 'COMPLETED'
          AND ($4::uuid IS NULL OR s.branch_id = $4)
-         AND s.created_at::date BETWEEN $1::date AND $2::date
+         AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
        GROUP BY si.product_id
        ORDER BY revenue DESC
        LIMIT $3`,
@@ -306,7 +306,7 @@ export class ReportsService {
          WHERE s.status = 'COMPLETED'
            AND p.status = 'COMPLETED'
            AND ($3::uuid IS NULL OR s.branch_id = $3)
-           AND s.created_at::date BETWEEN $1::date AND $2::date
+           AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
          GROUP BY p.method
          ORDER BY total DESC`,
         [from, to, branchId],
@@ -322,7 +322,7 @@ export class ReportsService {
          WHERE s.status = 'COMPLETED'
            AND p.status = 'COMPLETED'
            AND ($3::uuid IS NULL OR s.branch_id = $3)
-           AND s.created_at::date BETWEEN $1::date AND $2::date
+           AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
          GROUP BY s.id, s.total
        ) t`,
       [from, to, branchId],
@@ -359,7 +359,7 @@ export class ReportsService {
        JOIN users u ON u.id = cs.opened_by_id
        LEFT JOIN sales s ON s.cash_session_id = cs.id
        WHERE ($3::uuid IS NULL OR cs.branch_id = $3)
-         AND cs.opened_at::date BETWEEN $1::date AND $2::date
+         AND (cs.opened_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
        GROUP BY u.id, u.username, u.full_name
        ORDER BY total_sold DESC`,
       [from, to, branchId],
@@ -457,7 +457,7 @@ export class ReportsService {
        JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
        LEFT JOIN products p ON p.id = si.product_id
        WHERE si.product_id IS NOT NULL
-         AND s.created_at::date BETWEEN $1::date AND $2::date
+         AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
          AND ($4::uuid IS NULL OR s.branch_id = $4)
        GROUP BY si.product_id
        ORDER BY (COALESCE(SUM(si.total), 0) - COALESCE(SUM(si.quantity * COALESCE(si.unit_cost_snapshot, p.cost_price, 0)), 0)) DESC
@@ -548,7 +548,7 @@ export class ReportsService {
        JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
        LEFT JOIN products p ON p.id = si.product_id
        LEFT JOIN categories c ON c.id = p.category_id
-       WHERE s.created_at::date BETWEEN $1::date AND $2::date
+       WHERE (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
          AND ($3::uuid IS NULL OR s.branch_id = $3)
        GROUP BY c.id, c.name
        ORDER BY revenue DESC`,
@@ -573,7 +573,7 @@ export class ReportsService {
               COALESCE(SUM(total), 0)::text AS total,
               COALESCE(SUM(tax_total), 0)::text AS tax
        FROM sale_returns
-       WHERE created_at::date BETWEEN $1::date AND $2::date
+       WHERE (created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
          AND ($3::uuid IS NULL OR branch_id = $3)`,
       [from, to, branchId],
     );
@@ -581,7 +581,7 @@ export class ReportsService {
       await this.ds.query(
         `SELECT refund_method, COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
          FROM sale_returns
-         WHERE created_at::date BETWEEN $1::date AND $2::date
+         WHERE (created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
            AND ($3::uuid IS NULL OR branch_id = $3)
          GROUP BY refund_method
          ORDER BY total DESC`,
@@ -592,7 +592,7 @@ export class ReportsService {
         `SELECT COALESCE(NULLIF(TRIM(reason), ''), '(Sin razón)') AS reason,
                 COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
          FROM sale_returns
-         WHERE created_at::date BETWEEN $1::date AND $2::date
+         WHERE (created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
            AND ($3::uuid IS NULL OR branch_id = $3)
          GROUP BY 1
          ORDER BY count DESC`,

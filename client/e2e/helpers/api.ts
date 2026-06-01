@@ -5,6 +5,18 @@
 const BASE = 'http://localhost:3001/api';
 let cachedToken: string | null = null;
 
+/**
+ * Fecha de HOY en hora de RD (America/Santo_Domingo), formato YYYY-MM-DD.
+ * Los reportes fiscales/diarios filtran por fecha LOCAL RD (no UTC), así que los
+ * specs deben usar esta — no `new Date().toISOString()` (UTC), que cerca de la
+ * medianoche UTC cae en otro día y no coincide con el rango del reporte.
+ */
+export function rdToday(): string {
+  return new Date().toLocaleDateString('en-CA', {
+    timeZone: 'America/Santo_Domingo',
+  });
+}
+
 export async function getToken(): Promise<string> {
   if (cachedToken) return cachedToken;
   const res = await fetch(`${BASE}/auth/login`, {

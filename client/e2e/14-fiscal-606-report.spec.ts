@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { api, purgeProductsBySkuPrefix } from './helpers/api';
+import { api, purgeProductsBySkuPrefix, rdToday } from './helpers/api';
 
 /**
  * Verifica el endpoint del 606:
@@ -53,7 +53,7 @@ test.describe.serial('Informe 606 — captura compra fiscal y generación', () =
   let supplierId = '';
   let productId = '';
   let createdNcf = '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = rdToday();
 
   test.beforeAll(async () => {
     await purgeTestSuppliers();

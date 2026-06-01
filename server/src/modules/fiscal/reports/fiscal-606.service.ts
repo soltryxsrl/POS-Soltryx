@@ -137,11 +137,13 @@ export class Fiscal606Service {
 
     // Standalone documents: E41/E43 (e-CF) y B11/B13 (NCF tradicional) que TÚ
     // emites para compras informales y gastos menores. Cuentan para el 606.
-    const fromDate = new Date(`${from}T00:00:00.000Z`);
-    const toDate = new Date(`${to}T23:59:59.999Z`);
     const standaloneDocs = await this.fiscalDocs
       .createQueryBuilder('d')
-      .where('d.issueDate BETWEEN :from AND :to', { from: fromDate, to: toDate })
+      // Fecha del comprobante en hora local RD (UTC-4): el 606 es por mes local.
+      .where(
+        "(d.issueDate AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN :from AND :to",
+        { from, to },
+      )
       // branchId null = consolidado (todas las sucursales).
       .andWhere('(:branchId::uuid IS NULL OR d.branchId = :branchId)', { branchId })
       .andWhere('d.docType IN (:...types)', {

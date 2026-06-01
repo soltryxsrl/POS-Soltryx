@@ -3,6 +3,7 @@ import {
   api,
   ensureCashSessionOpen,
   purgeProductsBySkuPrefix,
+  rdToday,
 } from './helpers/api';
 
 /**
@@ -45,7 +46,7 @@ test.describe.serial('Informe 607 — generación y formato DGII', () => {
   let saleNcfCreditNote = '';
   // Rango de hoy (los specs se ejecutan secuencialmente, las ventas que cree
   // entran en este rango).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = rdToday();
 
   test.beforeAll(async () => {
     await purgeProductsBySkuPrefix(SKU_PREFIX);

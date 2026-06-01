@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { api } from './helpers/api';
+import { api, rdToday } from './helpers/api';
 
 /**
  * Verifica el endpoint `POST /api/fiscal/documents/standalone`:
@@ -14,7 +14,7 @@ import { api } from './helpers/api';
 test.describe.serial('Fiscal standalone docs (E41/E43/B11/B13)', () => {
   let e41Ncf = '';
   let e43Ncf = '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = rdToday();
 
   test('emite E41 (compra informal) con NCF e-CF de 10 dígitos', async () => {
     const result = await api<{ ncf: string; docType: string; saleId: string | null }>(
