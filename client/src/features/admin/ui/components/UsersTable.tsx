@@ -8,6 +8,7 @@ import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { useAdminRoles } from '../../application/hooks/use-admin-roles';
 import {
@@ -50,15 +51,8 @@ export function UsersTable() {
   const [formState, setFormState] = useState<
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
-
-  const handleRemove = async (id: string, name: string) => {
-    if (!confirm(`¿Eliminar el usuario "${name}"?`)) return;
-    try {
-      await remove.mutateAsync(id);
-    } catch (e) {
-      alert(getErrorMessage(e));
-    }
-  };
+  const [deleting, setDeleting] = useState<AdminUser | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
 
   const columns = useMemo<DataTableColumn<AdminUser>[]>(
     () => [
@@ -141,7 +135,10 @@ export function UsersTable() {
             <Can permission="users.delete">
               <button
                 type="button"
-                onClick={() => handleRemove(u.id, u.fullName)}
+                onClick={() => {
+                  setDelError(null);
+                  setDeleting(u);
+                }}
                 title="Eliminar"
                 disabled={remove.isPending}
                 className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
@@ -220,6 +217,32 @@ export function UsersTable() {
         <UserFormDialog
           userId={formState.mode === 'edit' ? formState.id : null}
           onClose={() => setFormState(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar usuario"
+          message={
+            <>
+              ¿Eliminar el usuario <strong>{deleting.fullName}</strong>? Esta acción no
+              se puede deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={remove.isPending}
+          error={delError}
+          onConfirm={async () => {
+            setDelError(null);
+            try {
+              await remove.mutateAsync(deleting.id);
+              setDeleting(null);
+            } catch (e) {
+              setDelError(getErrorMessage(e));
+            }
+          }}
+          onClose={() => setDeleting(null)}
         />
       )}
 

@@ -19,6 +19,7 @@ export function CurrenciesTable() {
   const currencies = useCurrencies();
   const toggle = useToggleCurrency();
   const [editing, setEditing] = useState<Currency | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const sort = useClientSort<Currency>(currencies.data, 'code', 'asc', (c, k) => {
     if (k === 'rate') return c.rateToBase ? Number(c.rateToBase) : null;
@@ -28,13 +29,14 @@ export function CurrenciesTable() {
 
   const onToggle = async (c: Currency) => {
     if (c.isBase) return;
+    setActionError(null);
     try {
       await toggle.mutateAsync({
         code: c.code,
         input: { isActive: !c.isActive },
       });
     } catch (err) {
-      window.alert(getErrorMessage(err));
+      setActionError(getErrorMessage(err));
     }
   };
 
@@ -144,6 +146,12 @@ export function CurrenciesTable() {
 
   return (
     <div className="space-y-3">
+      {actionError && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          {actionError}
+        </p>
+      )}
+
       <DataTable<Currency>
         columns={columns}
         rows={sort.sorted}

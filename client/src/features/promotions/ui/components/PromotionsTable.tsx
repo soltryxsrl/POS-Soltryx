@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Input } from '@/shared/ui/controls/Input';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import {
   useDeletePromotion,
@@ -65,6 +66,8 @@ function computeStatus(p: Promotion): PromotionStatusFilter {
 export function PromotionsTable() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
+  const [deleting, setDeleting] = useState<Promotion | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
 
   const table = useTableQueryState({
     defaultSort: 'createdAt',
@@ -84,10 +87,6 @@ export function PromotionsTable() {
   });
 
   const del = useDeletePromotion();
-  const onDelete = async (p: Promotion) => {
-    if (!confirm(`¿Eliminar la promoción "${p.name}"?`)) return;
-    await del.mutateAsync(p.id);
-  };
 
   const columns = useMemo<DataTableColumn<Promotion>[]>(
     () => [
@@ -164,7 +163,10 @@ export function PromotionsTable() {
             </button>
             <button
               type="button"
-              onClick={() => onDelete(p)}
+              onClick={() => {
+                setDelError(null);
+                setDeleting(p);
+              }}
               disabled={del.isPending}
               className="inline-flex items-center gap-1 text-xs text-destructive hover:underline disabled:opacity-50"
             >
@@ -277,6 +279,31 @@ export function PromotionsTable() {
       {showCreate && <PromotionFormDialog onClose={() => setShowCreate(false)} />}
       {editing && (
         <PromotionFormDialog promotion={editing} onClose={() => setEditing(null)} />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar promoción"
+          message={
+            <>
+              ¿Eliminar <strong>{deleting.name}</strong>? Esta acción no se puede
+              deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={del.isPending}
+          error={delError}
+          onConfirm={async () => {
+            setDelError(null);
+            try {
+              await del.mutateAsync(deleting.id);
+              setDeleting(null);
+            } catch (e) {
+              setDelError(getErrorMessage(e));
+            }
+          }}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </>
   );

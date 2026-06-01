@@ -9,6 +9,7 @@ import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { useCategories } from '@/features/categories/application/hooks/use-categories';
 import { useProducts, useRemoveProduct } from '../../application/hooks/use-products';
@@ -39,6 +40,8 @@ export function ProductsTable() {
   const remove = useRemoveProduct();
 
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Product | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
   const [formState, setFormState] = useState<
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
@@ -171,7 +174,8 @@ export function ProductsTable() {
             <button
               type="button"
               onClick={() => {
-                if (confirm(`¿Eliminar "${p.name}"?`)) remove.mutate(p.id);
+                setDelError(null);
+                setDeleting(p);
               }}
               title="Eliminar"
               aria-label="Eliminar"
@@ -278,6 +282,32 @@ export function ProductsTable() {
         <ProductFormDialog
           productId={formState.mode === 'edit' ? formState.id : null}
           onClose={() => setFormState(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar producto"
+          message={
+            <>
+              ¿Eliminar <strong>{deleting.name}</strong>? Esta acción no se puede
+              deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={remove.isPending}
+          error={delError}
+          onConfirm={async () => {
+            setDelError(null);
+            try {
+              await remove.mutateAsync(deleting.id);
+              setDeleting(null);
+            } catch (e) {
+              setDelError(getErrorMessage(e));
+            }
+          }}
+          onClose={() => setDeleting(null)}
         />
       )}
 

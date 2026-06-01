@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { AdjustStockDialog } from '@/features/inventory/ui/components/AdjustStockDialog';
 import {
@@ -28,15 +29,8 @@ export function VariantsManager({ product }: Props) {
   const [editing, setEditing] = useState<ProductVariant | null>(null);
   const [adjusting, setAdjusting] = useState<ProductVariant | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-
-  const onDelete = async (v: ProductVariant) => {
-    if (!window.confirm(`¿Eliminar la variante "${v.name}"?`)) return;
-    try {
-      await remove.mutateAsync(v.id);
-    } catch (err) {
-      window.alert(getErrorMessage(err));
-    }
-  };
+  const [deleting, setDeleting] = useState<ProductVariant | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4">
@@ -117,7 +111,10 @@ export function VariantsManager({ product }: Props) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDelete(v)}
+                      onClick={() => {
+                        setDelError(null);
+                        setDeleting(v);
+                      }}
                       disabled={remove.isPending}
                       className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
                       title="Eliminar"
@@ -158,6 +155,31 @@ export function VariantsManager({ product }: Props) {
           variantId={adjusting.id}
           contextLabel={`${product.name} · ${adjusting.name}`}
           onClose={() => setAdjusting(null)}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar variante"
+          message={
+            <>
+              ¿Eliminar la variante <strong>{deleting.name}</strong>? Esta acción
+              no se puede deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={remove.isPending}
+          error={delError}
+          onConfirm={async () => {
+            setDelError(null);
+            try {
+              await remove.mutateAsync(deleting.id);
+              setDeleting(null);
+            } catch (err) {
+              setDelError(getErrorMessage(err));
+            }
+          }}
+          onClose={() => setDeleting(null)}
         />
       )}
     </div>

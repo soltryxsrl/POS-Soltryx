@@ -5,6 +5,7 @@ import { Lock, Pencil, Trash2 } from 'lucide-react';
 import { Can } from '@/features/auth/ui/components/Can';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import {
   DataTable,
   useClientSort,
@@ -25,21 +26,14 @@ export function RolesTable() {
   const [formState, setFormState] = useState<
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
+  const [deleting, setDeleting] = useState<AdminRole | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
 
   const sort = useClientSort<AdminRole>(roles.data, 'name', 'asc', (r, k) => {
     if (k === 'permissions') return r.permissions.length;
     if (k === 'userCount') return r.userCount ?? 0;
     return (r as unknown as Record<string, unknown>)[k];
   });
-
-  const handleRemove = async (id: string, name: string) => {
-    if (!confirm(`¿Eliminar el rol "${name}"?`)) return;
-    try {
-      await remove.mutateAsync(id);
-    } catch (e) {
-      alert(getErrorMessage(e));
-    }
-  };
 
   const columns = useMemo<DataTableColumn<AdminRole>[]>(
     () => [
@@ -105,7 +99,10 @@ export function RolesTable() {
               <Can permission="roles.delete">
                 <button
                   type="button"
-                  onClick={() => handleRemove(r.id, r.name)}
+                  onClick={() => {
+                    setDelError(null);
+                    setDeleting(r);
+                  }}
                   disabled={isSystem || remove.isPending}
                   title={isSystem ? 'Rol del sistema (no eliminable)' : 'Eliminar'}
                   className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
@@ -145,6 +142,32 @@ export function RolesTable() {
         <RoleFormDialog
           roleId={formState.mode === 'edit' ? formState.id : null}
           onClose={() => setFormState(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Eliminar rol"
+          message={
+            <>
+              ¿Eliminar el rol <strong>{deleting.name}</strong>? Esta acción no se
+              puede deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={remove.isPending}
+          error={delError}
+          onConfirm={async () => {
+            setDelError(null);
+            try {
+              await remove.mutateAsync(deleting.id);
+              setDeleting(null);
+            } catch (e) {
+              setDelError(getErrorMessage(e));
+            }
+          }}
+          onClose={() => setDeleting(null)}
         />
       )}
 
