@@ -17,6 +17,7 @@ import { useProducts, useRemoveProduct } from '../../application/hooks/use-produ
 import type { Product, ProductTypeFilter } from '../../domain/types';
 import { AdjustStockDialog } from '@/features/inventory/ui/components/AdjustStockDialog';
 import { BulkUpdateDialog } from './BulkUpdateDialog';
+import { CatalogExportButton } from './CatalogExportButton';
 import { ProductFormDialog } from './ProductFormDialog';
 
 const FILTER_KEYS = ['q', 'categoryId', 'isActive', 'lowStock', 'type'] as const;
@@ -201,6 +202,18 @@ export function ProductsTable() {
   const categories = useCategories();
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
 
+  // Mismos filtros aplicados que la tabla, para que "Exportar maestro" respete
+  // lo que el usuario está viendo (sin límite/offset: la exportación pagina sola).
+  const exportParams = {
+    q: table.filters.q || undefined,
+    categoryId: table.filters.categoryId || undefined,
+    isActive: parseBool(table.filters.isActive),
+    lowStock: parseBool(table.filters.lowStock),
+    type: (table.filters.type as ProductTypeFilter) || undefined,
+    sort: table.sort,
+    sortDir: table.sortDir,
+  };
+
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
       <Input
@@ -254,16 +267,19 @@ export function ProductsTable() {
           <X className="h-3 w-3" /> Limpiar
         </button>
       )}
-      {canUpdate && (
-        <button
-          type="button"
-          onClick={() => setBulkOpen(true)}
-          title="Actualización masiva de precios y niveles de stock"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Layers className="h-3.5 w-3.5" /> Actualización masiva
-        </button>
-      )}
+      <div className="ml-auto flex items-center gap-2">
+        <CatalogExportButton params={exportParams} />
+        {canUpdate && (
+          <button
+            type="button"
+            onClick={() => setBulkOpen(true)}
+            title="Actualización masiva de precios y niveles de stock"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Layers className="h-3.5 w-3.5" /> Actualización masiva
+          </button>
+        )}
+      </div>
     </div>
   );
 
