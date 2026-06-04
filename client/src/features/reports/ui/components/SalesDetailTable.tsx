@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { downloadCsv } from '@/shared/lib/csv';
+import { downloadTablePdf, type PdfColumn } from '@/shared/lib/pdf';
 import { formatDateTime, formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { reportsApiHttp } from '../../infrastructure/api/reports.api.http';
 import { useSalesDetail } from '../../application/hooks/use-reports';
+import type { SalesDetailLine } from '../../domain/types';
 import { StatCard } from './StatCard';
 
 const PAGE = 50;
@@ -34,10 +36,23 @@ const CSV_HEADERS = [
   'Margen',
 ];
 
+// PDF: listado legible (omite NCF y SKU para que entre en una página A4 horizontal).
+const PDF_COLUMNS: PdfColumn[] = [
+  { header: 'Fecha', width: 18 },
+  { header: 'Venta', width: 13 },
+  { header: 'Cajero', width: 16 },
+  { header: 'Producto', width: 30 },
+  { header: 'Cant.', width: 9, align: 'right' },
+  { header: 'Precio', width: 12, align: 'right' },
+  { header: 'Total', width: 12, align: 'right' },
+  { header: 'Costo', width: 12, align: 'right' },
+  { header: 'Margen', width: 12, align: 'right' },
+];
+
 /** Detalle de ventas línea por línea, con totales del rango y exportación CSV. */
 export function SalesDetailTable({ from, to, branchId }: Props) {
   const [offset, setOffset] = useState(0);
-  const [exporting, setExporting] = useState(false);
+  const [busy, setBusy] = useState<null | 'csv' | 'pdf'>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   // Al cambiar el rango/sucursal, volvemos a la primera página.
@@ -49,46 +64,80 @@ export function SalesDetailTable({ from, to, branchId }: Props) {
   const pages = Math.max(1, Math.ceil(total / PAGE));
   const page = Math.floor(offset / PAGE) + 1;
 
+  /** Recorre todas las páginas del rango (tope defensivo de 20.000 líneas). */
+  const collect = async (): Promise<SalesDetailLine[]> => {
+    const out: SalesDetailLine[] = [];
+    let off = 0;
+    for (let i = 0; i < 100; i++) {
+      const res = await reportsApiHttp.salesDetail({
+        from,
+        to,
+        branchId,
+        limit: EXPORT_LIMIT,
+        offset: off,
+      });
+      out.push(...res.items);
+      off += EXPORT_LIMIT;
+      if (res.items.length === 0 || off >= res.total) break;
+    }
+    return out;
+  };
+
   const exportCsv = async () => {
-    setExporting(true);
+    setBusy('csv');
     setExportError(null);
     try {
-      const rows: Array<Array<string | number>> = [];
-      let off = 0;
-      // Recorre todas las páginas (tope defensivo de 20.000 líneas).
-      for (let i = 0; i < 100; i++) {
-        const res = await reportsApiHttp.salesDetail({
-          from,
-          to,
-          branchId,
-          limit: EXPORT_LIMIT,
-          offset: off,
-        });
-        for (const it of res.items) {
-          rows.push([
-            formatDateTime(it.createdAt),
-            it.saleNumber,
-            it.ncf ?? '',
-            it.cashier,
-            it.productName,
-            it.productSku,
-            it.variantName ?? '',
-            it.quantity,
-            it.unitPrice,
-            it.discount,
-            it.total,
-            it.unitCost,
-            it.margin,
-          ]);
-        }
-        off += EXPORT_LIMIT;
-        if (res.items.length === 0 || off >= res.total) break;
-      }
+      const lines = await collect();
+      const rows = lines.map((it) => [
+        formatDateTime(it.createdAt),
+        it.saleNumber,
+        it.ncf ?? '',
+        it.cashier,
+        it.productName,
+        it.productSku,
+        it.variantName ?? '',
+        it.quantity,
+        it.unitPrice,
+        it.discount,
+        it.total,
+        it.unitCost,
+        it.margin,
+      ]);
       downloadCsv(`detalle-ventas_${from ?? ''}_a_${to ?? ''}.csv`, CSV_HEADERS, rows);
     } catch (e) {
       setExportError(getErrorMessage(e));
     } finally {
-      setExporting(false);
+      setBusy(null);
+    }
+  };
+
+  const exportPdf = async () => {
+    setBusy('pdf');
+    setExportError(null);
+    try {
+      const lines = await collect();
+      const rows = lines.map((it) => [
+        formatDateTime(it.createdAt),
+        it.saleNumber,
+        it.cashier,
+        it.variantName ? `${it.productName} (${it.variantName})` : it.productName,
+        formatQuantity(it.quantity),
+        formatMoney(it.unitPrice),
+        formatMoney(it.total),
+        formatMoney(it.unitCost),
+        formatMoney(it.margin),
+      ]);
+      downloadTablePdf({
+        filename: `detalle-ventas_${from ?? ''}_a_${to ?? ''}.pdf`,
+        title: 'Detalle de ventas',
+        subtitle: `${from ?? ''} a ${to ?? ''} · ${lines.length} línea(s)`,
+        columns: PDF_COLUMNS,
+        rows,
+      });
+    } catch (e) {
+      setExportError(getErrorMessage(e));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -105,15 +154,29 @@ export function SalesDetailTable({ from, to, branchId }: Props) {
       <div className="rounded-lg border bg-card">
         <div className="flex items-center justify-between border-b px-4 py-2">
           <h3 className="text-sm font-medium">Detalle de ventas</h3>
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={exporting || total === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {exporting ? 'Exportando...' : 'Exportar CSV'}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Exportar:</span>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={busy !== null || total === 0}
+              title="Detalle completo en CSV (Excel)"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {busy === 'csv' ? '...' : 'CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={exportPdf}
+              disabled={busy !== null || total === 0}
+              title="Detalle imprimible (PDF)"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {busy === 'pdf' ? '...' : 'PDF'}
+            </button>
+          </div>
         </div>
 
         {exportError && (
