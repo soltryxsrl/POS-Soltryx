@@ -82,4 +82,17 @@ export class StockMovementRepositoryTypeOrm implements StockMovementRepository {
     const [items, total] = await qb.getManyAndCount();
     return { items: items.map(toDomain), total };
   }
+
+  async listChronological(productId: string, branchId: string): Promise<StockMovement[]> {
+    const rows = await this.repo
+      .createQueryBuilder('m')
+      .where('m.product_id = :pid', { pid: productId })
+      .andWhere('m.branch_id = :branchId', { branchId })
+      // created_at asc + id como desempate determinista (movimientos del mismo
+      // instante, p. ej. explosión de kit). El orden no altera el promedio final.
+      .orderBy('m.created_at', 'ASC')
+      .addOrderBy('m.id', 'ASC')
+      .getMany();
+    return rows.map(toDomain);
+  }
 }

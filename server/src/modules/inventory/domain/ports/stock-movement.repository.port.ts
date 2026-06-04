@@ -35,4 +35,10 @@ export interface StockMovementRepository {
   list(
     input: ListStockMovementsInput,
   ): Promise<{ items: StockMovement[]; total: number }>;
+  /**
+   * TODOS los movimientos de un producto en una sucursal, en orden cronológico
+   * ascendente (sin paginar ni filtrar por tipo/fecha). Base para reconstruir el
+   * saldo valorado por promedio móvil del kardex.
+   */
+  listChronological(productId: string, branchId: string): Promise<StockMovement[]>;
 }

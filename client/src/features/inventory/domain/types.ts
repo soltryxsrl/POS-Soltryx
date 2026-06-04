@@ -11,6 +11,10 @@ export interface StockMovement {
   newStock: string;
   /** Costo unitario del movimiento (base promedio móvil; compras = costo recibido). null = histórico. */
   unitCost: string | null;
+  /** Costo promedio móvil vigente tras el movimiento (solo en kardex por producto). */
+  avgCost: string | null;
+  /** Valor del inventario tras el movimiento = stock × promedio (solo por producto). */
+  balanceValue: string | null;
   reason: string | null;
   saleId: string | null;
   userId: string;

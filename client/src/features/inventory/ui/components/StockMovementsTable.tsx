@@ -127,11 +127,14 @@ export function StockMovementsTable({ productId }: { productId?: string }) {
         header: 'Saldo (valor)',
         align: 'right',
         render: (m) =>
-          m.unitCost == null ? (
+          m.balanceValue == null ? (
             <span className="text-muted-foreground">—</span>
           ) : (
-            <span className="font-medium">
-              {formatMoney(Number(m.newStock) * Number(m.unitCost))}
+            <span
+              className="font-medium"
+              title={m.avgCost ? `Costo promedio: ${formatMoney(m.avgCost)}` : undefined}
+            >
+              {formatMoney(m.balanceValue)}
             </span>
           ),
       },
