@@ -54,28 +54,14 @@ export function BranchSwitcher({ className }: { className?: string }) {
         value={currentId ?? ''}
         onChange={(e) => {
           setActiveBranch(e.target.value);
-          // Eliminar SOLO la caché de datos por-sucursal (productos, ventas,
-          // caja, reportes, fiscal, etc.) para que no quede nada de la sucursal
-          // anterior. Conservamos las cachés TRANSVERSALES (lista de sucursales,
-          // y catálogos globales: config del negocio, monedas, métodos de pago,
-          // tipos de ITBIS) para no refetchearlas en vano ni parpadear el logo.
-          // El recibo por-sucursal ya está keyeado por activeBranchId y se
-          // refresca solo. Los observers activos refetchean con el nuevo header.
-          const KEEP = new Set([
-            'branches',
-            'config',
-            'currencies',
-            'payment-methods',
-            'tax-types',
-          ]);
-          qc.removeQueries({
-            predicate: (query) => {
-              const root = Array.isArray(query.queryKey)
-                ? (query.queryKey[0] as string)
-                : (query.queryKey as unknown as string);
-              return !KEEP.has(root);
-            },
-          });
+          // Refetch determinista de TODOS los observers activos con el nuevo
+          // header X-Branch-Id. `invalidateQueries` (sin filtro) revalida lo
+          // activo en pantalla — a diferencia de `removeQueries`, que borraba la
+          // caché pero no siempre forzaba el refetch del observer montado (la
+          // lista se quedaba con datos de la sucursal anterior). Además, las
+          // query-keys por-sucursal (productos, movimientos, transferencias…)
+          // incluyen la sucursal activa, así que cambian y refetchean solas.
+          void qc.invalidateQueries();
         }}
         className="appearance-none rounded-lg border border-border/60 bg-card py-1.5 pl-8 pr-7 text-xs font-medium text-foreground outline-none transition hover:border-brand-from/40 focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
       >

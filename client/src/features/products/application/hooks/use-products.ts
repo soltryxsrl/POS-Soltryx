@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
 import { productsApiHttp } from '../../infrastructure/api/products.api.http';
 import type {
   BulkPriceUpdateInput,
@@ -15,15 +16,20 @@ import type {
 
 export const productsKey = {
   all: ['products'] as const,
-  list: (params: ListProductsParams) => ['products', 'list', params] as const,
+  // La lista se acota a la sucursal activa en el server (header X-Branch-Id);
+  // incluir la sucursal en la key separa la caché por sucursal y fuerza refetch
+  // determinista al cambiar de sucursal.
+  list: (branchId: string | null, params: ListProductsParams) =>
+    ['products', 'list', branchId, params] as const,
   byId: (id: string) => ['products', 'byId', id] as const,
   kitComponents: (id: string) => ['products', 'kitComponents', id] as const,
   variants: (id: string) => ['products', 'variants', id] as const,
 };
 
 export function useProducts(params: ListProductsParams = {}) {
+  const branchId = useActiveBranchStore((s) => s.activeBranchId);
   return useQuery({
-    queryKey: productsKey.list(params),
+    queryKey: productsKey.list(branchId, params),
     queryFn: () => productsApiHttp.list(params),
   });
 }
