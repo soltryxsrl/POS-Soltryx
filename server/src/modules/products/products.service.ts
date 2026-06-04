@@ -27,6 +27,7 @@ import {
   type StockMovementRecorder,
 } from '../inventory/domain/ports/stock-movement-recorder.port';
 import { TaxTypeOrmEntity } from '../tax-types/tax-type.orm-entity';
+import { PriceHistoryOrmEntity } from './price-history.orm-entity';
 import { ProductBarcodeOrmEntity } from './product-barcode.orm-entity';
 import { ProductKitComponentOrmEntity } from './product-kit-component.orm-entity';
 import { ProductVariantOrmEntity } from './product-variant.orm-entity';
@@ -82,6 +83,12 @@ export interface VariantResponse {
 export interface BulkUpdateResult {
   /** Cantidad de productos afectados. */
   updated: number;
+}
+
+interface PriceChange {
+  field: 'sale_price' | 'cost_price';
+  oldValue: string;
+  newValue: string;
 }
 
 export interface CloneCatalogResult {
@@ -364,7 +371,12 @@ export class ProductsService {
     });
   }
 
-  async update(id: string, dto: UpdateProductDto, branchId: string): Promise<ProductOrmEntity> {
+  async update(
+    id: string,
+    dto: UpdateProductDto,
+    branchId: string,
+    actorUserId?: string,
+  ): Promise<ProductOrmEntity> {
     const current = await this.findById(id, branchId);
     if (dto.sku && dto.sku !== current.sku) {
       await this.assertSkuFree(this.repo.manager, dto.sku, branchId, id);
@@ -372,6 +384,10 @@ export class ProductsService {
     if (dto.barcode && dto.barcode !== current.barcode) {
       await this.assertBarcodeFreeAny(this.repo.manager, dto.barcode, branchId, id);
     }
+
+    // Capturamos precios previos ANTES del patch (para el historial de precios).
+    const oldSale = current.salePrice;
+    const oldCost = current.costPrice;
 
     // Aplicamos solo campos permitidos — stock NO se toca aquí.
     const patch: Partial<ProductOrmEntity> = {};
@@ -399,8 +415,59 @@ export class ProductsService {
     if (dto.hasVariants !== undefined) patch.hasVariants = dto.hasVariants;
     if (dto.soldByWeight !== undefined) patch.soldByWeight = dto.soldByWeight;
 
-    Object.assign(current, patch);
-    return this.repo.save(current);
+    return this.uow.run(async ({ manager }) => {
+      Object.assign(current, patch);
+      const saved = await manager.save(ProductOrmEntity, current);
+      const changes: PriceChange[] = [];
+      if (patch.salePrice !== undefined && Number(patch.salePrice) !== Number(oldSale)) {
+        changes.push({ field: 'sale_price', oldValue: oldSale, newValue: patch.salePrice });
+      }
+      if (patch.costPrice !== undefined && Number(patch.costPrice) !== Number(oldCost)) {
+        changes.push({ field: 'cost_price', oldValue: oldCost, newValue: patch.costPrice });
+      }
+      await this.recordPriceChanges(manager, {
+        branchId,
+        productId: id,
+        variantId: null,
+        source: 'manual',
+        userId: actorUserId ?? null,
+        changes,
+      });
+      return saved;
+    });
+  }
+
+  /**
+   * Inserta filas de historial de precio (una por campo cambiado). No-op si no
+   * hay cambios. `field` = 'sale_price' | 'cost_price'.
+   */
+  private async recordPriceChanges(
+    manager: EntityManager,
+    input: {
+      branchId: string;
+      productId: string;
+      variantId: string | null;
+      source: 'manual' | 'bulk';
+      userId: string | null;
+      reason?: string | null;
+      changes: PriceChange[];
+    },
+  ): Promise<void> {
+    if (input.changes.length === 0) return;
+    await manager.insert(
+      PriceHistoryOrmEntity,
+      input.changes.map((c) => ({
+        branchId: input.branchId,
+        productId: input.productId,
+        variantId: input.variantId,
+        field: c.field,
+        oldValue: c.oldValue,
+        newValue: c.newValue,
+        source: input.source,
+        reason: input.reason ?? null,
+        userId: input.userId,
+      })),
+    );
   }
 
   // --- Actualización masiva ---
@@ -431,6 +498,7 @@ export class ProductsService {
   async bulkUpdatePrices(
     dto: BulkPriceUpdateDto,
     branchId: string,
+    actorUserId?: string,
   ): Promise<BulkUpdateResult> {
     const num = Number(dto.value);
     if (!Number.isFinite(num)) {
@@ -439,6 +507,7 @@ export class ProductsService {
     // `num` proviene de un string validado por @Matches(MONEY) → es un decimal
     // limpio, sin riesgo de inyección al interpolarlo como literal numérico.
     const col = dto.field === 'costPrice' ? 'cost_price' : 'sale_price';
+    const field: PriceChange['field'] = dto.field === 'costPrice' ? 'cost_price' : 'sale_price';
     let expr: string;
     switch (dto.mode) {
       case 'set':
@@ -457,11 +526,50 @@ export class ProductsService {
         expr = `GREATEST(0, ROUND(${col} - ${num}, 2))`;
         break;
     }
-    const qb = this.repo.createQueryBuilder().update(ProductOrmEntity);
-    qb.set({ [dto.field]: () => expr } as Parameters<typeof qb.set>[0]);
-    this.applyBulkScope(qb, dto, branchId);
-    const res = await qb.execute();
-    return { updated: res.affected ?? 0 };
+
+    // Selecciona id + valor del campo de los productos del alcance.
+    const selectScoped = async (manager: EntityManager): Promise<Map<string, string>> => {
+      const qb = manager
+        .createQueryBuilder(ProductOrmEntity, 'p')
+        .select('p.id', 'id')
+        .addSelect(`p.${dto.field}`, 'val')
+        .where('p.branch_id = :branchId', { branchId })
+        .andWhere('p.deleted_at IS NULL');
+      if (dto.scope === 'category') qb.andWhere('p.category_id = :catId', { catId: dto.categoryId });
+      else if (dto.scope === 'ids') qb.andWhere('p.id IN (:...ids)', { ids: dto.productIds });
+      const rows: Array<{ id: string; val: string }> = await qb.getRawMany();
+      return new Map(rows.map((r) => [r.id, String(r.val)]));
+    };
+
+    return this.uow.run(async ({ manager }) => {
+      // Capturamos valores ANTES, ejecutamos el UPDATE, y leemos los valores
+      // reales DESPUÉS (no recomputamos en JS para no diverger del ROUND de SQL).
+      const before = await selectScoped(manager);
+      const qb = manager.createQueryBuilder().update(ProductOrmEntity);
+      qb.set({ [dto.field]: () => expr } as Parameters<typeof qb.set>[0]);
+      this.applyBulkScope(qb, dto, branchId);
+      const res = await qb.execute();
+      const after = await selectScoped(manager);
+
+      const rows: Array<Partial<PriceHistoryOrmEntity>> = [];
+      for (const [id, oldVal] of before) {
+        const newVal = after.get(id);
+        if (newVal === undefined || Number(newVal) === Number(oldVal)) continue;
+        rows.push({
+          branchId,
+          productId: id,
+          variantId: null,
+          field,
+          oldValue: oldVal,
+          newValue: newVal,
+          source: 'bulk',
+          userId: actorUserId ?? null,
+        });
+      }
+      if (rows.length > 0) await manager.insert(PriceHistoryOrmEntity, rows);
+
+      return { updated: res.affected ?? 0 };
+    });
   }
 
   /**

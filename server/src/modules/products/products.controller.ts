@@ -68,8 +68,12 @@ export class ProductsController {
   /** Cambio masivo de precios (venta/costo) por sucursal. */
   @Post('bulk/prices')
   @Roles('ADMIN', 'MANAGER')
-  bulkPrices(@Body() dto: BulkPriceUpdateDto, @ActiveBranch() branchId: string) {
-    return this.service.bulkUpdatePrices(dto, branchId);
+  bulkPrices(
+    @Body() dto: BulkPriceUpdateDto,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.bulkUpdatePrices(dto, branchId, user.id);
   }
 
   /** Cambio masivo de niveles de stock (mín/máx/reorden) por sucursal. */
@@ -85,8 +89,9 @@ export class ProductsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
     @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.service.update(id, dto, branchId);
+    return this.service.update(id, dto, branchId, user.id);
   }
 
   @Delete(':id')

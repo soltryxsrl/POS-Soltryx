@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryModule } from '../inventory/inventory.module';
+import { PriceHistoryOrmEntity } from './price-history.orm-entity';
 import { ProductBarcodeOrmEntity } from './product-barcode.orm-entity';
 import { ProductKitComponentOrmEntity } from './product-kit-component.orm-entity';
 import { ProductVariantOrmEntity } from './product-variant.orm-entity';
@@ -15,6 +16,7 @@ import { ProductsService } from './products.service';
       ProductBarcodeOrmEntity,
       ProductKitComponentOrmEntity,
       ProductVariantOrmEntity,
+      PriceHistoryOrmEntity,
     ]),
     InventoryModule,
   ],

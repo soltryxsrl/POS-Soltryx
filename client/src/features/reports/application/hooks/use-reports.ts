@@ -30,6 +30,14 @@ export const reportsKey = {
     offset?: number;
     branchId?: string;
   }) => ['reports', 'sales-detail', params] as const,
+  priceHistory: (params: {
+    from?: string;
+    to?: string;
+    productId?: string;
+    limit?: number;
+    offset?: number;
+    branchId?: string;
+  }) => ['reports', 'price-history', params] as const,
 };
 
 export function useDailySales(date: string, branchId?: string) {
@@ -122,6 +130,23 @@ export function useSalesDetail(
   return useQuery({
     queryKey: reportsKey.salesDetail(params),
     queryFn: () => reportsApiHttp.salesDetail(params),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function usePriceHistory(
+  params: {
+    from?: string;
+    to?: string;
+    productId?: string;
+    limit?: number;
+    offset?: number;
+    branchId?: string;
+  } = {},
+) {
+  return useQuery({
+    queryKey: reportsKey.priceHistory(params),
+    queryFn: () => reportsApiHttp.priceHistory(params),
     placeholderData: (prev) => prev,
   });
 }

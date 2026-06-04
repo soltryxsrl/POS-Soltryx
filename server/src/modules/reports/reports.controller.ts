@@ -6,7 +6,12 @@ import {
   type CurrentUserPayload,
 } from '../auth/infrastructure/http/current-user.decorator';
 import { Roles } from '../auth/infrastructure/http/roles.decorator';
-import { DateQuery, DateRangeQuery, SalesDetailQuery } from './dto/date-range.query';
+import {
+  DateQuery,
+  DateRangeQuery,
+  PriceHistoryQuery,
+  SalesDetailQuery,
+} from './dto/date-range.query';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
@@ -127,6 +132,22 @@ export class ReportsController {
     return this.service.salesDetail(from, to, scope, {
       productId: q.productId,
       categoryId: q.categoryId,
+      limit: q.limit ?? 50,
+      offset: q.offset ?? 0,
+    });
+  }
+
+  @Get('price-history')
+  priceHistory(
+    @Query() q: PriceHistoryQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.priceHistory(from, to, scope, {
+      productId: q.productId,
       limit: q.limit ?? 50,
       offset: q.offset ?? 0,
     });

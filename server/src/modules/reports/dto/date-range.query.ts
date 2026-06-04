@@ -81,3 +81,36 @@ export class SalesDetailQuery {
   @IsString()
   branchId?: string;
 }
+
+/** Historial de cambios de precio: rango + filtro por producto + paginación. */
+export class PriceHistoryQuery {
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number = 50;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number = 0;
+
+  /** Sucursal a consultar; `all` = consolidado (solo con permiso branches.switch). */
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+}

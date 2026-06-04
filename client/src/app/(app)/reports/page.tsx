@@ -11,6 +11,7 @@ import {
 } from '@/features/reports/ui/components/AnalysisReports';
 import { DailySummaryCards } from '@/features/reports/ui/components/DailySummaryCards';
 import { LowStockTable } from '@/features/reports/ui/components/LowStockTable';
+import { PriceHistoryTable } from '@/features/reports/ui/components/PriceHistoryTable';
 import { SalesDetailTable } from '@/features/reports/ui/components/SalesDetailTable';
 import { TopProductsTable } from '@/features/reports/ui/components/TopProductsTable';
 import { localDateISO, startOfMonthLocalISO } from '@/shared/lib/date';
@@ -92,6 +93,8 @@ export default function ReportsPage() {
         <ReturnsAnalysisCard from={from} to={to} branchId={branchId} />
 
         <SalesDetailTable from={from} to={to} branchId={branchId} />
+
+        <PriceHistoryTable from={from} to={to} branchId={branchId} />
       </section>
 
       <section className="space-y-3">

@@ -4,6 +4,7 @@ import type {
   DailySalesSummary,
   InventoryValuation,
   LowStockProduct,
+  PriceHistoryReport,
   ProductMargin,
   ReturnsAnalysis,
   SalesByMethod,
@@ -75,6 +76,13 @@ export const reportsApiHttp = {
     } = {},
   ) =>
     http<SalesDetailReport>('/reports/sales/detail', {
+      searchParams: params as Record<string, string | number | boolean | undefined>,
+    }),
+
+  priceHistory: (
+    params: RangeParams & { productId?: string; limit?: number; offset?: number } = {},
+  ) =>
+    http<PriceHistoryReport>('/reports/price-history', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 };

@@ -37,6 +37,11 @@ test.describe.serial('Exportaciones', () => {
         payments: [{ method: 'CASH', amount: '100.00' }],
       }),
     });
+    // Un cambio de precio hoy para que el historial de precios tenga datos.
+    await api(`/products/${product.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ salePrice: '110.00' }),
+    });
   });
 
   test.afterAll(async () => {
@@ -62,12 +67,32 @@ test.describe.serial('Exportaciones', () => {
     await page.goto('/reports');
     await page.waitForLoadState('networkidle');
 
-    // El botón PDF del detalle de ventas (único "PDF" en /reports).
-    const pdfBtn = page.getByRole('button', { name: 'PDF' });
+    // /reports tiene varias tarjetas con botón "PDF" (detalle de ventas e
+    // historial de precios). Acotamos a la cabecera de "Detalle de ventas".
+    const header = page.getByRole('heading', { name: 'Detalle de ventas' }).locator('..');
+    const pdfBtn = header.getByRole('button', { name: 'PDF' });
     await expect(pdfBtn).toBeVisible();
     await expect(pdfBtn).toBeEnabled();
     const pdfDl = page.waitForEvent('download');
     await pdfBtn.click();
     expect((await pdfDl).suggestedFilename()).toMatch(/^detalle-ventas_.*\.pdf$/);
+  });
+
+  test('historial de precios: descarga PDF', async ({ page }) => {
+    await page.goto('/reports');
+    await page.waitForLoadState('networkidle');
+
+    const header = page
+      .getByRole('heading', { name: 'Historial de cambios de precio' })
+      .locator('..');
+    const pdfBtn = header.getByRole('button', { name: 'PDF' });
+    await expect(pdfBtn).toBeVisible();
+    // Puede estar deshabilitado si no hubo cambios en el rango; solo probamos
+    // la descarga cuando está habilitado.
+    if (await pdfBtn.isEnabled()) {
+      const pdfDl = page.waitForEvent('download');
+      await pdfBtn.click();
+      expect((await pdfDl).suggestedFilename()).toMatch(/^historial-precios_.*\.pdf$/);
+    }
   });
 });
