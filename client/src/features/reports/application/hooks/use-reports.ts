@@ -21,6 +21,15 @@ export const reportsKey = {
     ['reports', 'by-category', params] as const,
   returns: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'returns-analysis', params] as const,
+  salesDetail: (params: {
+    from?: string;
+    to?: string;
+    productId?: string;
+    categoryId?: string;
+    limit?: number;
+    offset?: number;
+    branchId?: string;
+  }) => ['reports', 'sales-detail', params] as const,
 };
 
 export function useDailySales(date: string, branchId?: string) {
@@ -96,5 +105,23 @@ export function useReturnsAnalysis(params: { from?: string; to?: string; branchI
   return useQuery({
     queryKey: reportsKey.returns(params),
     queryFn: () => reportsApiHttp.returnsAnalysis(params),
+  });
+}
+
+export function useSalesDetail(
+  params: {
+    from?: string;
+    to?: string;
+    productId?: string;
+    categoryId?: string;
+    limit?: number;
+    offset?: number;
+    branchId?: string;
+  } = {},
+) {
+  return useQuery({
+    queryKey: reportsKey.salesDetail(params),
+    queryFn: () => reportsApiHttp.salesDetail(params),
+    placeholderData: (prev) => prev,
   });
 }

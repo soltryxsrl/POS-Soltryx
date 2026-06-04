@@ -6,7 +6,7 @@ import {
   type CurrentUserPayload,
 } from '../auth/infrastructure/http/current-user.decorator';
 import { Roles } from '../auth/infrastructure/http/roles.decorator';
-import { DateQuery, DateRangeQuery } from './dto/date-range.query';
+import { DateQuery, DateRangeQuery, SalesDetailQuery } from './dto/date-range.query';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
@@ -113,6 +113,23 @@ export class ReportsController {
     const from = q.from ?? startOfMonth();
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
     return this.service.salesByCategory(from, to, scope);
+  }
+
+  @Get('sales/detail')
+  salesDetail(
+    @Query() q: SalesDetailQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.salesDetail(from, to, scope, {
+      productId: q.productId,
+      categoryId: q.categoryId,
+      limit: q.limit ?? 50,
+      offset: q.offset ?? 0,
+    });
   }
 
   @Get('returns/analysis')

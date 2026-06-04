@@ -7,6 +7,7 @@ import type {
   ProductMargin,
   ReturnsAnalysis,
   SalesByMethod,
+  SalesDetailReport,
   SessionsByUser,
   SlowMover,
   TopProduct,
@@ -62,6 +63,18 @@ export const reportsApiHttp = {
 
   returnsAnalysis: (params: RangeParams = {}) =>
     http<ReturnsAnalysis>('/reports/returns/analysis', {
+      searchParams: params as Record<string, string | number | boolean | undefined>,
+    }),
+
+  salesDetail: (
+    params: RangeParams & {
+      productId?: string;
+      categoryId?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) =>
+    http<SalesDetailReport>('/reports/sales/detail', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 };

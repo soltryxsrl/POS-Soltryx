@@ -101,6 +101,40 @@ export interface ReturnsAnalysis {
   byReason: Array<{ reason: string; count: number; total: string }>;
 }
 
+/** Una línea de venta (renglón) en el detalle de ventas. */
+export interface SalesDetailLine {
+  saleId: string;
+  saleNumber: string;
+  ncf: string | null;
+  createdAt: string;
+  cashier: string;
+  productId: string | null;
+  productName: string;
+  productSku: string;
+  variantName: string | null;
+  quantity: string;
+  unitPrice: string;
+  discount: string;
+  total: string;
+  unitCost: string;
+  margin: string;
+}
+
+export interface SalesDetailReport {
+  items: SalesDetailLine[];
+  total: number;
+  limit: number;
+  offset: number;
+  /** Totales del rango COMPLETO filtrado (no solo la página). */
+  summary: {
+    lines: number;
+    units: string;
+    revenue: string;
+    cost: string;
+    margin: string;
+  };
+}
+
 @Injectable()
 export class ReportsService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
@@ -612,6 +646,120 @@ export class ReportsService {
         count: Number(r.count),
         total: r.total,
       })),
+    };
+  }
+
+  /**
+   * Detalle de ventas línea por línea (renglones de cada venta COMPLETED en el
+   * rango). Filtrable por sucursal, producto y categoría. Paginado. El `summary`
+   * agrega TODO el rango filtrado (no solo la página) para mostrar totales.
+   * El costo cae a `unit_cost_snapshot` (promedio móvil al vender) y, si falta,
+   * al costo actual del producto.
+   */
+  async salesDetail(
+    from: string,
+    to: string,
+    branchId: string | null,
+    opts: { productId?: string; categoryId?: string; limit: number; offset: number },
+  ): Promise<SalesDetailReport> {
+    const productId = opts.productId ?? null;
+    const categoryId = opts.categoryId ?? null;
+    const where = `
+        (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+        AND ($3::uuid IS NULL OR s.branch_id = $3)
+        AND ($4::uuid IS NULL OR si.product_id = $4)
+        AND ($5::uuid IS NULL OR p.category_id = $5)`;
+
+    const rows: Array<{
+      sale_id: string;
+      sale_number: string;
+      ncf: string | null;
+      created_at: string;
+      cashier: string | null;
+      product_id: string | null;
+      product_name: string;
+      product_sku: string;
+      variant_name: string | null;
+      quantity: string;
+      unit_price: string;
+      discount: string;
+      total: string;
+      unit_cost: string;
+    }> = await this.ds.query(
+      `SELECT s.id AS sale_id,
+              s.sale_number,
+              fd.ncf,
+              s.created_at,
+              COALESCE(u.full_name, u.username) AS cashier,
+              si.product_id,
+              si.product_name_snapshot AS product_name,
+              si.product_sku_snapshot  AS product_sku,
+              si.variant_name_snapshot AS variant_name,
+              si.quantity::text,
+              si.unit_price::text,
+              si.discount::text,
+              si.total::text,
+              COALESCE(si.unit_cost_snapshot, p.cost_price, 0)::text AS unit_cost
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+       LEFT JOIN products p ON p.id = si.product_id
+       LEFT JOIN fiscal_documents fd ON fd.id = s.fiscal_document_id
+       LEFT JOIN users u ON u.id = s.user_id
+       WHERE ${where}
+       ORDER BY s.created_at DESC, s.sale_number, si.created_at
+       LIMIT $6 OFFSET $7`,
+      [from, to, branchId, productId, categoryId, opts.limit, opts.offset],
+    );
+
+    const [agg]: Array<{
+      lines: string;
+      units: string | null;
+      revenue: string | null;
+      cost: string | null;
+    }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS lines,
+              COALESCE(SUM(si.quantity), 0)::text AS units,
+              ROUND(COALESCE(SUM(si.total), 0), 2)::text AS revenue,
+              ROUND(COALESCE(SUM(si.quantity * COALESCE(si.unit_cost_snapshot, p.cost_price, 0)), 0), 2)::text AS cost
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+       LEFT JOIN products p ON p.id = si.product_id
+       WHERE ${where}`,
+      [from, to, branchId, productId, categoryId],
+    );
+
+    const lines = agg?.lines ? Number(agg.lines) : 0;
+    const revenue = agg?.revenue ?? '0.00';
+    const cost = agg?.cost ?? '0.00';
+
+    return {
+      items: rows.map((r) => ({
+        saleId: r.sale_id,
+        saleNumber: r.sale_number,
+        ncf: r.ncf,
+        createdAt: new Date(r.created_at).toISOString(),
+        cashier: r.cashier ?? '—',
+        productId: r.product_id,
+        productName: r.product_name,
+        productSku: r.product_sku,
+        variantName: r.variant_name,
+        quantity: r.quantity,
+        unitPrice: r.unit_price,
+        discount: r.discount,
+        total: r.total,
+        unitCost: r.unit_cost,
+        margin: subtractDecimals(r.total, multiplyDecimals(r.quantity, r.unit_cost)),
+      })),
+      total: lines,
+      limit: opts.limit,
+      offset: opts.offset,
+      summary: {
+        lines,
+        units: agg?.units ?? '0',
+        revenue,
+        cost,
+        margin: subtractDecimals(revenue, cost),
+      },
     };
   }
 }

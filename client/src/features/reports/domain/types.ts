@@ -101,3 +101,35 @@ export interface ReturnsAnalysis {
   byMethod: Array<{ refundMethod: string; count: number; total: MoneyDto }>;
   byReason: Array<{ reason: string; count: number; total: MoneyDto }>;
 }
+
+export interface SalesDetailLine {
+  saleId: string;
+  saleNumber: string;
+  ncf: string | null;
+  createdAt: string;
+  cashier: string;
+  productId: string | null;
+  productName: string;
+  productSku: string;
+  variantName: string | null;
+  quantity: string;
+  unitPrice: MoneyDto;
+  discount: MoneyDto;
+  total: MoneyDto;
+  unitCost: MoneyDto;
+  margin: MoneyDto;
+}
+
+export interface SalesDetailReport {
+  items: SalesDetailLine[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary: {
+    lines: number;
+    units: string;
+    revenue: MoneyDto;
+    cost: MoneyDto;
+    margin: MoneyDto;
+  };
+}
