@@ -28,6 +28,10 @@ export interface LowStockProduct {
   sku: string;
   stock: string;
   minStock: string;
+  /** Punto de reorden (0 = no definido → se usa el mínimo como umbral). */
+  reorderPoint: string;
+  /** Umbral de alerta efectivo usado: reorden si >0, si no el mínimo. */
+  threshold: string;
   categoryName: string | null;
 }
 
@@ -133,6 +137,29 @@ export interface SalesDetailReport {
     cost: string;
     margin: string;
   };
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  createdAt: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  variantName: string | null;
+  /** 'sale_price' | 'cost_price'. */
+  field: string;
+  oldValue: string;
+  newValue: string;
+  /** 'manual' | 'bulk'. */
+  source: string;
+  userName: string | null;
+}
+
+export interface PriceHistoryReport {
+  items: PriceHistoryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 @Injectable()
@@ -299,24 +326,31 @@ export class ReportsService {
   }
 
   async lowStock(branchId: string | null): Promise<LowStockProduct[]> {
+    // Umbral de alerta = punto de reorden si está definido (>0), si no el mínimo
+    // (mismo criterio que la lista de productos, products.service.list lowStock).
+    const threshold = `(CASE WHEN p.reorder_point > 0 THEN p.reorder_point ELSE p.min_stock END)`;
     const rows: Array<{
       id: string;
       name: string;
       sku: string;
       stock: string;
       min_stock: string;
+      reorder_point: string;
+      threshold: string;
       category_name: string | null;
     }> = await this.ds.query(
       `SELECT p.id, p.name, p.sku, p.stock::text, p.min_stock::text,
+              p.reorder_point::text,
+              ${threshold}::text AS threshold,
               c.name AS category_name
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.is_active = true
          AND ($1::uuid IS NULL OR p.branch_id = $1)
          AND p.deleted_at IS NULL
-         AND p.min_stock > 0
-         AND p.stock <= p.min_stock
-       ORDER BY (p.stock - p.min_stock) ASC, p.name ASC`,
+         AND ${threshold} > 0
+         AND p.stock <= ${threshold}
+       ORDER BY (p.stock - ${threshold}) ASC, p.name ASC`,
       [branchId],
     );
     return rows.map((r) => ({
@@ -325,6 +359,8 @@ export class ReportsService {
       sku: r.sku,
       stock: r.stock,
       minStock: r.min_stock,
+      reorderPoint: r.reorder_point,
+      threshold: r.threshold,
       categoryName: r.category_name,
     }));
   }
@@ -760,6 +796,78 @@ export class ReportsService {
         cost,
         margin: subtractDecimals(revenue, cost),
       },
+    };
+  }
+
+  /**
+   * Historial de cambios de precio (venta/costo) en el rango. Filtrable por
+   * producto, paginado. Fechas en hora local RD. Es la auditoría de quién/cuándo
+   * cambió un precio y de cuánto a cuánto (manual o masivo).
+   */
+  async priceHistory(
+    from: string,
+    to: string,
+    branchId: string | null,
+    opts: { productId?: string; limit: number; offset: number },
+  ): Promise<PriceHistoryReport> {
+    const productId = opts.productId ?? null;
+    const where = `
+        (ph.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+        AND ($3::uuid IS NULL OR ph.branch_id = $3)
+        AND ($4::uuid IS NULL OR ph.product_id = $4)`;
+
+    const rows: Array<{
+      id: string;
+      created_at: string;
+      product_id: string;
+      product_name: string | null;
+      product_sku: string | null;
+      variant_name: string | null;
+      field: string;
+      old_value: string;
+      new_value: string;
+      source: string;
+      user_name: string | null;
+    }> = await this.ds.query(
+      `SELECT ph.id, ph.created_at, ph.product_id,
+              p.name AS product_name, p.sku AS product_sku,
+              pv.name AS variant_name,
+              ph.field, ph.old_value::text, ph.new_value::text, ph.source,
+              COALESCE(u.full_name, u.username) AS user_name
+       FROM price_history ph
+       LEFT JOIN products p ON p.id = ph.product_id
+       LEFT JOIN product_variants pv ON pv.id = ph.variant_id
+       LEFT JOIN users u ON u.id = ph.user_id
+       WHERE ${where}
+       ORDER BY ph.created_at DESC
+       LIMIT $5 OFFSET $6`,
+      [from, to, branchId, productId, opts.limit, opts.offset],
+    );
+
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS total
+       FROM price_history ph
+       WHERE ${where}`,
+      [from, to, branchId, productId],
+    );
+
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        createdAt: new Date(r.created_at).toISOString(),
+        productId: r.product_id,
+        productName: r.product_name ?? '(producto eliminado)',
+        productSku: r.product_sku ?? '',
+        variantName: r.variant_name,
+        field: r.field,
+        oldValue: r.old_value,
+        newValue: r.new_value,
+        source: r.source,
+        userName: r.user_name,
+      })),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit: opts.limit,
+      offset: opts.offset,
     };
   }
 }

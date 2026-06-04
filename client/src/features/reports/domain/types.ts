@@ -32,6 +32,10 @@ export interface LowStockProduct {
   sku: string;
   stock: string;
   minStock: string;
+  /** Punto de reorden (0 = no definido → se usa el mínimo). */
+  reorderPoint: string;
+  /** Umbral de alerta efectivo: reorden si >0, si no el mínimo. */
+  threshold: string;
   categoryName: string | null;
 }
 
@@ -132,4 +136,27 @@ export interface SalesDetailReport {
     cost: MoneyDto;
     margin: MoneyDto;
   };
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  createdAt: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  variantName: string | null;
+  /** 'sale_price' | 'cost_price'. */
+  field: string;
+  oldValue: MoneyDto;
+  newValue: MoneyDto;
+  /** 'manual' | 'bulk'. */
+  source: string;
+  userName: string | null;
+}
+
+export interface PriceHistoryReport {
+  items: PriceHistoryEntry[];
+  total: number;
+  limit: number;
+  offset: number;
 }

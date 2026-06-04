@@ -24,7 +24,7 @@ export function LowStockTable({ branchId }: { branchId?: string } = {}) {
             <th className="px-4 py-2">Producto</th>
             <th className="px-4 py-2">Categoría</th>
             <th className="px-4 py-2 text-right">Stock</th>
-            <th className="px-4 py-2 text-right">Mínimo</th>
+            <th className="px-4 py-2 text-right">Umbral</th>
           </tr>
         </thead>
         <tbody>
@@ -61,8 +61,15 @@ export function LowStockTable({ branchId }: { branchId?: string } = {}) {
               <td className="px-4 py-2 text-right font-medium text-destructive">
                 {formatQuantity(p.stock)}
               </td>
-              <td className="px-4 py-2 text-right text-muted-foreground">
-                {formatQuantity(p.minStock)}
+              <td
+                className="px-4 py-2 text-right text-muted-foreground"
+                title={
+                  Number(p.reorderPoint) > 0
+                    ? `Punto de reorden ${formatQuantity(p.reorderPoint)}`
+                    : `Stock mínimo ${formatQuantity(p.minStock)}`
+                }
+              >
+                {formatQuantity(p.threshold)}
               </td>
             </tr>
           ))}
