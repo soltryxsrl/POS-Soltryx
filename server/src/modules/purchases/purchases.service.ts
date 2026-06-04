@@ -328,6 +328,8 @@ export class PurchasesService {
           reason: `Recepción orden ${po.orderNumber}`,
           userId,
           branchId: po.branchId,
+          // Costo recibido (no la base promedio): es el costo real de esta entrada.
+          unitCost: it.unitCost,
         });
 
         const newReceived = addMoney(it.receivedQuantity, r.quantity);

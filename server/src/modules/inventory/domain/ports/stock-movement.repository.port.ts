@@ -12,6 +12,7 @@ export interface SaveStockMovementInput {
   quantity: string;
   previousStock: string;
   newStock: string;
+  unitCost?: string | null;
   reason?: string | null;
   saleId?: string | null;
   userId: string;

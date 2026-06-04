@@ -25,6 +25,7 @@ export class ProductStockAdapterTypeOrm implements ProductStockPort {
       productId: row.id,
       branchId: row.branchId,
       stock: row.stock,
+      costPrice: row.costPrice ?? null,
     };
   }
 
@@ -48,6 +49,7 @@ export class ProductStockAdapterTypeOrm implements ProductStockPort {
       productId: row.productId,
       branchId: row.branchId,
       stock: row.stock,
+      costPrice: row.costPrice ?? null,
     };
   }
 

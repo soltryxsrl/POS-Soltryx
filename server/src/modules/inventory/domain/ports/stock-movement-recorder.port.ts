@@ -18,6 +18,12 @@ export interface RecordStockMovementInput {
   saleId?: string | null;
   userId: string;
   branchId?: string | null;
+  /**
+   * Costo unitario a registrar. Si se omite, el recorder usa la base de costo
+   * actual del producto/variante (promedio móvil). Las compras lo pasan con el
+   * costo recibido.
+   */
+  unitCost?: string | null;
 }
 
 /**

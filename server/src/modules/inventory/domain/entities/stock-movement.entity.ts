@@ -14,6 +14,8 @@ export interface StockMovement {
   readonly quantity: string;
   readonly previousStock: string;
   readonly newStock: string;
+  /** Costo unitario del movimiento (base promedio móvil; compras = costo recibido). NULL = histórico. */
+  readonly unitCost: string | null;
   readonly reason: string | null;
   readonly saleId: string | null;
   readonly userId: string;

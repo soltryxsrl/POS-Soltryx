@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { X } from 'lucide-react';
-import { formatDateTime, formatQuantity } from '@/shared/lib/format';
+import { formatDateTime, formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Input } from '@/shared/ui/controls/Input';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -99,6 +99,41 @@ export function StockMovementsTable({ productId }: { productId?: string }) {
         header: 'Stock después',
         align: 'right',
         render: (m) => formatQuantity(m.newStock),
+      },
+      {
+        key: 'unitCost',
+        header: 'Costo unit.',
+        align: 'right',
+        render: (m) =>
+          m.unitCost == null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <span className="text-muted-foreground">{formatMoney(m.unitCost)}</span>
+          ),
+      },
+      {
+        key: 'value',
+        header: 'Importe',
+        align: 'right',
+        render: (m) =>
+          m.unitCost == null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            formatMoney(Math.abs(Number(m.quantity)) * Number(m.unitCost))
+          ),
+      },
+      {
+        key: 'balanceValue',
+        header: 'Saldo (valor)',
+        align: 'right',
+        render: (m) =>
+          m.unitCost == null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <span className="font-medium">
+              {formatMoney(Number(m.newStock) * Number(m.unitCost))}
+            </span>
+          ),
       },
       {
         key: 'reason',

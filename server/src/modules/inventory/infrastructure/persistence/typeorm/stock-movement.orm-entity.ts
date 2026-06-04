@@ -42,6 +42,20 @@ export class StockMovementOrmEntity {
   })
   newStock!: string;
 
+  /**
+   * Costo unitario del movimiento (base de costo promedio móvil al momento;
+   * para compras, el costo recibido). NULL = histórico/desconocido.
+   */
+  @Column({
+    name: 'unit_cost',
+    type: 'numeric',
+    precision: 14,
+    scale: 4,
+    nullable: true,
+    transformer: numericString,
+  })
+  unitCost!: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   reason!: string | null;
 

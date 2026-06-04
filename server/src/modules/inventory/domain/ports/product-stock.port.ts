@@ -6,6 +6,8 @@ export interface ProductStockSnapshot {
   productId: string;
   branchId: string | null;
   stock: string;
+  /** Base de costo vigente (promedio móvil) — para sellar el costo del movimiento. */
+  costPrice: string | null;
 }
 
 export interface VariantStockSnapshot {
@@ -14,6 +16,8 @@ export interface VariantStockSnapshot {
   /** Sucursal de la variante (denormalizada = la del producto padre). */
   branchId: string | null;
   stock: string;
+  /** Costo propio de la variante (puede ser null → se hereda del padre / queda sin costo). */
+  costPrice: string | null;
 }
 
 /**

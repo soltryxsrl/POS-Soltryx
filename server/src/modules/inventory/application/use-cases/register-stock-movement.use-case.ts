@@ -72,6 +72,8 @@ export class RegisterStockMovementUseCase implements StockMovementRecorder {
         quantity: input.quantity,
         previousStock: variantSnap.stock,
         newStock,
+        // Costo del movimiento: el provisto (compra) o la base de costo vigente.
+        unitCost: input.unitCost ?? variantSnap.costPrice,
         reason: input.reason ?? null,
         saleId: input.saleId ?? null,
         userId: input.userId,
@@ -102,6 +104,8 @@ export class RegisterStockMovementUseCase implements StockMovementRecorder {
       quantity: input.quantity,
       previousStock: snapshot.stock,
       newStock,
+      // Costo del movimiento: el provisto (compra) o la base de costo vigente.
+      unitCost: input.unitCost ?? snapshot.costPrice,
       reason: input.reason ?? null,
       saleId: input.saleId ?? null,
       userId: input.userId,
