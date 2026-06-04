@@ -162,6 +162,24 @@ export interface PriceHistoryReport {
   offset: number;
 }
 
+export interface StockByBranchRow {
+  sku: string;
+  name: string;
+  categoryName: string | null;
+  /** Stock por sucursal: { [branchId]: stock }. Sucursal sin la fila → ausente (0). */
+  perBranch: Record<string, string>;
+  totalStock: string;
+}
+
+export interface StockByBranchReport {
+  /** Sucursales activas (columnas de la matriz), en orden. */
+  branches: Array<{ id: string; name: string }>;
+  items: StockByBranchRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
@@ -864,6 +882,72 @@ export class ReportsService {
         newValue: r.new_value,
         source: r.source,
         userName: r.user_name,
+      })),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit: opts.limit,
+      offset: opts.offset,
+    };
+  }
+
+  /**
+   * Existencia COMPARATIVA por sucursal: matriz SKU × sucursal. Como cada
+   * sucursal tiene su propio catálogo, se agrupa por SKU (mismo criterio que las
+   * transferencias) y se pivotea el stock por sucursal. Es una vista consolidada
+   * cross-sucursal (requiere permiso branches.switch en el controlador).
+   */
+  async stockByBranch(opts: {
+    q?: string;
+    limit: number;
+    offset: number;
+  }): Promise<StockByBranchReport> {
+    const branches: Array<{ id: string; name: string }> = await this.ds.query(
+      `SELECT id, name FROM branches
+       WHERE is_active = true AND deleted_at IS NULL
+       ORDER BY name ASC`,
+    );
+
+    const term = opts.q ? `%${opts.q.toLowerCase()}%` : null;
+
+    const rows: Array<{
+      sku: string;
+      name: string;
+      category_name: string | null;
+      total_stock: string;
+      per_branch: Record<string, string>;
+    }> = await this.ds.query(
+      `SELECT p.sku AS sku,
+              MAX(p.name) AS name,
+              MAX(c.name) AS category_name,
+              SUM(p.stock)::text AS total_stock,
+              jsonb_object_agg(p.branch_id::text, p.stock::text) AS per_branch
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.deleted_at IS NULL
+         AND p.is_active = true
+         AND ($1::text IS NULL OR LOWER(p.name) LIKE $1 OR LOWER(p.sku) LIKE $1)
+       GROUP BY p.sku
+       ORDER BY MAX(p.name) ASC
+       LIMIT $2 OFFSET $3`,
+      [term, opts.limit, opts.offset],
+    );
+
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(DISTINCT p.sku)::int AS total
+       FROM products p
+       WHERE p.deleted_at IS NULL
+         AND p.is_active = true
+         AND ($1::text IS NULL OR LOWER(p.name) LIKE $1 OR LOWER(p.sku) LIKE $1)`,
+      [term],
+    );
+
+    return {
+      branches,
+      items: rows.map((r) => ({
+        sku: r.sku,
+        name: r.name,
+        categoryName: r.category_name,
+        perBranch: r.per_branch ?? {},
+        totalStock: r.total_stock,
       })),
       total: agg?.total ? Number(agg.total) : 0,
       limit: opts.limit,

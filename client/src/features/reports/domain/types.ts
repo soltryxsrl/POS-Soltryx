@@ -160,3 +160,20 @@ export interface PriceHistoryReport {
   limit: number;
   offset: number;
 }
+
+export interface StockByBranchRow {
+  sku: string;
+  name: string;
+  categoryName: string | null;
+  /** { [branchId]: stock } — sucursal ausente = 0. */
+  perBranch: Record<string, string>;
+  totalStock: string;
+}
+
+export interface StockByBranchReport {
+  branches: Array<{ id: string; name: string }>;
+  items: StockByBranchRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}

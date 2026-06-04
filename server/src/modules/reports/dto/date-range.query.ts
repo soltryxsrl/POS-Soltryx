@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class DateQuery {
   /** YYYY-MM-DD; default = hoy. */
@@ -80,6 +80,28 @@ export class SalesDetailQuery {
   @IsOptional()
   @IsString()
   branchId?: string;
+}
+
+/** Existencia comparativa por sucursal: búsqueda + paginación. */
+export class StockByBranchQuery {
+  /** Busca en nombre o SKU. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number = 50;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number = 0;
 }
 
 /** Historial de cambios de precio: rango + filtro por producto + paginación. */

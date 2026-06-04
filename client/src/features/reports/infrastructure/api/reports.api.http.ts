@@ -11,6 +11,7 @@ import type {
   SalesDetailReport,
   SessionsByUser,
   SlowMover,
+  StockByBranchReport,
   TopProduct,
 } from '../../domain/types';
 
@@ -83,6 +84,11 @@ export const reportsApiHttp = {
     params: RangeParams & { productId?: string; limit?: number; offset?: number } = {},
   ) =>
     http<PriceHistoryReport>('/reports/price-history', {
+      searchParams: params as Record<string, string | number | boolean | undefined>,
+    }),
+
+  stockByBranch: (params: { q?: string; limit?: number; offset?: number } = {}) =>
+    http<StockByBranchReport>('/reports/inventory/by-branch', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 };

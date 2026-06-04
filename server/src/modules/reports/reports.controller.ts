@@ -6,11 +6,13 @@ import {
   type CurrentUserPayload,
 } from '../auth/infrastructure/http/current-user.decorator';
 import { Roles } from '../auth/infrastructure/http/roles.decorator';
+import { RequirePermissions } from '../auth/infrastructure/http/permissions.decorator';
 import {
   DateQuery,
   DateRangeQuery,
   PriceHistoryQuery,
   SalesDetailQuery,
+  StockByBranchQuery,
 } from './dto/date-range.query';
 import { ReportsService } from './reports.service';
 
@@ -132,6 +134,17 @@ export class ReportsController {
     return this.service.salesDetail(from, to, scope, {
       productId: q.productId,
       categoryId: q.categoryId,
+      limit: q.limit ?? 50,
+      offset: q.offset ?? 0,
+    });
+  }
+
+  /** Existencia comparativa por sucursal (matriz). Solo con permiso de cambio de sucursal. */
+  @Get('inventory/by-branch')
+  @RequirePermissions('branches.switch')
+  stockByBranch(@Query() q: StockByBranchQuery) {
+    return this.service.stockByBranch({
+      q: q.q,
       limit: q.limit ?? 50,
       offset: q.offset ?? 0,
     });

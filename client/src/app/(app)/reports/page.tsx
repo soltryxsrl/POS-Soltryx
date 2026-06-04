@@ -13,6 +13,7 @@ import { DailySummaryCards } from '@/features/reports/ui/components/DailySummary
 import { LowStockTable } from '@/features/reports/ui/components/LowStockTable';
 import { PriceHistoryTable } from '@/features/reports/ui/components/PriceHistoryTable';
 import { SalesDetailTable } from '@/features/reports/ui/components/SalesDetailTable';
+import { StockByBranchTable } from '@/features/reports/ui/components/StockByBranchTable';
 import { TopProductsTable } from '@/features/reports/ui/components/TopProductsTable';
 import { localDateISO, startOfMonthLocalISO } from '@/shared/lib/date';
 import { Input } from '@/shared/ui/controls/Input';
@@ -101,6 +102,8 @@ export default function ReportsPage() {
         <h2 className="text-lg font-medium">Inventario</h2>
         <InventoryValuationCard branchId={branchId} />
         <SlowMoversTable days={30} branchId={branchId} />
+        {/* Matriz comparativa de existencias por sucursal — solo consolidado. */}
+        {canConsolidate && <StockByBranchTable />}
       </section>
     </div>
   );

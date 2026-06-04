@@ -38,6 +38,8 @@ export const reportsKey = {
     offset?: number;
     branchId?: string;
   }) => ['reports', 'price-history', params] as const,
+  stockByBranch: (params: { q?: string; limit?: number; offset?: number }) =>
+    ['reports', 'stock-by-branch', params] as const,
 };
 
 export function useDailySales(date: string, branchId?: string) {
@@ -147,6 +149,18 @@ export function usePriceHistory(
   return useQuery({
     queryKey: reportsKey.priceHistory(params),
     queryFn: () => reportsApiHttp.priceHistory(params),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useStockByBranch(
+  params: { q?: string; limit?: number; offset?: number } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: reportsKey.stockByBranch(params),
+    queryFn: () => reportsApiHttp.stockByBranch(params),
+    enabled,
     placeholderData: (prev) => prev,
   });
 }
