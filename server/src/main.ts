@@ -42,12 +42,18 @@ async function bootstrap(): Promise<void> {
     /^https:\/\/pos-soltryx[a-z0-9-]*\.vercel\.app$/,
     /^https:\/\/[a-z0-9-]+-soltryx-s-projects\.vercel\.app$/,
   ];
+  // En desarrollo, permitir localhost/127.0.0.1 en CUALQUIER puerto: así los e2e
+  // (o un `next dev` en otro puerto) funcionan sin reconfigurar WEB_ORIGIN. Nunca
+  // en producción.
+  const isDev = config.get('NODE_ENV', { infer: true }) !== 'production';
+  const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
   app.enableCors({
     origin: (origin, cb) => {
       // Sin Origin (curl, server-to-server, same-origin) → permitir.
       if (!origin) return cb(null, true);
       if (exactOrigins.has(origin)) return cb(null, true);
       if (vercelPatterns.some((re) => re.test(origin))) return cb(null, true);
+      if (isDev && localhostPattern.test(origin)) return cb(null, true);
       return cb(null, false); // no permitido: sin ACAO, el navegador lo bloquea
     },
     credentials: true,

@@ -69,7 +69,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('navegar a /impuestos/facturas y encontrar documento emitido', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/facturas');
+    await page.goto('/impuestos/facturas');
     await page.waitForLoadState('networkidle');
 
     // La fila del documento, anclada por el NCF dentro de la tabla.
@@ -78,7 +78,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('estado del documento es ISSUED antes de anular', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/facturas');
+    await page.goto('/impuestos/facturas');
     await page.waitForLoadState('networkidle');
 
     const row = page.getByRole('row').filter({ hasText: docNcf });
@@ -91,7 +91,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('abrir modal "Anular comprobante" y seleccionar tipo anulación', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/facturas');
+    await page.goto('/impuestos/facturas');
     await page.waitForLoadState('networkidle');
 
     const row = page.getByRole('row').filter({ hasText: docNcf });
@@ -222,7 +222,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('navegación a /impuestos/informe-608 y verificar UI', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/informe-608');
+    await page.goto('/impuestos/informe-608');
     await page.waitForLoadState('networkidle');
 
     // Título (SectionHeader h1). Usamos role=heading para no chocar con el
@@ -257,7 +257,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('tabla en informe 608 muestra el documento anulado', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/informe-608');
+    await page.goto('/impuestos/informe-608');
     await page.waitForLoadState('networkidle');
 
     // La sección "Vista previa" siempre está presente.
@@ -285,7 +285,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   });
 
   test('botón de descarga del TXT 608 funciona', async ({ page }) => {
-    await page.goto('http://localhost:3000/impuestos/informe-608');
+    await page.goto('/impuestos/informe-608');
     await page.waitForLoadState('networkidle');
 
     // Esperar a que la tabla cargue (hay al menos nuestro NCF).
@@ -307,7 +307,7 @@ test.describe.serial('Fiscal 608 — Anular documento standalone', () => {
   test('toggle "Todas las sucursales" está disponible si tiene permiso', async ({
     page,
   }) => {
-    await page.goto('http://localhost:3000/impuestos/informe-608');
+    await page.goto('/impuestos/informe-608');
     await page.waitForLoadState('networkidle');
 
     // El toggle (Switch) sólo se renderiza con permiso branches.switch. Si no
