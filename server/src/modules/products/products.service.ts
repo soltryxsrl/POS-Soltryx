@@ -7,7 +7,14 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, EntityManager, In, IsNull, Repository } from 'typeorm';
+import {
+  Brackets,
+  EntityManager,
+  In,
+  IsNull,
+  Repository,
+  UpdateQueryBuilder,
+} from 'typeorm';
 import { CategoryOrmEntity } from '../categories/category.orm-entity';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import {
@@ -24,6 +31,10 @@ import { ProductBarcodeOrmEntity } from './product-barcode.orm-entity';
 import { ProductKitComponentOrmEntity } from './product-kit-component.orm-entity';
 import { ProductVariantOrmEntity } from './product-variant.orm-entity';
 import { ProductOrmEntity } from './product.orm-entity';
+import type {
+  BulkPriceUpdateDto,
+  BulkStockLevelsDto,
+} from './dto/bulk-products.dto';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { CreateVariantDto } from './dto/create-variant.dto';
 import type { ListProductsQuery } from './dto/list-products.query';
@@ -66,6 +77,11 @@ export interface VariantResponse {
   stock: string;
   minStock: string;
   isActive: boolean;
+}
+
+export interface BulkUpdateResult {
+  /** Cantidad de productos afectados. */
+  updated: number;
 }
 
 export interface CloneCatalogResult {
@@ -146,7 +162,11 @@ export class ProductsService {
     if (q.categoryId) qb.andWhere('p.category_id = :cid', { cid: q.categoryId });
     if (typeof q.isActive === 'boolean')
       qb.andWhere('p.is_active = :ia', { ia: q.isActive });
-    if (q.lowStock) qb.andWhere('p.stock <= p.min_stock');
+    // Umbral de alerta: punto de reorden si está definido (>0), si no el mínimo.
+    if (q.lowStock)
+      qb.andWhere(
+        'p.stock <= (CASE WHEN p.reorder_point > 0 THEN p.reorder_point ELSE p.min_stock END)',
+      );
     if (q.type === 'simple') {
       qb.andWhere('p.is_kit = false').andWhere('p.has_variants = false');
     } else if (q.type === 'kit') {
@@ -201,6 +221,8 @@ export class ProductsService {
         taxRate,
         taxTypeCode,
         minStock: dto.minStock ?? '0.000',
+        maxStock: dto.maxStock ?? '0.000',
+        reorderPoint: dto.reorderPoint ?? '0.000',
         stock: '0.000',
         isActive: dto.isActive ?? true,
         isKit: dto.isKit ?? false,
@@ -370,6 +392,8 @@ export class ProductsService {
       patch.taxRate = dto.taxRate;
     }
     if (dto.minStock !== undefined) patch.minStock = dto.minStock;
+    if (dto.maxStock !== undefined) patch.maxStock = dto.maxStock;
+    if (dto.reorderPoint !== undefined) patch.reorderPoint = dto.reorderPoint;
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     if (dto.isKit !== undefined) patch.isKit = dto.isKit;
     if (dto.hasVariants !== undefined) patch.hasVariants = dto.hasVariants;
@@ -377,6 +401,90 @@ export class ProductsService {
 
     Object.assign(current, patch);
     return this.repo.save(current);
+  }
+
+  // --- Actualización masiva ---
+
+  /**
+   * Aplica un WHERE de alcance (sucursal + scope) a un UPDATE query builder.
+   * 'all' = toda la sucursal · 'category' = una categoría · 'ids' = lista.
+   * Siempre acotado a la sucursal activa y a productos no borrados.
+   */
+  private applyBulkScope(
+    qb: UpdateQueryBuilder<ProductOrmEntity>,
+    target: { scope: 'all' | 'category' | 'ids'; categoryId?: string; productIds?: string[] },
+    branchId: string,
+  ): void {
+    qb.where('branch_id = :branchId', { branchId }).andWhere('deleted_at IS NULL');
+    if (target.scope === 'category') {
+      qb.andWhere('category_id = :catId', { catId: target.categoryId });
+    } else if (target.scope === 'ids') {
+      qb.andWhere('id IN (:...ids)', { ids: target.productIds });
+    }
+  }
+
+  /**
+   * Cambio masivo de precio (venta o costo) por sucursal. Modos: fijar un valor,
+   * o subir/bajar por porcentaje o monto. El resultado se redondea a 2 decimales
+   * y nunca baja de 0. Las variantes conservan su propio precio (no se tocan).
+   */
+  async bulkUpdatePrices(
+    dto: BulkPriceUpdateDto,
+    branchId: string,
+  ): Promise<BulkUpdateResult> {
+    const num = Number(dto.value);
+    if (!Number.isFinite(num)) {
+      throw new BadRequestException('value inválido');
+    }
+    // `num` proviene de un string validado por @Matches(MONEY) → es un decimal
+    // limpio, sin riesgo de inyección al interpolarlo como literal numérico.
+    const col = dto.field === 'costPrice' ? 'cost_price' : 'sale_price';
+    let expr: string;
+    switch (dto.mode) {
+      case 'set':
+        expr = `${num}`;
+        break;
+      case 'increasePct':
+        expr = `ROUND(${col} * (1 + ${num} / 100.0), 2)`;
+        break;
+      case 'decreasePct':
+        expr = `GREATEST(0, ROUND(${col} * (1 - ${num} / 100.0), 2))`;
+        break;
+      case 'increaseAmount':
+        expr = `ROUND(${col} + ${num}, 2)`;
+        break;
+      case 'decreaseAmount':
+        expr = `GREATEST(0, ROUND(${col} - ${num}, 2))`;
+        break;
+    }
+    const qb = this.repo.createQueryBuilder().update(ProductOrmEntity);
+    qb.set({ [dto.field]: () => expr } as Parameters<typeof qb.set>[0]);
+    this.applyBulkScope(qb, dto, branchId);
+    const res = await qb.execute();
+    return { updated: res.affected ?? 0 };
+  }
+
+  /**
+   * Cambio masivo de niveles de stock (mínimo / máximo / punto de reorden) por
+   * sucursal. Solo escribe los campos provistos. No mueve stock.
+   */
+  async bulkUpdateStockLevels(
+    dto: BulkStockLevelsDto,
+    branchId: string,
+  ): Promise<BulkUpdateResult> {
+    const patch: Partial<ProductOrmEntity> = {};
+    if (dto.minStock !== undefined) patch.minStock = dto.minStock;
+    if (dto.maxStock !== undefined) patch.maxStock = dto.maxStock;
+    if (dto.reorderPoint !== undefined) patch.reorderPoint = dto.reorderPoint;
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException(
+        'Indica al menos uno: minStock, maxStock o reorderPoint',
+      );
+    }
+    const qb = this.repo.createQueryBuilder().update(ProductOrmEntity).set(patch);
+    this.applyBulkScope(qb, dto, branchId);
+    const res = await qb.execute();
+    return { updated: res.affected ?? 0 };
   }
 
   // --- Variants ---

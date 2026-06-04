@@ -104,6 +104,29 @@ export class ProductOrmEntity {
   })
   minStock!: string;
 
+  /** Stock máximo deseado (para reposición). 0 = sin tope definido. */
+  @Column({
+    name: 'max_stock',
+    type: 'numeric',
+    precision: 14,
+    scale: 3,
+    default: 0,
+    transformer: numericString,
+  })
+  maxStock!: string;
+
+  /** Punto de reorden: cuando el stock baja a este nivel, conviene reabastecer.
+   *  0 = usar min_stock como umbral de alerta. */
+  @Column({
+    name: 'reorder_point',
+    type: 'numeric',
+    precision: 14,
+    scale: 3,
+    default: 0,
+    transformer: numericString,
+  })
+  reorderPoint!: string;
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 

@@ -82,6 +82,16 @@ export class CreateProductDto {
   minStock?: string;
 
   @IsOptional()
+  @IsNumberString()
+  @Matches(QTY, { message: 'maxStock debe tener hasta 3 decimales' })
+  maxStock?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  @Matches(QTY, { message: 'reorderPoint debe tener hasta 3 decimales' })
+  reorderPoint?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

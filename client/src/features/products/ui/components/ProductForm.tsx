@@ -45,6 +45,8 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
   const [taxTypeCode, setTaxTypeCode] = useState(product?.taxTypeCode ?? '');
   const [initialStock, setInitialStock] = useState('0');
   const [minStock, setMinStock] = useState(product?.minStock ?? '0');
+  const [maxStock, setMaxStock] = useState(product?.maxStock ?? '0');
+  const [reorderPoint, setReorderPoint] = useState(product?.reorderPoint ?? '0');
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const [isKit, setIsKit] = useState(product?.isKit ?? false);
   const [soldByWeight, setSoldByWeight] = useState(product?.soldByWeight ?? false);
@@ -88,6 +90,8 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           salePrice,
           ...(taxTypeCode && { taxTypeCode }),
           minStock,
+          maxStock,
+          reorderPoint,
           isActive,
           isKit,
           soldByWeight,
@@ -107,6 +111,8 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           ...(taxTypeCode && { taxTypeCode }),
           ...(initialStock && Number(initialStock) > 0 && { initialStock }),
           minStock,
+          maxStock,
+          reorderPoint,
           isActive,
           isKit,
           soldByWeight,
@@ -199,6 +205,28 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
           <Input
             value={minStock}
             onChange={(e) => setMinStock(e.target.value)}
+            inputMode="decimal"
+            pattern="^\d+(\.\d{1,3})?$"
+          />
+        </FormField>
+        <FormField
+          label="Punto de reorden"
+          hint="Umbral de alerta de stock bajo. 0 = usa el mínimo."
+        >
+          <Input
+            value={reorderPoint}
+            onChange={(e) => setReorderPoint(e.target.value)}
+            inputMode="decimal"
+            pattern="^\d+(\.\d{1,3})?$"
+          />
+        </FormField>
+        <FormField
+          label="Stock máximo"
+          hint="Tope deseado al reponer. 0 = sin definir."
+        >
+          <Input
+            value={maxStock}
+            onChange={(e) => setMaxStock(e.target.value)}
             inputMode="decimal"
             pattern="^\d+(\.\d{1,3})?$"
           />

@@ -18,6 +18,10 @@ export interface Product {
   taxTypeCode: string | null;
   stock: string;
   minStock: string;
+  /** Tope deseado de existencia para reposición (0 = no definido). */
+  maxStock: string;
+  /** Punto de reorden: umbral de alerta de stock bajo (0 = usa minStock). */
+  reorderPoint: string;
   isActive: boolean;
   /** Si true, este producto es un kit/combo y vende stock de sus componentes. */
   isKit: boolean;
@@ -100,6 +104,8 @@ export interface CreateProductInput {
   taxTypeCode?: string;
   initialStock?: string;
   minStock?: string;
+  maxStock?: string;
+  reorderPoint?: string;
   isActive?: boolean;
   isKit?: boolean;
   soldByWeight?: boolean;
@@ -118,10 +124,35 @@ export interface UpdateProductInput {
   /** Si se provee, el servidor deriva taxRate de la tasa del tipo. */
   taxTypeCode?: string | null;
   minStock?: string;
+  maxStock?: string;
+  reorderPoint?: string;
   isActive?: boolean;
   isKit?: boolean;
   hasVariants?: boolean;
   soldByWeight?: boolean;
+}
+
+/** A qué productos aplica una operación masiva (acotada a la sucursal activa). */
+export interface BulkTarget {
+  scope: 'all' | 'category' | 'ids';
+  categoryId?: string;
+  productIds?: string[];
+}
+
+export interface BulkPriceUpdateInput extends BulkTarget {
+  field: 'salePrice' | 'costPrice';
+  mode: 'set' | 'increasePct' | 'decreasePct' | 'increaseAmount' | 'decreaseAmount';
+  value: string;
+}
+
+export interface BulkStockLevelsInput extends BulkTarget {
+  minStock?: string;
+  maxStock?: string;
+  reorderPoint?: string;
+}
+
+export interface BulkUpdateResult {
+  updated: number;
 }
 
 export type ProductTypeFilter = 'simple' | 'kit' | 'variant';

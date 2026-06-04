@@ -81,6 +81,16 @@ export class UpdateProductDto {
   minStock?: string;
 
   @IsOptional()
+  @IsNumberString()
+  @Matches(QTY)
+  maxStock?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  @Matches(QTY)
+  reorderPoint?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

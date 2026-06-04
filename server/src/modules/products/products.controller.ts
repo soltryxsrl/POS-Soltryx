@@ -18,6 +18,10 @@ import {
 } from '../auth/infrastructure/http/current-user.decorator';
 import { Roles } from '../auth/infrastructure/http/roles.decorator';
 import { AddBarcodeRequestDto } from './dto/add-barcode.request-dto';
+import {
+  BulkPriceUpdateDto,
+  BulkStockLevelsDto,
+} from './dto/bulk-products.dto';
 import { CloneCatalogRequestDto } from './dto/clone-catalog.request-dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateVariantDto } from './dto/create-variant.dto';
@@ -59,6 +63,20 @@ export class ProductsController {
     @ActiveBranch() branchId: string,
   ) {
     return this.service.cloneCatalog(dto.sourceBranchId, branchId);
+  }
+
+  /** Cambio masivo de precios (venta/costo) por sucursal. */
+  @Post('bulk/prices')
+  @Roles('ADMIN', 'MANAGER')
+  bulkPrices(@Body() dto: BulkPriceUpdateDto, @ActiveBranch() branchId: string) {
+    return this.service.bulkUpdatePrices(dto, branchId);
+  }
+
+  /** Cambio masivo de niveles de stock (mín/máx/reorden) por sucursal. */
+  @Post('bulk/stock-levels')
+  @Roles('ADMIN', 'MANAGER')
+  bulkStockLevels(@Body() dto: BulkStockLevelsDto, @ActiveBranch() branchId: string) {
+    return this.service.bulkUpdateStockLevels(dto, branchId);
   }
 
   @Patch(':id')

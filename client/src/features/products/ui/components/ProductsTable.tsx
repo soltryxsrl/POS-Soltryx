@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Package, Pencil, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { Layers, Package, Pencil, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
@@ -15,6 +16,7 @@ import { useCategories } from '@/features/categories/application/hooks/use-categ
 import { useProducts, useRemoveProduct } from '../../application/hooks/use-products';
 import type { Product, ProductTypeFilter } from '../../domain/types';
 import { AdjustStockDialog } from '@/features/inventory/ui/components/AdjustStockDialog';
+import { BulkUpdateDialog } from './BulkUpdateDialog';
 import { ProductFormDialog } from './ProductFormDialog';
 
 const FILTER_KEYS = ['q', 'categoryId', 'isActive', 'lowStock', 'type'] as const;
@@ -38,10 +40,12 @@ export function ProductsTable() {
     offset: (table.page - 1) * table.pageSize,
   });
   const remove = useRemoveProduct();
+  const canUpdate = useHasPermission('products.update');
 
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [delError, setDelError] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [formState, setFormState] = useState<
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
@@ -123,7 +127,10 @@ export function ProductsTable() {
         sortable: true,
         align: 'right',
         render: (p) => {
-          const low = Number(p.stock) <= Number(p.minStock) && Number(p.minStock) > 0;
+          // Umbral de alerta = punto de reorden si está definido (>0), si no el mínimo.
+          const threshold =
+            Number(p.reorderPoint) > 0 ? Number(p.reorderPoint) : Number(p.minStock);
+          const low = threshold > 0 && Number(p.stock) <= threshold;
           return (
             <span className={low ? 'text-destructive font-medium' : ''}>
               {formatQuantity(p.stock)}
@@ -247,6 +254,16 @@ export function ProductsTable() {
           <X className="h-3 w-3" /> Limpiar
         </button>
       )}
+      {canUpdate && (
+        <button
+          type="button"
+          onClick={() => setBulkOpen(true)}
+          title="Actualización masiva de precios y niveles de stock"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Layers className="h-3.5 w-3.5" /> Actualización masiva
+        </button>
+      )}
     </div>
   );
 
@@ -284,6 +301,8 @@ export function ProductsTable() {
           onClose={() => setFormState(null)}
         />
       )}
+
+      {bulkOpen && <BulkUpdateDialog onClose={() => setBulkOpen(false)} />}
 
       {deleting && (
         <ConfirmDialog

@@ -1,4 +1,7 @@
 import type {
+  BulkPriceUpdateInput,
+  BulkStockLevelsInput,
+  BulkUpdateResult,
   CreateProductInput,
   CreateVariantInput,
   KitComponent,
@@ -17,6 +20,8 @@ export interface ProductsApi {
   create(input: CreateProductInput): Promise<Product>;
   update(id: string, input: UpdateProductInput): Promise<Product>;
   remove(id: string): Promise<void>;
+  bulkUpdatePrices(input: BulkPriceUpdateInput): Promise<BulkUpdateResult>;
+  bulkUpdateStockLevels(input: BulkStockLevelsInput): Promise<BulkUpdateResult>;
   listKitComponents(id: string): Promise<KitComponent[]>;
   setKitComponents(id: string, input: SetKitComponentsInput): Promise<KitComponent[]>;
   listVariants(id: string): Promise<ProductVariant[]>;

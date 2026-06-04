@@ -60,6 +60,8 @@ export function RecentProducts({ onPick }: Props) {
               taxTypeCode: null,
               stock: '0',
               minStock: '0',
+              maxStock: '0',
+              reorderPoint: '0',
               isActive: true,
               isKit: r.isKit,
               hasVariants: r.hasVariants,

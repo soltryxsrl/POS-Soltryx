@@ -1,6 +1,9 @@
 import { http } from '@/shared/lib/http-client';
 import type { ProductsApi } from '../../domain/ports';
 import type {
+  BulkPriceUpdateInput,
+  BulkStockLevelsInput,
+  BulkUpdateResult,
   CreateProductInput,
   CreateVariantInput,
   KitComponent,
@@ -24,6 +27,10 @@ export const productsApiHttp: ProductsApi = {
   update: (id: string, input: UpdateProductInput) =>
     http<Product>(`/products/${id}`, { method: 'PATCH', body: input }),
   remove: (id: string) => http<void>(`/products/${id}`, { method: 'DELETE' }),
+  bulkUpdatePrices: (input: BulkPriceUpdateInput) =>
+    http<BulkUpdateResult>('/products/bulk/prices', { method: 'POST', body: input }),
+  bulkUpdateStockLevels: (input: BulkStockLevelsInput) =>
+    http<BulkUpdateResult>('/products/bulk/stock-levels', { method: 'POST', body: input }),
   listKitComponents: (id: string) =>
     http<KitComponent[]>(`/products/${id}/kit-components`),
   setKitComponents: (id: string, input: SetKitComponentsInput) =>

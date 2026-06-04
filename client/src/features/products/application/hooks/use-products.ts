@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { productsApiHttp } from '../../infrastructure/api/products.api.http';
 import type {
+  BulkPriceUpdateInput,
+  BulkStockLevelsInput,
   CreateProductInput,
   CreateVariantInput,
   ListProductsParams,
@@ -57,6 +59,22 @@ export function useRemoveProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => productsApiHttp.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: productsKey.all }),
+  });
+}
+
+export function useBulkUpdatePrices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkPriceUpdateInput) => productsApiHttp.bulkUpdatePrices(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: productsKey.all }),
+  });
+}
+
+export function useBulkUpdateStockLevels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BulkStockLevelsInput) => productsApiHttp.bulkUpdateStockLevels(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: productsKey.all }),
   });
 }
