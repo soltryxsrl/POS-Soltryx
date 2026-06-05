@@ -8,3 +8,7 @@ Thumbs.db
 
 # Local-only
 *.local
+
+# Test / e2e output (Playwright) — regenerable, at any level
+test-results/
+playwright-report/
