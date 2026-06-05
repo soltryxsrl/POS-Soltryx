@@ -31,7 +31,6 @@ import { AuthGuard } from '@/features/auth/ui/components/AuthGuard';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { useLogout } from '@/features/auth/application/hooks/use-logout';
 import { useActiveSessionMine } from '@/features/cash/application/hooks/use-cash';
-import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
 import { BranchSwitcher } from '@/features/branches/ui/components/BranchSwitcher';
 import { POSHeader } from '@/features/sales/ui/components/POSHeader';
 import { OfflineSyncBadge } from '@/features/sales/ui/components/OfflineSyncBadge';
@@ -307,33 +306,17 @@ function AppShell({ children }: { children: ReactNode }) {
 }
 
 /**
- * Marca de la app. Reutiliza el logo del negocio (el mismo de los recibos /
- * e-CF) cuando está configurado en business_settings; si no, un cuadro con la
- * inicial. El nombre del producto es "Soltryx".
+ * Marca del producto (Soltryx). `withName` = expandido → logo completo
+ * (/soltryx-logo.png, hexágono S + "SOLTRYX"); colapsado → solo la "S"
+ * (/soltryx-mark.svg, el mismo ícono del favicon).
  */
 function BrandLogo({ withName = true }: { withName?: boolean }) {
-  const business = useBusinessInfo();
-  const logoUrl = business.data?.logoUrl ?? null;
-  return (
-    <span className="flex min-w-0 items-center gap-2.5">
-      {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={logoUrl}
-          alt="Logo"
-          className="h-8 w-8 flex-shrink-0 rounded-lg object-contain"
-        />
-      ) : (
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-from to-brand-to text-sm font-bold text-white shadow-sm shadow-brand-from/30">
-          S
-        </span>
-      )}
-      {withName && (
-        <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-          Soltryx
-        </span>
-      )}
-    </span>
+  return withName ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/soltryx-logo.png" alt="Soltryx" className="h-8 w-auto object-contain" />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/soltryx-mark.svg" alt="Soltryx" className="h-9 w-9 object-contain" />
   );
 }
 
@@ -486,13 +469,9 @@ function Sidebar({
         </button>
       )}
 
-      <div
-        className={cn(
-          'pb-4 pt-6',
-          collapsed ? 'flex justify-center px-3' : 'px-5',
-        )}
-      >
-        <Link href="/" className="flex min-w-0 items-center" title="Soltryx">
+      <div className={cn('pb-4 pt-6', collapsed ? 'px-3' : 'px-5')}>
+        {/* Logo centrado en el nav: completo expandido, la "S" colapsado. */}
+        <Link href="/" className="flex items-center justify-center" title="Soltryx">
           <BrandLogo withName={!collapsed} />
         </Link>
         {!collapsed && <BranchSwitcher className="mt-3" />}

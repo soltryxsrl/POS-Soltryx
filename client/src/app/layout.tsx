@@ -4,9 +4,10 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Soltryx',
+  title: 'POS - Soltryx',
   description: 'Soltryx — Punto de venta',
   manifest: '/manifest.webmanifest',
+  // El favicon sale de src/app/icon.svg (la "S" de la marca Soltryx).
 };
 
 export const viewport: Viewport = {
