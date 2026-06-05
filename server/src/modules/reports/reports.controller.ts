@@ -66,6 +66,18 @@ export class ReportsController {
     return this.service.salesByMethod(from, to, scope);
   }
 
+  @Get('sales/by-seller')
+  salesBySeller(
+    @Query() q: DateRangeQuery,
+    @ActiveBranch() branchId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const to = q.to ?? today();
+    const from = q.from ?? startOfMonth();
+    const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
+    return this.service.salesBySeller(from, to, scope);
+  }
+
   @Get('sessions/by-user')
   sessionsByUser(
     @Query() q: DateRangeQuery,

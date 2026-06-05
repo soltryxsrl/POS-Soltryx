@@ -9,6 +9,7 @@ import type {
   ProductMargin,
   ReturnsAnalysis,
   SalesByMethod,
+  SalesBySeller,
   SalesDetailReport,
   SessionsByUser,
   SlowMover,
@@ -43,6 +44,11 @@ export const reportsApiHttp = {
 
   sessionsByUser: (params: { from?: string; to?: string; branchId?: string } = {}) =>
     http<SessionsByUser[]>('/reports/sessions/by-user', {
+      searchParams: params as Record<string, string | number | boolean | undefined>,
+    }),
+
+  salesBySeller: (params: { from?: string; to?: string; branchId?: string } = {}) =>
+    http<SalesBySeller[]>('/reports/sales/by-seller', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 

@@ -14,6 +14,7 @@ import {
   Tags,
   Timer,
   Undo2,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
@@ -36,6 +37,7 @@ const GROUPS: Array<{ group: string; items: ReportItem[] }> = [
       { href: '/reports/sales-detail', title: 'Detalle de ventas', desc: 'Renglón por renglón con costo y margen. Export CSV/PDF.', icon: ReceiptText },
       { href: '/reports/top-products', title: 'Top productos', desc: 'Más vendidos por ingresos en el rango.', icon: ListOrdered },
       { href: '/reports/by-category', title: 'Ventas por categoría', desc: 'Ingresos y unidades agrupados por categoría.', icon: Tags },
+      { href: '/reports/by-seller', title: 'Ventas por vendedor', desc: 'Total vendido y ticket promedio por vendedor (base de comisión).', icon: UserRound },
       { href: '/reports/margins', title: 'Márgenes por producto', desc: 'Ingreso, costo, margen y % por producto.', icon: Percent },
       { href: '/reports/returns', title: 'Devoluciones', desc: 'Análisis de devoluciones por método y razón.', icon: Undo2 },
     ],

@@ -49,6 +49,16 @@ export interface SalesByMethod {
   total: string;
 }
 
+/** Ventas agrupadas por el VENDEDOR (= usuario que registró la venta). */
+export interface SalesBySeller {
+  userId: string;
+  username: string;
+  fullName: string;
+  salesCount: number;
+  total: string;
+  avgTicket: string;
+}
+
 export interface SessionsByUser {
   userId: string;
   username: string;
@@ -470,6 +480,51 @@ export class ReportsService {
             : r.total,
       }))
       .sort((a, b) => Number(b.total) - Number(a.total));
+  }
+
+  /**
+   * Ventas por vendedor (= usuario que registró la venta) en el rango. Base para
+   * comisiones. Suma de ventas COMPLETED por usuario, con ticket promedio.
+   */
+  async salesBySeller(
+    from: string,
+    to: string,
+    branchId: string | null,
+  ): Promise<SalesBySeller[]> {
+    const rows: Array<{
+      user_id: string;
+      username: string;
+      full_name: string;
+      sales_count: number;
+      total: string;
+    }> = await this.ds.query(
+      `SELECT s.user_id,
+              u.username,
+              u.full_name,
+              COUNT(*)::int AS sales_count,
+              COALESCE(SUM(s.total), 0)::text AS total
+       FROM sales s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.status = 'COMPLETED'
+         AND ($3::uuid IS NULL OR s.branch_id = $3)
+         AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+       GROUP BY s.user_id, u.username, u.full_name
+       ORDER BY total DESC`,
+      [from, to, branchId],
+    );
+    return rows.map((r) => {
+      const count = Number(r.sales_count);
+      const avgTicket =
+        count > 0 ? (parseFloat(r.total) / count).toFixed(2) : '0.00';
+      return {
+        userId: r.user_id,
+        username: r.username,
+        fullName: r.full_name,
+        salesCount: count,
+        total: r.total,
+        avgTicket,
+      };
+    });
   }
 
   async sessionsByUser(from: string, to: string, branchId: string | null): Promise<SessionsByUser[]> {

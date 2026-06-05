@@ -53,6 +53,15 @@ export interface SalesByMethod {
   total: MoneyDto;
 }
 
+export interface SalesBySeller {
+  userId: string;
+  username: string;
+  fullName: string;
+  salesCount: number;
+  total: MoneyDto;
+  avgTicket: MoneyDto;
+}
+
 export interface SessionsByUser {
   userId: string;
   username: string;

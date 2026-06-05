@@ -13,6 +13,8 @@ export const reportsKey = {
     ['reports', 'by-method', params] as const,
   byUser: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'by-user', params] as const,
+  bySeller: (params: { from?: string; to?: string; branchId?: string }) =>
+    ['reports', 'by-seller', params] as const,
   valuation: (branchId?: string) => ['reports', 'valuation', branchId ?? null] as const,
   margins: (params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string }) =>
     ['reports', 'margins', params] as const,
@@ -81,6 +83,13 @@ export function useSessionsByUser(params: { from?: string; to?: string; branchId
   return useQuery({
     queryKey: reportsKey.byUser(params),
     queryFn: () => reportsApiHttp.sessionsByUser(params),
+  });
+}
+
+export function useSalesBySeller(params: { from?: string; to?: string; branchId?: string } = {}) {
+  return useQuery({
+    queryKey: reportsKey.bySeller(params),
+    queryFn: () => reportsApiHttp.salesBySeller(params),
   });
 }
 

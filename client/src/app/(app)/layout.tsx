@@ -116,6 +116,7 @@ const NAV_ITEMS: NavEntry[] = [
       { href: '/reports/sales-detail', label: 'Detalle de ventas', permissions: ['reports.read'] },
       { href: '/reports/top-products', label: 'Top productos', permissions: ['reports.read'] },
       { href: '/reports/by-category', label: 'Ventas por categoría', permissions: ['reports.read'] },
+      { href: '/reports/by-seller', label: 'Ventas por vendedor', permissions: ['reports.read'] },
       { href: '/reports/margins', label: 'Márgenes', permissions: ['reports.read'] },
       { href: '/reports/returns', label: 'Análisis devoluciones', permissions: ['reports.read'] },
       { href: '/reports/price-history', label: 'Historial de precios', permissions: ['reports.read'] },
