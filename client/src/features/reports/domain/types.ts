@@ -1,5 +1,13 @@
 import type { MoneyDto } from '@/shared/types/enums';
 
+/** Envoltura paginada genérica para reportes de lista. */
+export interface Paged<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface DailySalesSummary {
   date: string;
   salesCount: number;

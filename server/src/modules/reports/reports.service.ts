@@ -14,6 +14,14 @@ export interface DailySalesSummary {
   byUser: Array<{ userId: string; username: string; fullName: string; salesCount: number; total: string }>;
 }
 
+/** Envoltura paginada genérica para reportes de lista. */
+export interface Paged<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface TopProduct {
   productId: string;
   name: string;
@@ -310,8 +318,9 @@ export class ReportsService {
     from: string,
     to: string,
     limit: number,
+    offset: number,
     branchId: string | null,
-  ): Promise<TopProduct[]> {
+  ): Promise<Paged<TopProduct>> {
     const rows: Array<{
       product_id: string;
       name: string;
@@ -331,19 +340,38 @@ export class ReportsService {
          AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
        GROUP BY si.product_id
        ORDER BY revenue DESC
-       LIMIT $3`,
-      [from, to, limit, branchId],
+       LIMIT $3 OFFSET $5`,
+      [from, to, limit, branchId, offset],
     );
-    return rows.map((r) => ({
-      productId: r.product_id,
-      name: r.name,
-      sku: r.sku,
-      unitsSold: r.units_sold,
-      revenue: r.revenue,
-    }));
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS total FROM (
+         SELECT 1 FROM sale_items si JOIN sales s ON s.id = si.sale_id
+         WHERE s.status = 'COMPLETED'
+           AND ($3::uuid IS NULL OR s.branch_id = $3)
+           AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+         GROUP BY si.product_id
+       ) t`,
+      [from, to, branchId],
+    );
+    return {
+      items: rows.map((r) => ({
+        productId: r.product_id,
+        name: r.name,
+        sku: r.sku,
+        unitsSold: r.units_sold,
+        revenue: r.revenue,
+      })),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit,
+      offset,
+    };
   }
 
-  async lowStock(branchId: string | null): Promise<LowStockProduct[]> {
+  async lowStock(
+    branchId: string | null,
+    limit: number,
+    offset: number,
+  ): Promise<Paged<LowStockProduct>> {
     // Umbral de alerta = punto de reorden si está definido (>0), si no el mínimo
     // (mismo criterio que la lista de productos, products.service.list lowStock).
     const threshold = `(CASE WHEN p.reorder_point > 0 THEN p.reorder_point ELSE p.min_stock END)`;
@@ -368,19 +396,35 @@ export class ReportsService {
          AND p.deleted_at IS NULL
          AND ${threshold} > 0
          AND p.stock <= ${threshold}
-       ORDER BY (p.stock - ${threshold}) ASC, p.name ASC`,
+       ORDER BY (p.stock - ${threshold}) ASC, p.name ASC
+       LIMIT $2 OFFSET $3`,
+      [branchId, limit, offset],
+    );
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS total
+       FROM products p
+       WHERE p.is_active = true
+         AND ($1::uuid IS NULL OR p.branch_id = $1)
+         AND p.deleted_at IS NULL
+         AND ${threshold} > 0
+         AND p.stock <= ${threshold}`,
       [branchId],
     );
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      sku: r.sku,
-      stock: r.stock,
-      minStock: r.min_stock,
-      reorderPoint: r.reorder_point,
-      threshold: r.threshold,
-      categoryName: r.category_name,
-    }));
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        sku: r.sku,
+        stock: r.stock,
+        minStock: r.min_stock,
+        reorderPoint: r.reorder_point,
+        threshold: r.threshold,
+        categoryName: r.category_name,
+      })),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit,
+      offset,
+    };
   }
 
   async salesByMethod(from: string, to: string, branchId: string | null): Promise<SalesByMethod[]> {
@@ -525,8 +569,9 @@ export class ReportsService {
     from: string,
     to: string,
     limit: number,
+    offset: number,
     branchId: string | null,
-  ): Promise<ProductMargin[]> {
+  ): Promise<Paged<ProductMargin>> {
     const rows: Array<{
       product_id: string;
       name: string;
@@ -549,34 +594,57 @@ export class ReportsService {
          AND ($4::uuid IS NULL OR s.branch_id = $4)
        GROUP BY si.product_id
        ORDER BY (COALESCE(SUM(si.total), 0) - COALESCE(SUM(si.quantity * COALESCE(si.unit_cost_snapshot, p.cost_price, 0)), 0)) DESC
-       LIMIT $3`,
-      [from, to, limit, branchId],
+       LIMIT $3 OFFSET $5`,
+      [from, to, limit, branchId, offset],
     );
-    return rows.map((r) => {
-      const revenue = r.revenue;
-      const cost = r.cost;
-      const margin = subtractDecimals(revenue, cost);
-      const rev = parseFloat(revenue);
-      const marginPct = rev > 0 ? ((parseFloat(margin) / rev) * 100).toFixed(2) : '0.00';
-      return {
-        productId: r.product_id,
-        name: r.name,
-        sku: r.sku,
-        unitsSold: r.units,
-        revenue,
-        cost,
-        margin,
-        marginPct,
-      };
-    });
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(DISTINCT si.product_id)::int AS total
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+       WHERE si.product_id IS NOT NULL
+         AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+         AND ($3::uuid IS NULL OR s.branch_id = $3)`,
+      [from, to, branchId],
+    );
+    return {
+      items: rows.map((r) => {
+        const revenue = r.revenue;
+        const cost = r.cost;
+        const margin = subtractDecimals(revenue, cost);
+        const rev = parseFloat(revenue);
+        const marginPct = rev > 0 ? ((parseFloat(margin) / rev) * 100).toFixed(2) : '0.00';
+        return {
+          productId: r.product_id,
+          name: r.name,
+          sku: r.sku,
+          unitsSold: r.units,
+          revenue,
+          cost,
+          margin,
+          marginPct,
+        };
+      }),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit,
+      offset,
+    };
   }
 
   /** Productos con stock que NO se han vendido en los últimos `days` días. */
   async slowMovers(
     days: number,
     limit: number,
+    offset: number,
     branchId: string | null,
-  ): Promise<SlowMover[]> {
+  ): Promise<Paged<SlowMover>> {
+    const notSold = `p.deleted_at IS NULL AND p.is_active = true AND p.stock > 0
+         AND ($BRANCH$::uuid IS NULL OR p.branch_id = $BRANCH$)
+         AND NOT EXISTS (
+           SELECT 1 FROM sale_items si
+           JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
+           WHERE si.product_id = p.id
+             AND s.created_at >= now() - make_interval(days => $DAYS$)
+         )`;
     const rows: Array<{
       id: string;
       name: string;
@@ -593,28 +661,32 @@ export class ReportsService {
                 WHERE si.product_id = p.id) AS last_sold_at
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
-       WHERE p.deleted_at IS NULL AND p.is_active = true AND p.stock > 0
-         AND ($3::uuid IS NULL OR p.branch_id = $3)
-         AND NOT EXISTS (
-           SELECT 1 FROM sale_items si
-           JOIN sales s ON s.id = si.sale_id AND s.status = 'COMPLETED'
-           WHERE si.product_id = p.id
-             AND s.created_at >= now() - make_interval(days => $1)
-         )
+       WHERE ${notSold.replace(/\$BRANCH\$/g, '$3').replace(/\$DAYS\$/g, '$1')}
        ORDER BY last_sold_at ASC NULLS FIRST, (p.stock * p.cost_price) DESC
-       LIMIT $2`,
-      [days, limit, branchId],
+       LIMIT $2 OFFSET $4`,
+      [days, limit, branchId, offset],
     );
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      sku: r.sku,
-      stock: r.stock,
-      costPrice: r.cost_price,
-      tiedUpCost: multiplyDecimals(r.stock, r.cost_price),
-      categoryName: r.category_name,
-      lastSoldAt: r.last_sold_at ? new Date(r.last_sold_at).toISOString() : null,
-    }));
+    const [agg]: Array<{ total: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS total
+       FROM products p
+       WHERE ${notSold.replace(/\$BRANCH\$/g, '$2').replace(/\$DAYS\$/g, '$1')}`,
+      [days, branchId],
+    );
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        sku: r.sku,
+        stock: r.stock,
+        costPrice: r.cost_price,
+        tiedUpCost: multiplyDecimals(r.stock, r.cost_price),
+        categoryName: r.category_name,
+        lastSoldAt: r.last_sold_at ? new Date(r.last_sold_at).toISOString() : null,
+      })),
+      total: agg?.total ? Number(agg.total) : 0,
+      limit,
+      offset,
+    };
   }
 
   /** Ventas (ingresos) por categoría en el rango. */

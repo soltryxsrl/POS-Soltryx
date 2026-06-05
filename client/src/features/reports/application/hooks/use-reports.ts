@@ -5,17 +5,18 @@ import { reportsApiHttp } from '../../infrastructure/api/reports.api.http';
 
 export const reportsKey = {
   daily: (date: string, branchId?: string) => ['reports', 'daily', date, branchId ?? null] as const,
-  top: (params: { from?: string; to?: string; limit?: number; branchId?: string }) =>
+  top: (params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string }) =>
     ['reports', 'top', params] as const,
-  lowStock: (branchId?: string) => ['reports', 'low-stock', branchId ?? null] as const,
+  lowStock: (params: { limit?: number; offset?: number; branchId?: string }) =>
+    ['reports', 'low-stock', params] as const,
   byMethod: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'by-method', params] as const,
   byUser: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'by-user', params] as const,
   valuation: (branchId?: string) => ['reports', 'valuation', branchId ?? null] as const,
-  margins: (params: { from?: string; to?: string; limit?: number; branchId?: string }) =>
+  margins: (params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string }) =>
     ['reports', 'margins', params] as const,
-  slowMovers: (params: { days?: number; limit?: number; branchId?: string }) =>
+  slowMovers: (params: { days?: number; limit?: number; offset?: number; branchId?: string }) =>
     ['reports', 'slow-movers', params] as const,
   byCategory: (params: { from?: string; to?: string; branchId?: string }) =>
     ['reports', 'by-category', params] as const,
@@ -50,18 +51,22 @@ export function useDailySales(date: string, branchId?: string) {
 }
 
 export function useTopProducts(
-  params: { from?: string; to?: string; limit?: number; branchId?: string } = {},
+  params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string } = {},
 ) {
   return useQuery({
     queryKey: reportsKey.top(params),
     queryFn: () => reportsApiHttp.topProducts(params),
+    placeholderData: (prev) => prev,
   });
 }
 
-export function useLowStock(branchId?: string) {
+export function useLowStock(
+  params: { limit?: number; offset?: number; branchId?: string } = {},
+) {
   return useQuery({
-    queryKey: reportsKey.lowStock(branchId),
-    queryFn: () => reportsApiHttp.lowStock(branchId),
+    queryKey: reportsKey.lowStock(params),
+    queryFn: () => reportsApiHttp.lowStock(params),
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -87,20 +92,22 @@ export function useInventoryValuation(branchId?: string) {
 }
 
 export function useProductMargins(
-  params: { from?: string; to?: string; limit?: number; branchId?: string } = {},
+  params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string } = {},
 ) {
   return useQuery({
     queryKey: reportsKey.margins(params),
     queryFn: () => reportsApiHttp.productMargins(params),
+    placeholderData: (prev) => prev,
   });
 }
 
 export function useSlowMovers(
-  params: { days?: number; limit?: number; branchId?: string } = {},
+  params: { days?: number; limit?: number; offset?: number; branchId?: string } = {},
 ) {
   return useQuery({
     queryKey: reportsKey.slowMovers(params),
     queryFn: () => reportsApiHttp.slowMovers(params),
+    placeholderData: (prev) => prev,
   });
 }
 

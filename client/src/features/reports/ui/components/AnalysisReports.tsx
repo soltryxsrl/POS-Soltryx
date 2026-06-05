@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import {
@@ -9,7 +10,11 @@ import {
   useSalesByCategory,
   useSlowMovers,
 } from '../../application/hooks/use-reports';
+import { ReportPager } from './ReportShell';
 import { StatCard } from './StatCard';
+
+const MARGINS_PAGE = 20;
+const SLOW_PAGE = 50;
 
 type RangeProps = { from?: string; to?: string; branchId?: string };
 
@@ -85,7 +90,10 @@ export function InventoryValuationCard({ branchId }: { branchId?: string }) {
 
 /** Margen por producto sobre las ventas del rango. */
 export function ProductMarginsTable({ from, to, branchId }: RangeProps) {
-  const q = useProductMargins({ from, to, limit: 20, branchId });
+  const [offset, setOffset] = useState(0);
+  useEffect(() => setOffset(0), [from, to, branchId]);
+  const q = useProductMargins({ from, to, limit: MARGINS_PAGE, offset, branchId });
+  const d = q.data;
   return (
     <div className="rounded-lg border bg-card">
       <h3 className="border-b px-4 py-2 text-sm font-medium">
@@ -106,8 +114,10 @@ export function ProductMarginsTable({ from, to, branchId }: RangeProps) {
         <tbody>
           {q.isLoading && <Loading cols={6} />}
           {q.isError && <ErrorRow cols={6} error={q.error} />}
-          {q.data?.length === 0 && <Empty cols={6} text="Sin ventas en el rango." />}
-          {q.data?.map((p) => (
+          {d?.items.length === 0 && !q.isLoading && (
+            <Empty cols={6} text="Sin ventas en el rango." />
+          )}
+          {d?.items.map((p) => (
             <tr key={p.productId} className="border-b last:border-0">
               <td className="px-4 py-2">
                 <div className="font-medium">{p.name}</div>
@@ -128,13 +138,22 @@ export function ProductMarginsTable({ from, to, branchId }: RangeProps) {
           ))}
         </tbody>
       </table>
+      <ReportPager
+        total={d?.total ?? 0}
+        limit={MARGINS_PAGE}
+        offset={offset}
+        onChange={setOffset}
+      />
     </div>
   );
 }
 
 /** Productos con stock sin venta en N días (capital inmovilizado). */
 export function SlowMoversTable({ days = 30, branchId }: { days?: number; branchId?: string }) {
-  const q = useSlowMovers({ days, limit: 50, branchId });
+  const [offset, setOffset] = useState(0);
+  useEffect(() => setOffset(0), [days, branchId]);
+  const q = useSlowMovers({ days, limit: SLOW_PAGE, offset, branchId });
+  const d = q.data;
   return (
     <div className="rounded-lg border bg-card">
       <h3 className="border-b px-4 py-2 text-sm font-medium">
@@ -154,8 +173,10 @@ export function SlowMoversTable({ days = 30, branchId }: { days?: number; branch
         <tbody>
           {q.isLoading && <Loading cols={5} />}
           {q.isError && <ErrorRow cols={5} error={q.error} />}
-          {q.data?.length === 0 && <Empty cols={5} text="Sin productos estancados. 🎉" />}
-          {q.data?.map((p) => (
+          {d?.items.length === 0 && !q.isLoading && (
+            <Empty cols={5} text="Sin productos estancados. 🎉" />
+          )}
+          {d?.items.map((p) => (
             <tr key={p.id} className="border-b last:border-0">
               <td className="px-4 py-2">
                 <div className="font-medium">{p.name}</div>
@@ -171,6 +192,7 @@ export function SlowMoversTable({ days = 30, branchId }: { days?: number; branch
           ))}
         </tbody>
       </table>
+      <ReportPager total={d?.total ?? 0} limit={SLOW_PAGE} offset={offset} onChange={setOffset} />
     </div>
   );
 }

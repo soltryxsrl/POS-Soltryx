@@ -110,8 +110,12 @@ test('stock bajo usa el punto de reorden cuando está definido', async () => {
     }),
   });
 
-  const rows = await api<LowStockRow[]>('/reports/products/low-stock');
-  const mine = rows.find((r) => r.id === p.id);
+  // El reporte ahora es paginado: { items, total, limit, offset }. Pedimos un
+  // límite alto para asegurar que el producto de prueba caiga en la primera página.
+  const rep = await api<{ items: LowStockRow[] }>(
+    '/reports/products/low-stock?limit=100',
+  );
+  const mine = rep.items.find((r) => r.id === p.id);
   expect(mine, 'producto bajo el punto de reorden debe aparecer').toBeTruthy();
   expect(Number(mine!.threshold)).toBeCloseTo(10, 3);
   expect(Number(mine!.reorderPoint)).toBeCloseTo(10, 3);

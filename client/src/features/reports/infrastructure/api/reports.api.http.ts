@@ -4,6 +4,7 @@ import type {
   DailySalesSummary,
   InventoryValuation,
   LowStockProduct,
+  Paged,
   PriceHistoryReport,
   ProductMargin,
   ReturnsAnalysis,
@@ -23,14 +24,16 @@ export const reportsApiHttp = {
       searchParams: { date, branchId },
     }),
 
-  topProducts: (params: { from?: string; to?: string; limit?: number; branchId?: string } = {}) =>
-    http<TopProduct[]>('/reports/products/top', {
+  topProducts: (
+    params: { from?: string; to?: string; limit?: number; offset?: number; branchId?: string } = {},
+  ) =>
+    http<Paged<TopProduct>>('/reports/products/top', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 
-  lowStock: (branchId?: string) =>
-    http<LowStockProduct[]>('/reports/products/low-stock', {
-      searchParams: { branchId },
+  lowStock: (params: { limit?: number; offset?: number; branchId?: string } = {}) =>
+    http<Paged<LowStockProduct>>('/reports/products/low-stock', {
+      searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 
   byMethod: (params: { from?: string; to?: string; branchId?: string } = {}) =>
@@ -48,13 +51,15 @@ export const reportsApiHttp = {
       searchParams: { branchId },
     }),
 
-  productMargins: (params: RangeParams & { limit?: number } = {}) =>
-    http<ProductMargin[]>('/reports/products/margins', {
+  productMargins: (params: RangeParams & { limit?: number; offset?: number } = {}) =>
+    http<Paged<ProductMargin>>('/reports/products/margins', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 
-  slowMovers: (params: { days?: number; limit?: number; branchId?: string } = {}) =>
-    http<SlowMover[]>('/reports/products/slow-movers', {
+  slowMovers: (
+    params: { days?: number; limit?: number; offset?: number; branchId?: string } = {},
+  ) =>
+    http<Paged<SlowMover>>('/reports/products/slow-movers', {
       searchParams: params as Record<string, string | number | boolean | undefined>,
     }),
 

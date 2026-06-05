@@ -104,7 +104,7 @@ export default function DashboardPage() {
   const salesCount = daily.data?.salesCount ?? 0;
   const avgTicket = salesCount > 0 ? totalToday / salesCount : 0;
   const cancelled = daily.data?.cancelledCount ?? 0;
-  const lowStockCount = lowStock.data?.length ?? 0;
+  const lowStockCount = lowStock.data?.total ?? 0;
 
   const session = activeSession.data;
   const sessionOpen = !!session;
@@ -182,7 +182,7 @@ export default function DashboardPage() {
             }
           />
           <TopProductsList
-            data={topMonth.data ?? []}
+            data={topMonth.data?.items ?? []}
             loading={topMonth.isLoading}
           />
         </Card>
@@ -209,7 +209,7 @@ export default function DashboardPage() {
               </Link>
             }
           />
-          <LowStockList data={lowStock.data ?? []} loading={lowStock.isLoading} />
+          <LowStockList data={lowStock.data?.items ?? []} loading={lowStock.isLoading} />
         </Card>
       </div>
 

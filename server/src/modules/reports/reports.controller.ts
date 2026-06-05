@@ -41,7 +41,7 @@ export class ReportsController {
     const to = q.to ?? today();
     const from = q.from ?? startOfMonth();
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
-    return this.service.topProducts(from, to, q.limit ?? 10, scope);
+    return this.service.topProducts(from, to, q.limit ?? 10, q.offset ?? 0, scope);
   }
 
   @Get('products/low-stock')
@@ -51,7 +51,7 @@ export class ReportsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
-    return this.service.lowStock(scope);
+    return this.service.lowStock(scope, q.limit ?? 50, q.offset ?? 0);
   }
 
   @Get('sales/by-method')
@@ -97,7 +97,7 @@ export class ReportsController {
     const to = q.to ?? today();
     const from = q.from ?? startOfMonth();
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
-    return this.service.productMargins(from, to, q.limit ?? 20, scope);
+    return this.service.productMargins(from, to, q.limit ?? 20, q.offset ?? 0, scope);
   }
 
   @Get('products/slow-movers')
@@ -107,7 +107,7 @@ export class ReportsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     const scope = resolveReportBranchScope(q.branchId, branchId, user.permissions ?? []);
-    return this.service.slowMovers(q.days ?? 30, q.limit ?? 50, scope);
+    return this.service.slowMovers(q.days ?? 30, q.limit ?? 50, q.offset ?? 0, scope);
   }
 
   @Get('sales/by-category')

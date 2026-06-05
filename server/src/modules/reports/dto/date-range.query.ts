@@ -39,6 +39,13 @@ export class DateRangeQuery {
   @Max(365)
   days?: number = 30;
 
+  /** Desplazamiento para paginación de reportes de lista (top, márgenes, etc.). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number = 0;
+
   /** Sucursal a consultar; `all` = consolidado (solo con permiso branches.switch). */
   @IsOptional()
   @IsString()

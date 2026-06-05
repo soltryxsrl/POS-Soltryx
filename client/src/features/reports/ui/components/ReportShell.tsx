@@ -63,6 +63,54 @@ export function RangeInputs({
   );
 }
 
+/**
+ * Pie de paginación reutilizable para reportes de lista. No renderiza nada si
+ * todo cabe en una página. Va dentro de la tarjeta, debajo de la tabla.
+ */
+export function ReportPager({
+  total,
+  limit,
+  offset,
+  onChange,
+}: {
+  total: number;
+  limit: number;
+  offset: number;
+  onChange: (offset: number) => void;
+}) {
+  if (total <= limit) return null;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.floor(offset / limit) + 1;
+  return (
+    <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground">
+      <span>
+        {offset + 1}–{Math.min(offset + limit, total)} de {total}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(0, offset - limit))}
+          disabled={offset === 0}
+          className="rounded-md border border-border/60 px-2 py-1 hover:bg-muted disabled:opacity-40"
+        >
+          Anterior
+        </button>
+        <span>
+          {page} / {pages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(offset + limit)}
+          disabled={offset + limit >= total}
+          className="rounded-md border border-border/60 px-2 py-1 hover:bg-muted disabled:opacity-40"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Filtro de un solo día. */
 export function DayInput({ date, onDate }: { date: string; onDate: (v: string) => void }) {
   return (

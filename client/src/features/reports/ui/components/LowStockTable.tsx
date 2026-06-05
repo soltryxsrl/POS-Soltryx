@@ -1,20 +1,27 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useLowStock } from '../../application/hooks/use-reports';
+import { ReportPager } from './ReportShell';
+
+const PAGE = 50;
 
 export function LowStockTable({ branchId }: { branchId?: string } = {}) {
-  const q = useLowStock(branchId);
+  const [offset, setOffset] = useState(0);
+  useEffect(() => setOffset(0), [branchId]);
+  const q = useLowStock({ branchId, limit: PAGE, offset });
+  const d = q.data;
 
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-4 py-2">
         <h3 className="text-sm font-medium">Stock bajo</h3>
-        {q.data && q.data.length > 0 && (
+        {d && d.total > 0 && (
           <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
-            {q.data.length} producto(s)
+            {d.total} producto(s)
           </span>
         )}
       </div>
@@ -42,14 +49,14 @@ export function LowStockTable({ branchId }: { branchId?: string } = {}) {
               </td>
             </tr>
           )}
-          {q.data?.length === 0 && (
+          {d?.items.length === 0 && !q.isLoading && (
             <tr>
               <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                Ningún producto bajo su mínimo.
+                Ningún producto bajo su umbral.
               </td>
             </tr>
           )}
-          {q.data?.map((p) => (
+          {d?.items.map((p) => (
             <tr key={p.id} className="border-b last:border-0">
               <td className="px-4 py-2">
                 <Link href={`/products/${p.id}`} className="font-medium hover:underline">
@@ -75,6 +82,7 @@ export function LowStockTable({ branchId }: { branchId?: string } = {}) {
           ))}
         </tbody>
       </table>
+      <ReportPager total={d?.total ?? 0} limit={PAGE} offset={offset} onChange={setOffset} />
     </div>
   );
 }
