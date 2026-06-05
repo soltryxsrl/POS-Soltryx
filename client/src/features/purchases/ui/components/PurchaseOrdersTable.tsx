@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -31,6 +33,7 @@ const STATUSES: PurchaseOrderStatus[] = ['PENDING', 'PARTIAL', 'RECEIVED', 'CANC
 const FILTER_KEYS = ['q', 'status', 'supplierId', 'from', 'to'] as const;
 
 export function PurchaseOrdersTable() {
+  const router = useRouter();
   const table = useTableQueryState({
     defaultSort: 'createdAt',
     defaultSortDir: 'desc',
@@ -151,13 +154,6 @@ export function PurchaseOrdersTable() {
             <X className="h-3 w-3" /> Limpiar
           </button>
         )}
-        <Link
-          href="/purchases/new"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva orden
-        </Link>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>Rango fecha:</span>
@@ -179,28 +175,32 @@ export function PurchaseOrdersTable() {
   );
 
   return (
-    <DataTable<PurchaseOrder>
-      columns={columns}
-      rows={orders.data?.items ?? []}
-      total={orders.data?.total ?? 0}
-      rowKey={(po) => po.id}
-      page={table.page}
-      pageSize={table.pageSize}
-      onPageChange={table.setPage}
-      onPageSizeChange={table.setPageSize}
-      sortKey={table.sort}
-      sortDir={table.sortDir}
-      onSortChange={table.setSort}
-      isLoading={orders.isLoading}
-      isFetching={orders.isFetching}
-      errorMessage={orders.isError ? getErrorMessage(orders.error) : null}
-      emptyState={
-        hasFilters
-          ? 'Sin resultados con esos filtros.'
-          : 'Sin órdenes todavía. Crea la primera con "Nueva orden".'
-      }
-      toolbar={toolbar}
-    />
+    <>
+      <DataTable<PurchaseOrder>
+        columns={columns}
+        rows={orders.data?.items ?? []}
+        total={orders.data?.total ?? 0}
+        rowKey={(po) => po.id}
+        page={table.page}
+        pageSize={table.pageSize}
+        onPageChange={table.setPage}
+        onPageSizeChange={table.setPageSize}
+        sortKey={table.sort}
+        sortDir={table.sortDir}
+        onSortChange={table.setSort}
+        isLoading={orders.isLoading}
+        isFetching={orders.isFetching}
+        errorMessage={orders.isError ? getErrorMessage(orders.error) : null}
+        emptyState={
+          hasFilters
+            ? 'Sin resultados con esos filtros.'
+            : 'Sin órdenes todavía. Crea la primera con "Nueva orden".'
+        }
+        toolbar={toolbar}
+      />
+
+      <Fab label="Nueva orden" onClick={() => router.push('/purchases/new')} />
+    </>
   );
 }
 

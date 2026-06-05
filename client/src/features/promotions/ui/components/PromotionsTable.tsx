@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { Fab } from '@/shared/ui/controls/Fab';
 import { Input } from '@/shared/ui/controls/Input';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -223,14 +224,6 @@ export function PromotionsTable() {
             <X className="h-3 w-3" /> Limpiar
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva promoción
-        </button>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>Rango creación:</span>
@@ -305,6 +298,8 @@ export function PromotionsTable() {
           onClose={() => setDeleting(null)}
         />
       )}
+
+      <Fab label="Nueva promoción" onClick={() => setShowCreate(true)} />
     </>
   );
 }

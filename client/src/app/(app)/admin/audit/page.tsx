@@ -1,8 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Filter, Shield } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Filter,
+  Shield,
+} from 'lucide-react';
 import { http } from '@/shared/lib/http-client';
 import { formatDateTime } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
@@ -58,17 +66,28 @@ const ENTITY_LABEL: Record<string, string> = {
 export default function AuditPage() {
   const [actionFilter, setActionFilter] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const events = useQuery({
-    queryKey: ['audit', 'list', { action: actionFilter }] as const,
+    queryKey: ['audit', 'list', { action: actionFilter, page, pageSize }] as const,
     queryFn: () =>
       http<AuditList>('/audit-events', {
         searchParams: {
           ...(actionFilter ? { action: actionFilter } : {}),
-          limit: 100,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
         },
       }),
+    placeholderData: (prev) => prev,
   });
+
+  const total = events.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
 
   return (
     <div className="space-y-6">
@@ -83,7 +102,10 @@ export default function AuditPage() {
         <span className="text-xs font-medium text-muted-foreground">Filtrar por acción:</span>
         <select
           value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
+          onChange={(e) => {
+            setActionFilter(e.target.value);
+            setPage(1);
+          }}
           className="rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus:border-brand-from"
         >
           <option value="">Todas</option>
@@ -154,15 +176,39 @@ export default function AuditPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                 </button>
-                {isOpen && e.payload && (
-                  <div className="border-t bg-muted/30 px-4 py-3">
-                    <pre className="overflow-x-auto whitespace-pre-wrap break-words text-[11px]">
-                      {JSON.stringify(e.payload, null, 2)}
-                    </pre>
-                    {e.ip && (
-                      <div className="mt-2 text-[10px] text-muted-foreground">
-                        IP: {e.ip}
+                {isOpen && (
+                  <div className="space-y-3 border-t bg-muted/30 px-4 py-3">
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[11px] sm:grid-cols-2">
+                      <DetailRow label="Acción">
+                        {ACTION_LABEL[e.action] ?? e.action}
+                        <span className="ml-1 text-muted-foreground">({e.action})</span>
+                      </DetailRow>
+                      <DetailRow label="Fecha">{formatDateTime(e.createdAt)}</DetailRow>
+                      {e.actorName && <DetailRow label="Usuario">{e.actorName}</DetailRow>}
+                      {e.entityType && (
+                        <DetailRow label="Entidad">
+                          {ENTITY_LABEL[e.entityType] ?? e.entityType}
+                          {e.entityId && (
+                            <span className="ml-1 font-mono text-muted-foreground">{e.entityId}</span>
+                          )}
+                        </DetailRow>
+                      )}
+                      {e.ip && <DetailRow label="IP">{e.ip}</DetailRow>}
+                      {e.userAgent && <DetailRow label="Dispositivo">{e.userAgent}</DetailRow>}
+                    </dl>
+                    {e.payload && Object.keys(e.payload).length > 0 ? (
+                      <div>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Detalle
+                        </div>
+                        <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-background p-2 text-[11px]">
+                          {JSON.stringify(e.payload, null, 2)}
+                        </pre>
                       </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">
+                        Sin detalles adicionales para este evento.
+                      </p>
                     )}
                   </div>
                 )}
@@ -170,12 +216,84 @@ export default function AuditPage() {
             );
           })}
         </ul>
-        {events.data && (
-          <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-            {events.data.total} evento(s)
+        {total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
+            <div>
+              Mostrando {from}–{to} de {total}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2">
+                <span>Por página</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded-md border border-border/60 bg-background px-2 py-1 text-xs outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
+                >
+                  {[25, 50, 100, 200].map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center gap-1">
+                <PagerButton disabled={!canPrev} onClick={() => setPage(1)} title="Primera página">
+                  <ChevronsLeft className="h-4 w-4" />
+                </PagerButton>
+                <PagerButton disabled={!canPrev} onClick={() => setPage(page - 1)} title="Página anterior">
+                  <ChevronLeft className="h-4 w-4" />
+                </PagerButton>
+                <span className="px-2 tabular-nums">
+                  {page} / {totalPages}
+                </span>
+                <PagerButton disabled={!canNext} onClick={() => setPage(page + 1)} title="Página siguiente">
+                  <ChevronRight className="h-4 w-4" />
+                </PagerButton>
+                <PagerButton disabled={!canNext} onClick={() => setPage(totalPages)} title="Última página">
+                  <ChevronsRight className="h-4 w-4" />
+                </PagerButton>
+              </div>
+            </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="min-w-[64px] flex-shrink-0 font-medium text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1 break-words text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+function PagerButton({
+  children,
+  disabled,
+  onClick,
+  title,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+    >
+      {children}
+    </button>
   );
 }

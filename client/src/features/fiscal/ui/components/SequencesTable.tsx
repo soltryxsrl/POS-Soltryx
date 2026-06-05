@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
+import { Fab } from '@/shared/ui/controls/Fab';
 import {
   DataTable,
   useClientSort,
@@ -171,19 +172,6 @@ export function SequencesTable() {
     [canManage],
   );
 
-  const toolbar = canManage ? (
-    <div className="flex items-center justify-end">
-      <button
-        type="button"
-        onClick={() => setShowCreate(true)}
-        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        <Plus className="h-4 w-4" />
-        Nueva secuencia
-      </button>
-    </div>
-  ) : null;
-
   return (
     <>
       <DataTable<FiscalSequence>
@@ -201,12 +189,15 @@ export function SequencesTable() {
         isFetching={sequences.isFetching}
         errorMessage={sequences.isError ? getErrorMessage(sequences.error) : null}
         emptyState={'Sin secuencias todavía. Crea la primera con "Nueva secuencia".'}
-        toolbar={toolbar}
       />
 
       {showCreate && <SequenceFormDialog onClose={() => setShowCreate(false)} />}
       {renewing && (
         <SequenceFormDialog renewFrom={renewing} onClose={() => setRenewing(null)} />
+      )}
+
+      {canManage && (
+        <Fab label="Nueva secuencia" onClick={() => setShowCreate(true)} />
       )}
     </>
   );

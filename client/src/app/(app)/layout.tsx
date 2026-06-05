@@ -11,26 +11,20 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  ArrowLeftRight,
   BarChart3,
   Boxes,
   ChevronLeft,
   ChevronRight,
-  ClipboardCheck,
   FileText,
   Home,
   LogOut,
   Menu,
   Package,
   Receipt,
-  RotateCcw,
   ScanLine,
   Settings2,
   Shield,
-  Sparkles,
-  Truck,
   UserRound,
-  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { AuthGuard } from '@/features/auth/ui/components/AuthGuard';
@@ -51,80 +45,96 @@ interface NavChild {
   permissions?: string[];
 }
 
-interface NavItem {
+/** Enlace suelto de primer nivel (Inicio, POS, Reportes). */
+interface NavLink {
+  kind?: 'link';
   href: string;
   label: string;
   icon: LucideIcon;
   /** Si se define, el usuario debe tener al menos uno de estos permisos. */
   permissions?: string[];
-  children?: NavChild[];
 }
 
-const NAV_ITEMS: NavItem[] = [
+/**
+ * Grupo colapsable. El encabezado NO navega: solo abre/cierra la sección. La
+ * visibilidad del grupo se deriva de sus hijos visibles (si no queda ninguno,
+ * el grupo no se muestra). El estado abierto/cerrado se persiste por `id`.
+ */
+interface NavGroup {
+  kind: 'group';
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  children: NavChild[];
+}
+
+type NavEntry = NavLink | NavGroup;
+
+const NAV_ITEMS: NavEntry[] = [
   { href: '/', label: 'Inicio', icon: Home },
+  { href: '/pos', label: 'POS', icon: ScanLine, permissions: ['sales.create'] },
   {
-    href: '/products',
-    label: 'Productos',
-    icon: Package,
-    permissions: ['products.read'],
+    kind: 'group',
+    id: 'ventas',
+    label: 'Ventas',
+    icon: Receipt,
+    children: [
+      { href: '/sales', label: 'Ventas', permissions: ['sales.read'] },
+      { href: '/returns', label: 'Devoluciones', permissions: ['returns.read'] },
+      { href: '/cash', label: 'Caja', permissions: ['cash.read'] },
+    ],
   },
   {
-    href: '/inventory',
+    kind: 'group',
+    id: 'catalogo',
+    label: 'Catálogo',
+    icon: Package,
+    children: [
+      { href: '/products', label: 'Productos', permissions: ['products.read'] },
+      { href: '/admin/categories', label: 'Categorías', permissions: ['categories.read'] },
+      { href: '/promotions', label: 'Promociones', permissions: ['promotions.read'] },
+    ],
+  },
+  {
+    kind: 'group',
+    id: 'inventario',
     label: 'Inventario',
     icon: Boxes,
-    permissions: ['inventory.read'],
+    children: [
+      { href: '/inventory', label: 'Existencias', permissions: ['inventory.read'] },
+      { href: '/transferencias', label: 'Transferencias', permissions: ['inventory.read'] },
+      { href: '/conteos', label: 'Conteo físico', permissions: ['inventory.read'] },
+      { href: '/purchases', label: 'Compras', permissions: ['purchases.read'] },
+    ],
   },
   {
-    href: '/transferencias',
-    label: 'Transferencias',
-    icon: ArrowLeftRight,
-    permissions: ['inventory.read'],
-  },
-  {
-    href: '/conteos',
-    label: 'Conteo físico',
-    icon: ClipboardCheck,
-    permissions: ['inventory.read'],
-  },
-  { href: '/cash', label: 'Caja', icon: Wallet, permissions: ['cash.read'] },
-  { href: '/pos', label: 'POS', icon: ScanLine, permissions: ['sales.create'] },
-  { href: '/sales', label: 'Ventas', icon: Receipt, permissions: ['sales.read'] },
-  {
-    href: '/returns',
-    label: 'Devoluciones',
-    icon: RotateCcw,
-    permissions: ['returns.read'],
-  },
-  {
-    href: '/reports',
+    kind: 'group',
+    id: 'reportes',
     label: 'Reportes',
     icon: BarChart3,
-    permissions: ['reports.read'],
+    children: [
+      { href: '/reports/daily', label: 'Resumen del día', permissions: ['reports.read'] },
+      { href: '/reports/sales-detail', label: 'Detalle de ventas', permissions: ['reports.read'] },
+      { href: '/reports/top-products', label: 'Top productos', permissions: ['reports.read'] },
+      { href: '/reports/by-category', label: 'Ventas por categoría', permissions: ['reports.read'] },
+      { href: '/reports/margins', label: 'Márgenes', permissions: ['reports.read'] },
+      { href: '/reports/returns', label: 'Análisis devoluciones', permissions: ['reports.read'] },
+      { href: '/reports/price-history', label: 'Historial de precios', permissions: ['reports.read'] },
+      { href: '/reports/valuation', label: 'Valuación inventario', permissions: ['reports.read'] },
+      { href: '/reports/low-stock', label: 'Stock bajo', permissions: ['reports.read'] },
+      { href: '/reports/slow-movers', label: 'Lento movimiento', permissions: ['reports.read'] },
+      {
+        href: '/reports/stock-by-branch',
+        label: 'Existencia x sucursal',
+        permissions: ['branches.switch'],
+      },
+    ],
   },
   {
-    href: '/purchases',
-    label: 'Compras',
-    icon: Truck,
-    permissions: ['purchases.read'],
-  },
-  {
-    href: '/promotions',
-    label: 'Promociones',
-    icon: Sparkles,
-    permissions: ['promotions.read'],
-  },
-  {
-    href: '/impuestos/facturas',
+    kind: 'group',
+    id: 'impuestos',
     label: 'Impuestos',
     icon: FileText,
-    permissions: [
-      'fiscal.docs.read',
-      'fiscal.sequences.read',
-      'fiscal.types.read',
-      'fiscal.reports.read',
-      'fiscal.purchases.create',
-      'tax-types.read',
-    ],
     children: [
       {
         href: '/impuestos/facturas',
@@ -174,53 +184,20 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    href: '/admin/users',
+    kind: 'group',
+    id: 'admin',
     label: 'Administración',
     icon: Shield,
-    permissions: [
-      'users.read',
-      'roles.read',
-      'branches.read',
-      'settings.read',
-      'customers.read',
-      'suppliers.read',
-      'currencies.read',
-      'payment-methods.read',
-    ],
     children: [
       { href: '/admin/users', label: 'Usuarios', permissions: ['users.read'] },
       { href: '/admin/roles', label: 'Roles', permissions: ['roles.read'] },
       { href: '/admin/branches', label: 'Sucursales', permissions: ['branches.read'] },
-      {
-        href: '/admin/customers',
-        label: 'Clientes',
-        permissions: ['customers.read'],
-      },
-      {
-        href: '/admin/suppliers',
-        label: 'Proveedores',
-        permissions: ['suppliers.read'],
-      },
-      {
-        href: '/admin/business',
-        label: 'Datos del negocio',
-        permissions: ['settings.read'],
-      },
-      {
-        href: '/admin/monedas',
-        label: 'Monedas y tasas',
-        permissions: ['currencies.read'],
-      },
-      {
-        href: '/admin/formas-pago',
-        label: 'Formas de pago',
-        permissions: ['payment-methods.read'],
-      },
-      {
-        href: '/admin/audit',
-        label: 'Auditoría',
-        permissions: ['audit.read'],
-      },
+      { href: '/admin/customers', label: 'Clientes', permissions: ['customers.read'] },
+      { href: '/admin/suppliers', label: 'Proveedores', permissions: ['suppliers.read'] },
+      { href: '/admin/business', label: 'Datos del negocio', permissions: ['settings.read'] },
+      { href: '/admin/monedas', label: 'Monedas y tasas', permissions: ['currencies.read'] },
+      { href: '/admin/formas-pago', label: 'Formas de pago', permissions: ['payment-methods.read'] },
+      { href: '/admin/audit', label: 'Auditoría', permissions: ['audit.read'] },
     ],
   },
 ];
@@ -230,16 +207,16 @@ function hasAnyPermission(required: string[] | undefined, userPerms: string[]): 
   return required.some((p) => userPerms.includes(p));
 }
 
-function filterNav(items: NavItem[], userPerms: string[]): NavItem[] {
-  const visible: NavItem[] = [];
+function filterNav(items: NavEntry[], userPerms: string[]): NavEntry[] {
+  const visible: NavEntry[] = [];
   for (const item of items) {
-    if (!hasAnyPermission(item.permissions, userPerms)) continue;
-    if (item.children?.length) {
-      const filteredChildren = item.children.filter((c) =>
+    if (item.kind === 'group') {
+      // El grupo se muestra solo si al menos un hijo es visible.
+      const children = item.children.filter((c) =>
         hasAnyPermission(c.permissions, userPerms),
       );
-      visible.push({ ...item, children: filteredChildren });
-    } else {
+      if (children.length) visible.push({ ...item, children });
+    } else if (hasAnyPermission(item.permissions, userPerms)) {
       visible.push(item);
     }
   }
@@ -247,6 +224,7 @@ function filterNav(items: NavItem[], userPerms: string[]): NavItem[] {
 }
 
 const COLLAPSED_KEY = 'sidebar:collapsed';
+const GROUPS_KEY = 'sidebar:groups';
 
 function useSidebarCollapsed(): readonly [boolean, () => void] {
   const [collapsed, setCollapsed] = useState(false);
@@ -272,6 +250,41 @@ function useSidebarCollapsed(): readonly [boolean, () => void] {
   }, []);
 
   return [collapsed, toggle] as const;
+}
+
+/**
+ * Estado abierto/cerrado de los grupos del sidebar, persistido en localStorage
+ * por `id`. El grupo de la sección activa se fuerza abierto en el render
+ * (independiente de este estado) para que siempre se vea dónde estás.
+ */
+function useOpenGroups(): readonly [
+  Record<string, boolean>,
+  (id: string, open: boolean) => void,
+] {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GROUPS_KEY);
+      if (raw) setOpen(JSON.parse(raw) as Record<string, boolean>);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const setGroup = useCallback((id: string, value: boolean) => {
+    setOpen((prev) => {
+      const next = { ...prev, [id]: value };
+      try {
+        localStorage.setItem(GROUPS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  return [open, setGroup] as const;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -443,6 +456,7 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [openGroups, setOpenGroup] = useOpenGroups();
   const visibleNav = useMemo(
     () => filterNav(NAV_ITEMS, user?.permissions ?? []),
     [user?.permissions],
@@ -486,14 +500,26 @@ function Sidebar({
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">
         <ul className="flex flex-col gap-0.5">
-          {visibleNav.map((item) => (
-            <NavRow
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              collapsed={collapsed}
-            />
-          ))}
+          {visibleNav.map((entry) =>
+            entry.kind === 'group' ? (
+              <NavGroupRow
+                key={entry.id}
+                group={entry}
+                pathname={pathname}
+                collapsed={collapsed}
+                open={!!openGroups[entry.id]}
+                onToggleOpen={(v) => setOpenGroup(entry.id, v)}
+                onExpandSidebar={onToggle}
+              />
+            ) : (
+              <NavLinkRow
+                key={entry.href}
+                item={entry}
+                pathname={pathname}
+                collapsed={collapsed}
+              />
+            ),
+          )}
         </ul>
       </nav>
 
@@ -666,21 +692,17 @@ function MenuItem({
   );
 }
 
-function NavRow({
+function NavLinkRow({
   item,
   pathname,
   collapsed,
 }: {
-  item: NavItem;
+  item: NavLink;
   pathname: string;
   collapsed: boolean;
 }) {
-  const hasChildren = !!item.children?.length;
-  const childActive =
-    hasChildren && item.children!.some((c) => matchesRoute(pathname, c.href));
-  const isActive = matchesRoute(pathname, item.href) || childActive;
+  const isActive = matchesRoute(pathname, item.href);
   const Icon = item.icon;
-  const childrenVisible = hasChildren && isActive && !collapsed;
 
   if (collapsed) {
     return (
@@ -727,20 +749,94 @@ function NavRow({
           )}
         />
         <span className="flex-1">{item.label}</span>
-        {hasChildren && (
-          <ChevronRight
+      </Link>
+    </li>
+  );
+}
+
+function NavGroupRow({
+  group,
+  pathname,
+  collapsed,
+  open,
+  onToggleOpen,
+  onExpandSidebar,
+}: {
+  group: NavGroup;
+  pathname: string;
+  collapsed: boolean;
+  open: boolean;
+  onToggleOpen: (open: boolean) => void;
+  onExpandSidebar: () => void;
+}) {
+  const Icon = group.icon;
+  const containsActive = group.children.some((c) => matchesRoute(pathname, c.href));
+  // La sección activa siempre se ve abierta; el resto respeta el toggle guardado.
+  const isOpen = containsActive || open;
+
+  // Modo colapsado (solo íconos): al pulsar, expandimos el sidebar y abrimos el
+  // grupo, evitando un flyout que la barra recorta por su overflow.
+  if (collapsed) {
+    return (
+      <li>
+        <button
+          type="button"
+          aria-label={group.label}
+          onClick={() => {
+            onExpandSidebar();
+            onToggleOpen(true);
+          }}
+          className={cn(
+            'group relative mx-auto flex h-10 w-10 items-center justify-center rounded-xl transition',
+            containsActive
+              ? 'bg-gradient-to-br from-brand-tint to-brand-soft text-brand-from shadow-sm shadow-brand-tint'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+        >
+          <Icon
             className={cn(
-              'h-3.5 w-3.5 transition-transform duration-200',
-              childrenVisible ? 'rotate-90 text-brand-from' : 'text-muted-foreground',
+              'h-4 w-4 transition-colors',
+              containsActive ? 'text-brand-from' : 'text-muted-foreground group-hover:text-foreground',
             )}
           />
-        )}
-      </Link>
+          <Tooltip>{group.label}</Tooltip>
+        </button>
+      </li>
+    );
+  }
 
-      {childrenVisible && (
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onToggleOpen(!isOpen)}
+        aria-expanded={isOpen}
+        className={cn(
+          'flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all',
+          containsActive
+            ? 'font-medium text-brand-from'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        )}
+      >
+        <Icon
+          className={cn(
+            'h-4 w-4 transition-colors',
+            containsActive ? 'text-brand-from' : 'text-muted-foreground',
+          )}
+        />
+        <span className="flex-1 text-left">{group.label}</span>
+        <ChevronRight
+          className={cn(
+            'h-3.5 w-3.5 transition-transform duration-200',
+            isOpen ? 'rotate-90 text-brand-from' : 'text-muted-foreground',
+          )}
+        />
+      </button>
+
+      {isOpen && (
         <ul className="mt-0.5 flex flex-col gap-0.5">
-          {item.children!.map((child) => {
-            const childActive = pathname === child.href;
+          {group.children.map((child) => {
+            const childActive = matchesRoute(pathname, child.href);
             return (
               <li key={child.href}>
                 <Link

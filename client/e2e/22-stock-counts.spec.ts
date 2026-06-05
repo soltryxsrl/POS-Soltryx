@@ -47,9 +47,10 @@ test.describe.serial('Conteo de inventario — simple product with variance', ()
     await page.goto('/conteos');
     await page.waitForLoadState('networkidle');
 
-    // El formulario de conteo se renderiza dentro de un <form> (sólo visible con
-    // permiso inventory.adjust). Lo scopeamos para distinguir la tabla de
-    // líneas staged de la tabla del listado de conteos que vive abajo.
+    // El formulario de conteo vive en un diálogo que abre el Fab "Nuevo conteo"
+    // (sólo con permiso inventory.adjust). Lo scopeamos para distinguir la tabla
+    // de líneas staged de la tabla del listado de conteos que vive detrás.
+    await page.getByRole('button', { name: 'Nuevo conteo' }).click();
     const form = page.locator('form');
     await expect(form).toBeVisible();
 
@@ -88,8 +89,8 @@ test.describe.serial('Conteo de inventario — simple product with variance', ()
     await expect(countedInputs).toHaveCount(2);
     await countedInputs.nth(1).fill('16');
 
-    // 5) Agregar notas opcionales (input por placeholder "Notas (opcional)").
-    const notesInput = page.getByPlaceholder(/notas \(opcional\)/i);
+    // 5) Agregar notas opcionales (FormField "Notas" con placeholder "Opcional").
+    const notesInput = form.getByPlaceholder(/opcional/i);
     await notesInput.fill('Conteo del almacén central - revisión inicial');
 
     // 6) Completar el conteo. El botón muestra "Procesando…" mientras isPending

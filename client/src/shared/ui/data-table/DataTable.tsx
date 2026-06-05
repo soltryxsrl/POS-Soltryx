@@ -40,7 +40,15 @@ export function DataTable<T>({
 
   return (
     <div className="space-y-3">
-      {toolbar && <div>{toolbar}</div>}
+      {toolbar && (
+        // Toolbar pegado: queda fijo arriba al hacer scroll de tablas largas,
+        // así los filtros (búsqueda / estado / fechas) están siempre a mano sin
+        // tapar las filas. Fondo translúcido + blur para enmascarar lo que pasa
+        // por detrás. z-20 < diálogos (z-50) y Fab (z-40).
+        <div className="sticky top-0 z-20 bg-card/90 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/70">
+          {toolbar}
+        </div>
+      )}
       <div className="relative rounded-lg border bg-card">
         {isFetching && !isLoading && (
           <div className="absolute inset-0 z-10 flex items-start justify-center pt-2 pointer-events-none">

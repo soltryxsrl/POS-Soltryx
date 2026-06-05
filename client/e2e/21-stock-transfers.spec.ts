@@ -94,7 +94,9 @@ test.describe.serial('Transferencias de stock', () => {
     await page.goto('/transferencias');
     await page.waitForLoadState('networkidle');
 
-    // El form solo se renderiza con permiso inventory.adjust (el admin lo tiene).
+    // El formulario vive en un diálogo que abre el Fab "Nueva transferencia"
+    // (solo visible con permiso inventory.adjust — el admin lo tiene).
+    await page.getByRole('button', { name: 'Nueva transferencia' }).click();
     const formSection = page.locator('form');
     await expect(formSection).toBeVisible();
 
@@ -123,6 +125,7 @@ test.describe.serial('Transferencias de stock', () => {
   test('buscar producto en el formulario de transferencia', async ({ page }) => {
     await page.goto('/transferencias');
     await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Nueva transferencia' }).click();
 
     const formSection = page.locator('form');
 
@@ -159,6 +162,7 @@ test.describe.serial('Transferencias de stock', () => {
   }) => {
     await page.goto('/transferencias');
     await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Nueva transferencia' }).click();
 
     const formSection = page.locator('form');
     // El texto del botón ("Enviar transferencia") convive con el icono Plus.
@@ -209,11 +213,12 @@ test.describe.serial('Transferencias de stock', () => {
   test('la nota opcional del formulario acepta texto', async ({ page }) => {
     await page.goto('/transferencias');
     await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Nueva transferencia' }).click();
 
     const formSection = page.locator('form');
 
-    // Input de notas: placeholder "Notas (opcional)".
-    const notesInput = formSection.getByPlaceholder(/notas.*opcional/i);
+    // Input de notas (FormField "Notas" con placeholder "Opcional").
+    const notesInput = formSection.getByPlaceholder(/opcional/i);
     await expect(notesInput).toBeVisible();
 
     const noteText = 'E2E test transfer note';

@@ -1,39 +1,92 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { Building2, Copy, Eye, Pencil, Plus, Power, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { Building2, Copy, Eye, Pencil, Power } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/controls/Button';
 import { Fab } from '@/shared/ui/controls/Fab';
-import { FormField } from '@/shared/ui/controls/FormField';
-import { Input } from '@/shared/ui/controls/Input';
-import { Select } from '@/shared/ui/controls/Select';
 import { useAuth, useHasPermission } from '@/features/auth/application/hooks/use-auth';
-import {
-  useCashRegisters,
-  useCreateCashRegister,
-} from '@/features/cash/application/hooks/use-cash';
-import {
-  useBranches,
-  useCloneCatalog,
-  useUpdateBranch,
-} from '../../application/hooks/use-branches';
+import { useCashRegisters } from '@/features/cash/application/hooks/use-cash';
+import { CashRegisterFormDialog } from '@/features/cash/ui/components/CashRegisterFormDialog';
+import { useBranches, useUpdateBranch } from '../../application/hooks/use-branches';
 import { useActiveBranchStore } from '../../application/stores/active-branch.store';
-import type { Branch, CloneCatalogResult } from '../../domain/types';
+import type { Branch } from '../../domain/types';
 import { BranchFormDialog } from './BranchFormDialog';
+import { CloneCatalogDialog } from './CloneCatalogDialog';
+
+type Tab = 'sucursales' | 'cajas';
 
 export function BranchesManager() {
+  const [tab, setTab] = useState<Tab>('sucursales');
+
+  return (
+    <div className="space-y-4">
+      <TabBar value={tab} onChange={setTab} />
+      {tab === 'sucursales' ? <SucursalesTab /> : <CajasTab />}
+    </div>
+  );
+}
+
+function TabBar({ value, onChange }: { value: Tab; onChange: (t: Tab) => void }) {
+  const tabs: { value: Tab; label: string }[] = [
+    { value: 'sucursales', label: 'Sucursales' },
+    { value: 'cajas', label: 'Cajas registradoras' },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Secciones de sucursales"
+      className="inline-flex gap-1 rounded-xl border border-border/60 bg-card p-1"
+    >
+      {tabs.map((t) => {
+        const active = t.value === value;
+        return (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(t.value)}
+            className={cn(
+              'rounded-lg px-4 py-1.5 text-sm font-medium transition',
+              active
+                ? 'bg-gradient-to-r from-brand-from to-brand-to text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SucursalesTab() {
+  const { user } = useAuth();
   const canCreate = useHasPermission('branches.create');
   const canManage = useHasPermission('branches.update');
+  const isAdminOrManager = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
   const branches = useBranches({ limit: 100 });
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [viewing, setViewing] = useState<Branch | null>(null);
+  const [showClone, setShowClone] = useState(false);
 
   const items = branches.data?.items ?? [];
 
   return (
     <div className="space-y-4">
+      {isAdminOrManager && (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => setShowClone(true)}>
+            <Copy className="h-4 w-4" />
+            Copiar catálogo
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -66,10 +119,6 @@ export function BranchesManager() {
         </table>
       </div>
 
-      <CloneCatalogSection />
-
-      <CashRegistersSection />
-
       {canCreate && (
         <Fab label="Nueva sucursal" onClick={() => setShowCreate(true)} />
       )}
@@ -80,6 +129,7 @@ export function BranchesManager() {
       {viewing && (
         <BranchFormDialog branch={viewing} readOnly onClose={() => setViewing(null)} />
       )}
+      {showClone && <CloneCatalogDialog onClose={() => setShowClone(false)} />}
     </div>
   );
 }
@@ -172,168 +222,29 @@ function BranchRow({
 }
 
 /**
- * Copia el catálogo (categorías + productos simples) de OTRA sucursal a la
- * sucursal activa. Útil para arrancar una sucursal nueva, que nace vacía bajo el
- * modelo de catálogo separado. Productos con variantes/kits se omiten.
- */
-function CloneCatalogSection() {
-  const { user } = useAuth();
-  const canManage = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
-  const branches = useBranches({ limit: 100 });
-  const clone = useCloneCatalog();
-  const activeBranchId = useActiveBranchStore((s) => s.activeBranchId);
-  const [sourceId, setSourceId] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CloneCatalogResult | null>(null);
-
-  if (!canManage) return null;
-
-  const currentId = activeBranchId ?? user?.branchId ?? null;
-  const activeName =
-    branches.data?.items.find((b) => b.id === currentId)?.name ?? 'actual';
-  const sources = (branches.data?.items ?? []).filter((b) => b.id !== currentId);
-
-  const onClone = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setResult(null);
-    try {
-      const res = await clone.mutateAsync(sourceId);
-      setResult(res);
-      setSourceId('');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  };
-
-  return (
-    <div className="space-y-3 pt-2">
-      <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-        <Copy className="h-4 w-4 text-brand-from" />
-        Copiar catálogo a la sucursal activa:{' '}
-        <span className="text-brand-from">{activeName}</span>
-      </h2>
-
-      <form
-        onSubmit={onClone}
-        className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
-      >
-        <FormField label="Copiar desde" required>
-          <Select
-            required
-            value={sourceId}
-            onChange={(e) => setSourceId(e.target.value)}
-            className="w-56"
-          >
-            <option value="" disabled>
-              Selecciona una sucursal…
-            </option>
-            {sources.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-        <Button type="submit" disabled={clone.isPending || !sourceId}>
-          <Copy className="h-4 w-4" />
-          {clone.isPending ? 'Copiando...' : 'Copiar catálogo'}
-        </Button>
-        <p className="w-full text-xs text-muted-foreground">
-          Copia categorías, productos (simples, con variantes y kits), variantes,
-          códigos de barras y recetas de kit, con stock en 0.
-        </p>
-        {error && <p className="w-full text-sm text-destructive">{error}</p>}
-        {result && (
-          <div className="w-full space-y-1">
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">
-              Listo: {result.categoriesCreated} categoría(s), {result.productsCreated}{' '}
-              producto(s)
-              {result.variantsCreated > 0 ? `, ${result.variantsCreated} variante(s)` : ''}
-              {result.kitComponentsCreated > 0
-                ? `, ${result.kitComponentsCreated} componente(s) de kit`
-                : ''}{' '}
-              copiados
-              {result.skipped > 0 ? `, ${result.skipped} producto(s) ya existente(s)` : ''}.
-            </p>
-            {(result.barcodesSkipped > 0 || result.kitComponentsSkipped > 0) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Aviso:
-                {result.barcodesSkipped > 0
-                  ? ` ${result.barcodesSkipped} código(s) de barras se omitieron (ya existían en destino).`
-                  : ''}
-                {result.kitComponentsSkipped > 0
-                  ? ` ${result.kitComponentsSkipped} componente(s) de kit no se pudieron copiar (producto borrado en origen).`
-                  : ''}
-              </p>
-            )}
-          </div>
-        )}
-      </form>
-    </div>
-  );
-}
-
-/**
  * Cajas registradoras de la SUCURSAL ACTIVA (la del selector). Para operar una
  * sucursal nueva hace falta al menos una caja: sin caja no se puede abrir turno.
  */
-function CashRegistersSection() {
+function CajasTab() {
   const { user } = useAuth();
-  const canManage = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
+  const isAdminOrManager = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
   const registers = useCashRegisters();
-  const createReg = useCreateCashRegister();
   const branches = useBranches({ limit: 100 });
   const activeBranchId = useActiveBranchStore((s) => s.activeBranchId);
-  const [regName, setRegName] = useState('');
-  const [regError, setRegError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   const currentId = activeBranchId ?? user?.branchId ?? null;
   const activeName =
     branches.data?.items.find((b) => b.id === currentId)?.name ?? 'actual';
-
-  const onCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    setRegError(null);
-    try {
-      await createReg.mutateAsync({ name: regName.trim() });
-      setRegName('');
-    } catch (err) {
-      setRegError(getErrorMessage(err));
-    }
-  };
-
   const items = registers.data ?? [];
 
   return (
-    <div className="space-y-3 pt-2">
-      <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-        <Wallet className="h-4 w-4 text-brand-from" />
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
         Cajas de la sucursal activa:{' '}
-        <span className="text-brand-from">{activeName}</span>
-      </h2>
-
-      {canManage && (
-        <form
-          onSubmit={onCreate}
-          className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
-        >
-          <FormField label="Nueva caja" required>
-            <Input
-              required
-              value={regName}
-              onChange={(e) => setRegName(e.target.value)}
-              placeholder="Ej: Caja 2"
-              className="w-56"
-            />
-          </FormField>
-          <Button type="submit" disabled={createReg.isPending || !regName.trim()}>
-            <Plus className="h-4 w-4" />
-            {createReg.isPending ? 'Creando...' : 'Crear caja'}
-          </Button>
-          {regError && <p className="w-full text-sm text-destructive">{regError}</p>}
-        </form>
-      )}
+        <span className="font-medium text-brand-from">{activeName}</span>. Cada
+        sucursal necesita al menos una caja para poder abrir turno.
+      </p>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
@@ -354,7 +265,8 @@ function CashRegistersSection() {
             {!registers.isLoading && items.length === 0 && (
               <tr>
                 <td colSpan={2} className="px-4 py-6 text-center text-muted-foreground">
-                  Esta sucursal no tiene cajas.{canManage ? ' Crea una arriba.' : ''}
+                  Esta sucursal no tiene cajas.
+                  {isAdminOrManager ? ' Crea una con el botón +.' : ''}
                 </td>
               </tr>
             )}
@@ -369,6 +281,13 @@ function CashRegistersSection() {
           </tbody>
         </table>
       </div>
+
+      {isAdminOrManager && (
+        <Fab label="Nueva caja" onClick={() => setShowCreate(true)} />
+      )}
+      {showCreate && (
+        <CashRegisterFormDialog branchName={activeName} onClose={() => setShowCreate(false)} />
+      )}
     </div>
   );
 }
