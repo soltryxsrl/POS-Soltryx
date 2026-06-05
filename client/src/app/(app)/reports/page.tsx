@@ -1,110 +1,104 @@
 'use client';
 
-import { useState } from 'react';
-import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import Link from 'next/link';
 import {
-  InventoryValuationCard,
-  ProductMarginsTable,
-  ReturnsAnalysisCard,
-  SalesByCategoryTable,
-  SlowMoversTable,
-} from '@/features/reports/ui/components/AnalysisReports';
-import { DailySummaryCards } from '@/features/reports/ui/components/DailySummaryCards';
-import { LowStockTable } from '@/features/reports/ui/components/LowStockTable';
-import { PriceHistoryTable } from '@/features/reports/ui/components/PriceHistoryTable';
-import { SalesDetailTable } from '@/features/reports/ui/components/SalesDetailTable';
-import { StockByBranchTable } from '@/features/reports/ui/components/StockByBranchTable';
-import { TopProductsTable } from '@/features/reports/ui/components/TopProductsTable';
-import { localDateISO, startOfMonthLocalISO } from '@/shared/lib/date';
-import { Input } from '@/shared/ui/controls/Input';
-import { Switch } from '@/shared/ui/controls/Switch';
+  AlertTriangle,
+  Boxes,
+  CalendarDays,
+  ChevronRight,
+  History,
+  ListOrdered,
+  Building2,
+  Percent,
+  ReceiptText,
+  Tags,
+  Timer,
+  Undo2,
+  type LucideIcon,
+} from 'lucide-react';
+import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
-export default function ReportsPage() {
-  const [date, setDate] = useState(localDateISO());
-  const [from, setFrom] = useState(startOfMonthLocalISO());
-  const [to, setTo] = useState(localDateISO());
-  // Solo quien puede cambiar de sucursal puede ver el consolidado de todas.
-  const canConsolidate = useHasPermission('branches.switch');
-  const [allBranches, setAllBranches] = useState(false);
-  // `'all'` = consolidado (todas las sucursales); undefined = la sucursal activa.
-  const branchId = canConsolidate && allBranches ? 'all' : undefined;
+interface ReportItem {
+  href: string;
+  title: string;
+  desc: string;
+  icon: LucideIcon;
+  /** Permiso requerido para mostrar la tarjeta (opcional). */
+  requires?: string;
+}
+
+const GROUPS: Array<{ group: string; items: ReportItem[] }> = [
+  {
+    group: 'Ventas',
+    items: [
+      { href: '/reports/daily', title: 'Resumen del día', desc: 'Totales del día por método y por usuario.', icon: CalendarDays },
+      { href: '/reports/sales-detail', title: 'Detalle de ventas', desc: 'Renglón por renglón con costo y margen. Export CSV/PDF.', icon: ReceiptText },
+      { href: '/reports/top-products', title: 'Top productos', desc: 'Más vendidos por ingresos en el rango.', icon: ListOrdered },
+      { href: '/reports/by-category', title: 'Ventas por categoría', desc: 'Ingresos y unidades agrupados por categoría.', icon: Tags },
+      { href: '/reports/margins', title: 'Márgenes por producto', desc: 'Ingreso, costo, margen y % por producto.', icon: Percent },
+      { href: '/reports/returns', title: 'Devoluciones', desc: 'Análisis de devoluciones por método y razón.', icon: Undo2 },
+    ],
+  },
+  {
+    group: 'Precios',
+    items: [
+      { href: '/reports/price-history', title: 'Historial de precios', desc: 'Cambios de precio (individual/masivo): antes → después.', icon: History },
+    ],
+  },
+  {
+    group: 'Inventario',
+    items: [
+      { href: '/reports/valuation', title: 'Valuación de inventario', desc: 'Costo, valor a precio de lista y margen potencial.', icon: Boxes },
+      { href: '/reports/low-stock', title: 'Stock bajo', desc: 'Productos en o bajo su punto de reorden.', icon: AlertTriangle },
+      { href: '/reports/slow-movers', title: 'Lento movimiento', desc: 'Stock sin venta reciente (capital inmovilizado).', icon: Timer },
+      { href: '/reports/stock-by-branch', title: 'Existencia por sucursal', desc: 'Matriz de stock por producto y sucursal.', icon: Building2, requires: 'branches.switch' },
+    ],
+  },
+];
+
+export default function ReportsIndexPage() {
+  const canSwitch = useHasPermission('branches.switch');
+  const visible = (it: ReportItem) => !it.requires || (it.requires === 'branches.switch' && canSwitch);
 
   return (
     <div className="space-y-8">
-      <SectionHeader title="Reportes" />
+      <SectionHeader title="Reportes" description="Elige un reporte. Cada uno abre con sus propios filtros." />
 
-      {canConsolidate && (
-        <div className="w-fit rounded-xl border border-border bg-card px-3 py-2">
-          <Switch
-            checked={allBranches}
-            onChange={setAllBranches}
-            label="Consolidado (todas las sucursales)"
-          />
-        </div>
-      )}
-
-      <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-medium">Día</h2>
-          <div className="w-44">
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-        </div>
-        <DailySummaryCards date={date} branchId={branchId} />
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-medium">Rango</h2>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Desde</span>
-            <div className="w-44">
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
+      {GROUPS.map(({ group, items }) => {
+        const shown = items.filter(visible);
+        if (shown.length === 0) return null;
+        return (
+          <section key={group} className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {group}
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {shown.map((it) => {
+                const Icon = it.icon;
+                return (
+                  <Link
+                    key={it.href}
+                    href={it.href}
+                    className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition hover:border-brand-from/40 hover:shadow-sm"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-from/10 text-brand-from">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 font-medium text-foreground">
+                        {it.title}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-brand-from" />
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{it.desc}</p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-            <span className="text-muted-foreground">Hasta</span>
-            <div className="w-44">
-              <Input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <TopProductsTable from={from} to={to} limit={10} branchId={branchId} />
-          <LowStockTable branchId={branchId} />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ProductMarginsTable from={from} to={to} branchId={branchId} />
-          <SalesByCategoryTable from={from} to={to} branchId={branchId} />
-        </div>
-
-        <ReturnsAnalysisCard from={from} to={to} branchId={branchId} />
-
-        <SalesDetailTable from={from} to={to} branchId={branchId} />
-
-        <PriceHistoryTable from={from} to={to} branchId={branchId} />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Inventario</h2>
-        <InventoryValuationCard branchId={branchId} />
-        <SlowMoversTable days={30} branchId={branchId} />
-        {/* Matriz comparativa de existencias por sucursal — solo consolidado. */}
-        {canConsolidate && <StockByBranchTable />}
-      </section>
+          </section>
+        );
+      })}
     </div>
   );
 }

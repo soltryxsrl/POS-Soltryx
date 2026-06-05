@@ -64,13 +64,11 @@ test.describe.serial('Exportaciones', () => {
   });
 
   test('detalle de ventas: descarga PDF', async ({ page }) => {
-    await page.goto('/reports');
+    // Cada reporte tiene su propia ruta y su único botón "PDF".
+    await page.goto('/reports/sales-detail');
     await page.waitForLoadState('networkidle');
 
-    // /reports tiene varias tarjetas con botón "PDF" (detalle de ventas e
-    // historial de precios). Acotamos a la cabecera de "Detalle de ventas".
-    const header = page.getByRole('heading', { name: 'Detalle de ventas' }).locator('..');
-    const pdfBtn = header.getByRole('button', { name: 'PDF' });
+    const pdfBtn = page.getByRole('button', { name: 'PDF' });
     await expect(pdfBtn).toBeVisible();
     await expect(pdfBtn).toBeEnabled();
     const pdfDl = page.waitForEvent('download');
@@ -79,13 +77,10 @@ test.describe.serial('Exportaciones', () => {
   });
 
   test('historial de precios: descarga PDF', async ({ page }) => {
-    await page.goto('/reports');
+    await page.goto('/reports/price-history');
     await page.waitForLoadState('networkidle');
 
-    const header = page
-      .getByRole('heading', { name: 'Historial de cambios de precio' })
-      .locator('..');
-    const pdfBtn = header.getByRole('button', { name: 'PDF' });
+    const pdfBtn = page.getByRole('button', { name: 'PDF' });
     await expect(pdfBtn).toBeVisible();
     // Puede estar deshabilitado si no hubo cambios en el rango; solo probamos
     // la descarga cuando está habilitado.
