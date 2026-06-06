@@ -2,6 +2,7 @@
 
 import { Banknote, Coins } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
+import { displayNumeric, selectAllOnFocus } from '@/shared/lib/numeric-field';
 import type { DenominationCounts } from '../../domain/types';
 import {
   RD_DENOMINATIONS,
@@ -53,8 +54,9 @@ export function DenominationCounter({ value, onChange, expectedTotal, disabled }
                 type="number"
                 min={0}
                 step={1}
-                value={count || ''}
+                value={displayNumeric(count)}
                 onChange={(e) => set(d.value, Number(e.target.value) || 0)}
+                onFocus={selectAllOnFocus}
                 disabled={disabled}
                 placeholder="0"
                 className="ml-auto w-16 rounded-lg border border-border/60 bg-background/60 px-2 py-1 text-right text-sm shadow-sm transition-all outline-none hover:border-border focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20 disabled:opacity-50"

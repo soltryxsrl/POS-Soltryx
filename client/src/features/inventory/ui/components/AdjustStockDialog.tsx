@@ -72,6 +72,7 @@ export function AdjustStockDialog({ productId, variantId, contextLabel, onClose 
             id="qty"
             required
             autoFocus
+            keepZero
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             pattern="^[+-]?\d+(\.\d{1,3})?$"

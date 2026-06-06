@@ -98,7 +98,7 @@ export function CountFormDialog({ onClose }: Props) {
                     <td className="px-3 py-2">{l.name} <span className="text-xs text-muted-foreground">{l.sku}</span></td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{formatQuantity(l.stock)}</td>
                     <td className="px-3 py-2 text-right">
-                      <Input inputMode="decimal" value={l.countedQty}
+                      <Input inputMode="decimal" keepZero value={l.countedQty}
                         onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, countedQty: e.target.value } : x)))}
                         className="w-24 text-right" />
                     </td>

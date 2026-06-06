@@ -6,6 +6,7 @@ import { Plus, Search, Trash2 } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { cn } from '@/shared/lib/cn';
+import { displayNumeric, selectAllOnFocus } from '@/shared/lib/numeric-field';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
@@ -326,15 +327,19 @@ export function CreatePurchaseOrderForm() {
                         type="number"
                         min={0}
                         step="0.001"
-                        value={l.quantity}
+                        value={displayNumeric(l.quantity)}
                         onChange={(e) => update(l.key, { quantity: e.target.value })}
+                        onFocus={selectAllOnFocus}
+                        placeholder="0"
                         className="w-20 rounded-lg border border-border/60 bg-background px-2 py-1 text-right text-sm"
                       />
                     </td>
                     <td className="px-3 py-2 text-right">
                       <input
-                        value={l.unitCost}
+                        value={displayNumeric(l.unitCost)}
                         onChange={(e) => update(l.key, { unitCost: e.target.value })}
+                        onFocus={selectAllOnFocus}
+                        placeholder="0.00"
                         pattern="^\d+(\.\d{1,2})?$"
                         inputMode="decimal"
                         className="w-24 rounded-lg border border-border/60 bg-background px-2 py-1 text-right text-sm"
@@ -342,8 +347,10 @@ export function CreatePurchaseOrderForm() {
                     </td>
                     <td className="px-3 py-2 text-right">
                       <input
-                        value={l.taxRate}
+                        value={displayNumeric(l.taxRate)}
                         onChange={(e) => update(l.key, { taxRate: e.target.value })}
+                        onFocus={selectAllOnFocus}
+                        placeholder="0"
                         pattern="^\d+(\.\d{1,2})?$"
                         inputMode="decimal"
                         className="w-16 rounded-lg border border-border/60 bg-background px-2 py-1 text-right text-sm"

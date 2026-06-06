@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Clock, HandCoins, MessageSquare, Minus, Percent, Plus, ShieldAlert, ShoppingBag, Sparkles, Tag, Trash2, UserCircle2, X } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
+import { displayNumeric, selectAllOnFocus } from '@/shared/lib/numeric-field';
 import { useOnlineStatus } from '@/shared/lib/use-online-status';
 import { Button } from '@/shared/ui/controls/Button';
 import { useBusinessInfo } from '@/features/config/application/hooks/use-business-info';
@@ -264,8 +265,9 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
             {orderDiscountMode === 'PERCENT' ? (
               <input
                 id="order-discount-input"
-                value={orderDiscountPct}
+                value={displayNumeric(orderDiscountPct)}
                 onChange={(e) => setOrderDiscountPct(e.target.value, orderDiscountBase)}
+                onFocus={selectAllOnFocus}
                 pattern="^\d+(\.\d{1,2})?$"
                 inputMode="decimal"
                 disabled={items.length === 0}
@@ -275,8 +277,9 @@ export function Cart({ onCheckout, onPark, onPickCustomer }: Props) {
             ) : (
               <input
                 id="order-discount-input"
-                value={orderDiscount}
+                value={displayNumeric(orderDiscount)}
                 onChange={(e) => setOrderDiscount(e.target.value)}
+                onFocus={selectAllOnFocus}
                 pattern="^\d+(\.\d{1,2})?$"
                 inputMode="decimal"
                 disabled={items.length === 0}
@@ -485,11 +488,13 @@ function CartLine({ item: it, isFlashing }: { item: CartItem; isFlashing: boolea
             type="number"
             min={0}
             step="0.001"
-            value={it.quantity}
+            value={displayNumeric(it.quantity)}
             onChange={(e) => setQuantity(it.lineKey, Number(e.target.value) || 0)}
+            onFocus={selectAllOnFocus}
             aria-label="Cantidad (admite decimales para venta por peso)"
             title="Admite decimales (venta por peso: 0.750, 1.5, etc.)"
             className="h-10 w-14 border-x border-border/60 bg-transparent text-center text-sm font-semibold tabular-nums outline-none focus:bg-brand-tint/40"
+            placeholder="0"
           />
           <button
             type="button"
@@ -569,8 +574,9 @@ function CartLine({ item: it, isFlashing }: { item: CartItem; isFlashing: boolea
             </div>
             {isPercent ? (
               <input
-                value={it.discountPct}
+                value={displayNumeric(it.discountPct)}
                 onChange={(e) => setDiscountPct(it.lineKey, e.target.value)}
+                onFocus={selectAllOnFocus}
                 pattern="^\d+(\.\d{1,2})?$"
                 inputMode="decimal"
                 autoFocus
@@ -580,8 +586,9 @@ function CartLine({ item: it, isFlashing }: { item: CartItem; isFlashing: boolea
               />
             ) : (
               <input
-                value={it.discount}
+                value={displayNumeric(it.discount)}
                 onChange={(e) => setDiscount(it.lineKey, e.target.value)}
+                onFocus={selectAllOnFocus}
                 pattern="^\d+(\.\d{1,2})?$"
                 inputMode="decimal"
                 autoFocus
@@ -701,8 +708,9 @@ function TipSection({
           Sin propina
         </button>
         <input
-          value={tipTotal}
+          value={displayNumeric(tipTotal)}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={selectAllOnFocus}
           pattern="^\d+(\.\d{1,2})?$"
           inputMode="decimal"
           disabled={disabled}

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { displayNumeric, selectAllOnFocus } from '@/shared/lib/numeric-field';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
@@ -113,8 +114,10 @@ export function ReceivePODialog({ po, onClose }: Props) {
                         min={0}
                         max={row.remaining}
                         step="0.001"
-                        value={row.quantity}
+                        value={displayNumeric(row.quantity)}
                         onChange={(e) => setQty(it.id, e.target.value)}
+                        onFocus={selectAllOnFocus}
+                        placeholder="0"
                         disabled={row.remaining <= 0}
                         className="w-24 rounded-lg border border-border/60 bg-background px-2 py-1 text-right text-sm disabled:opacity-50"
                       />

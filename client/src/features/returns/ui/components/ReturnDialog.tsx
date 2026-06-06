@@ -5,6 +5,7 @@ import { Undo2 } from 'lucide-react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { cn } from '@/shared/lib/cn';
+import { displayNumeric, selectAllOnFocus } from '@/shared/lib/numeric-field';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
@@ -182,8 +183,9 @@ export function ReturnDialog({
                           min={0}
                           max={remaining}
                           step="0.001"
-                          value={qtyByItem[it.saleItemId] ?? ''}
+                          value={displayNumeric(qtyByItem[it.saleItemId] ?? '')}
                           onChange={(e) => setQty(it.saleItemId, e.target.value)}
+                          onFocus={selectAllOnFocus}
                           disabled={remaining <= 0}
                           placeholder="0"
                           className="w-24 rounded-lg border border-border/60 bg-background px-2 py-1 text-right text-sm disabled:opacity-50"
