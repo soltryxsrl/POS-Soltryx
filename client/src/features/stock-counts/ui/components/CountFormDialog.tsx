@@ -9,7 +9,7 @@ import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
-import { useProducts } from '@/features/products/application/hooks/use-products';
+import { ProductCombobox } from '@/features/products/ui/components/ProductCombobox';
 import { useRunStockCount } from '../../application/hooks/use-stock-counts';
 import type { StockCount } from '../../domain/types';
 
@@ -28,17 +28,13 @@ interface Props {
 export function CountFormDialog({ onClose }: Props) {
   const run = useRunStockCount();
   const [lines, setLines] = useState<Line[]>([]);
-  const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<StockCount | null>(null);
 
-  const found = useProducts({ q: search.trim() || undefined, type: 'simple', limit: 8 });
-
   const addLine = (p: { id: string; name: string; sku: string; stock: string }) => {
     if (lines.some((l) => l.productId === p.id)) return;
     setLines((prev) => [...prev, { productId: p.id, name: p.name, sku: p.sku, stock: p.stock, countedQty: p.stock }]);
-    setSearch('');
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -66,18 +62,14 @@ export function CountFormDialog({ onClose }: Props) {
           Registra la cantidad <strong>contada físicamente</strong>. Al completar, el sistema
           ajusta el stock a lo contado y calcula la varianza (merma/sobrante).
         </p>
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto por nombre o SKU…" className="w-72" />
-        {search.trim() && (
-          <div className="rounded-xl border border-border">
-            {(found.data?.items ?? []).map((p) => (
-              <button key={p.id} type="button" onClick={() => addLine(p)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/40">
-                <span>{p.name} <span className="text-xs text-muted-foreground">{p.sku}</span></span>
-                <span className="text-xs text-muted-foreground">sistema {formatQuantity(p.stock)}</span>
-              </button>
-            ))}
-            {found.data?.items.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Sin productos simples.</p>}
-          </div>
-        )}
+        <FormField label="Producto">
+          <ProductCombobox
+            type="simple"
+            excludeIds={lines.map((l) => l.productId)}
+            onSelect={addLine}
+            autoFocus
+          />
+        </FormField>
 
         {lines.length > 0 && (
           <table className="w-full text-sm">

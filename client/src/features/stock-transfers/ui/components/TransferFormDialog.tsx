@@ -11,7 +11,7 @@ import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 import { useBranches } from '@/features/branches/application/hooks/use-branches';
-import { useProducts } from '@/features/products/application/hooks/use-products';
+import { ProductCombobox } from '@/features/products/ui/components/ProductCombobox';
 import { useCreateStockTransfer } from '../../application/hooks/use-stock-transfers';
 
 interface Line {
@@ -35,16 +35,13 @@ export function TransferFormDialog({ active, onClose }: Props) {
   const [destBranchId, setDestBranchId] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
-  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const destOptions = (branches.data?.items ?? []).filter((b) => b.id !== active);
-  const found = useProducts({ q: search.trim() || undefined, type: 'simple', limit: 8 });
 
   const addLine = (p: { id: string; name: string; sku: string; stock: string }) => {
     if (lines.some((l) => l.productId === p.id)) return;
     setLines((prev) => [...prev, { productId: p.id, name: p.name, sku: p.sku, stock: p.stock, quantity: '1' }]);
-    setSearch('');
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -76,29 +73,15 @@ export function TransferFormDialog({ active, onClose }: Props) {
               ))}
             </Select>
           </FormField>
-          <FormField label="Buscar producto (de esta sucursal)">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nombre o SKU…" className="w-64" />
+          <FormField label="Buscar producto (de esta sucursal)" className="min-w-64 flex-1">
+            <ProductCombobox
+              type="simple"
+              excludeIds={lines.map((l) => l.productId)}
+              onSelect={addLine}
+              placeholder="Nombre o SKU…"
+            />
           </FormField>
         </div>
-
-        {search.trim() && (
-          <div className="rounded-xl border border-border">
-            {(found.data?.items ?? []).map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => addLine(p)}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/40"
-              >
-                <span>{p.name} <span className="text-xs text-muted-foreground">{p.sku}</span></span>
-                <span className="text-xs text-muted-foreground">stock {formatQuantity(p.stock)}</span>
-              </button>
-            ))}
-            {found.data?.items.length === 0 && (
-              <p className="px-3 py-2 text-sm text-muted-foreground">Sin productos simples.</p>
-            )}
-          </div>
-        )}
 
         {lines.length > 0 && (
           <table className="w-full text-sm">

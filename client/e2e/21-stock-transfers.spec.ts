@@ -143,7 +143,7 @@ test.describe.serial('Transferencias de stock', () => {
     const productButton = formSection.getByRole('button', {
       name: /E2E Transfer Product/,
     });
-    const emptyMsg = formSection.getByText(/sin productos simples/i);
+    const emptyMsg = formSection.getByText(/sin coincidencias|escribe para buscar/i);
 
     // Esperamos a que el panel resuelva: o el producto, o el mensaje vacío.
     await expect(productButton.or(emptyMsg).first()).toBeVisible();
