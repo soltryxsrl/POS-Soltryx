@@ -6,6 +6,7 @@ import { getErrorMessage } from '@/shared/lib/error-message';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/controls/Button';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { useAuth, useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { useCashRegisters } from '@/features/cash/application/hooks/use-cash';
 import { CashRegisterFormDialog } from '@/features/cash/ui/components/CashRegisterFormDialog';
@@ -68,7 +69,8 @@ function SucursalesTab() {
   const canCreate = useHasPermission('branches.create');
   const canManage = useHasPermission('branches.update');
   const isAdminOrManager = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
-  const branches = useBranches({ limit: 100 });
+  const [status, setStatus] = useState<'true' | 'false' | undefined>(undefined);
+  const branches = useBranches({ limit: 100, isActive: status });
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [viewing, setViewing] = useState<Branch | null>(null);
@@ -78,14 +80,18 @@ function SucursalesTab() {
 
   return (
     <div className="space-y-4">
-      {isAdminOrManager && (
-        <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <StatusFilter
+          value={status}
+          onChange={(v) => setStatus(v as 'true' | 'false' | undefined)}
+        />
+        {isAdminOrManager && (
           <Button variant="outline" onClick={() => setShowClone(true)}>
             <Copy className="h-4 w-4" />
             Copiar catálogo
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
@@ -103,6 +109,17 @@ function SucursalesTab() {
               <tr>
                 <td colSpan={canManage ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">
                   Cargando...
+                </td>
+              </tr>
+            )}
+            {!branches.isLoading && items.length === 0 && (
+              <tr>
+                <td colSpan={canManage ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">
+                  {status === 'false'
+                    ? 'No hay sucursales inactivas.'
+                    : status === 'true'
+                    ? 'No hay sucursales activas.'
+                    : 'No hay sucursales.'}
                 </td>
               </tr>
             )}
