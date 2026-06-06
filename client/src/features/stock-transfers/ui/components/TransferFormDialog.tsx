@@ -63,7 +63,9 @@ export function TransferFormDialog({ active, onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Nueva transferencia" size="xl">
-      <form onSubmit={onSubmit} className="space-y-4">
+      {/* min-h: deja sitio para el dropdown del combobox de producto sin que se
+          recorte ni el modal tenga que scrollear. */}
+      <form onSubmit={onSubmit} className="min-h-[26rem] space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <FormField label="Enviar a sucursal" required>
             <Select value={destBranchId} onChange={(e) => setDestBranchId(e.target.value)} className="w-56" required>

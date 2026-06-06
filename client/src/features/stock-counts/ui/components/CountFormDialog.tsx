@@ -57,7 +57,9 @@ export function CountFormDialog({ onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Nuevo conteo de inventario" size="xl">
-      <form onSubmit={onSubmit} className="space-y-4">
+      {/* min-h: reserva alto para que el dropdown del combobox de producto se
+          despliegue completo sin recortarse ni forzar scroll del modal. */}
+      <form onSubmit={onSubmit} className="min-h-[26rem] space-y-4">
         <p className="text-sm text-muted-foreground">
           Registra la cantidad <strong>contada físicamente</strong>. Al completar, el sistema
           ajusta el stock a lo contado y calcula la varianza (merma/sobrante).
@@ -67,7 +69,6 @@ export function CountFormDialog({ onClose }: Props) {
             type="simple"
             excludeIds={lines.map((l) => l.productId)}
             onSelect={addLine}
-            autoFocus
           />
         </FormField>
 
