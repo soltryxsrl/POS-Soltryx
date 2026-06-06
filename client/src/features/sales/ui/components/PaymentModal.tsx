@@ -190,6 +190,9 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
     [docTypesQuery.data, customerHasRnc],
   );
   const [fiscalDocTypeCode, setFiscalDocTypeCode] = useState<string>('');
+  // El comprobante fiscal está OCULTO por defecto (la mayoría de ventas son
+  // recibo no fiscal). Un check lo despliega para no ocupar espacio en el cobro.
+  const [wantsFiscal, setWantsFiscal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Después de cobrar exitosamente mostramos un panel de éxito con acciones
   // (imprimir, nueva venta, ver detalle) en vez de redirigir abruptamente.
@@ -679,43 +682,66 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
         </div>
       )}
 
-      {/* Tipo de comprobante DGII */}
+      {/* Tipo de comprobante DGII — colapsado tras un check para ahorrar espacio. */}
       <div className="mt-3 rounded-xl border border-border bg-card p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Tipo de comprobante
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={wantsFiscal}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setWantsFiscal(on);
+              // Al activar preselecciona el primer tipo disponible; al desactivar
+              // vuelve a recibo no fiscal (sin NCF).
+              setFiscalDocTypeCode(on ? availableDocTypes[0]?.code ?? '' : '');
+            }}
+            className="h-4 w-4 rounded border-border text-brand-from focus:ring-2 focus:ring-brand-from/30"
+          />
+          <span className="flex-1 text-sm font-medium text-foreground">
+            Emitir comprobante fiscal (NCF)
           </span>
-          {fiscalDocTypeCode && (
+          {wantsFiscal && fiscalDocTypeCode && (
             <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
               NCF se emitirá
             </span>
           )}
-        </div>
-        <select
-          value={fiscalDocTypeCode}
-          onChange={(e) => setFiscalDocTypeCode(e.target.value)}
-          className="w-full rounded-lg border border-border/60 bg-background px-2 py-1.5 text-sm outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
-          disabled={docTypesQuery.isLoading}
-        >
-          <option value="">Sin comprobante fiscal (recibo no fiscal)</option>
-          {availableDocTypes.map((dt) => (
-            <option key={dt.code} value={dt.code}>
-              {dt.code} — {dt.name}
-            </option>
-          ))}
-        </select>
-        {customer && !customerHasRnc &&
-          docTypesQuery.data?.some((d) => d.requiresBuyerRnc && d.isActive) && (
-            <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">
-              El cliente no tiene RNC — los tipos B01/E31/E45 no aparecen. Asigna
-              un cliente con RNC para emitirlos.
-            </p>
-          )}
-        {!customer && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Sin cliente asignado. Para emitir Crédito Fiscal (E31/B01) asigna un
-            cliente con RNC.
-          </p>
+        </label>
+
+        {wantsFiscal && (
+          <div className="mt-3 space-y-1.5">
+            {availableDocTypes.length > 0 ? (
+              <select
+                value={fiscalDocTypeCode}
+                onChange={(e) => setFiscalDocTypeCode(e.target.value)}
+                className="w-full rounded-lg border border-border/60 bg-background px-2 py-1.5 text-sm outline-none focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20"
+                disabled={docTypesQuery.isLoading}
+              >
+                {availableDocTypes.map((dt) => (
+                  <option key={dt.code} value={dt.code}>
+                    {dt.code} — {dt.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                No hay tipos de comprobante disponibles
+                {customer && !customerHasRnc ? ' para este cliente (sin RNC)' : ''}.
+              </p>
+            )}
+            {customer && !customerHasRnc &&
+              docTypesQuery.data?.some((d) => d.requiresBuyerRnc && d.isActive) && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  El cliente no tiene RNC — los tipos B01/E31/E45 no aparecen.
+                  Asigna un cliente con RNC para emitirlos.
+                </p>
+              )}
+            {!customer && (
+              <p className="text-[11px] text-muted-foreground">
+                Sin cliente asignado. Para emitir Crédito Fiscal (E31/B01) asigna
+                un cliente con RNC.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

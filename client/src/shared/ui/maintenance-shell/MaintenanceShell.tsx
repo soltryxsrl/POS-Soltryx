@@ -104,7 +104,12 @@ export function MaintenanceShell({
           )}
         >
           <Header title={title} onClose={onClose} />
-          <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          {/* Sin padding inferior cuando hay FormFooter (`.form-footer`): así la
+              barra de acciones queda al ras del borde. Sin footer, conserva el
+              `pb-5` de respiro. */}
+          <div className="flex-1 overflow-y-auto px-6 pt-5 pb-5 [&:has(.form-footer)]:pb-0">
+            {children}
+          </div>
         </aside>
       </div>
     ) : (
@@ -126,7 +131,12 @@ export function MaintenanceShell({
           )}
         >
           <Header title={title} onClose={onClose} />
-          <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          {/* Sin padding inferior cuando hay FormFooter (`.form-footer`): así la
+              barra de acciones queda al ras del borde. Sin footer, conserva el
+              `pb-5` de respiro. */}
+          <div className="flex-1 overflow-y-auto px-6 pt-5 pb-5 [&:has(.form-footer)]:pb-0">
+            {children}
+          </div>
         </div>
       </div>
     );
