@@ -33,14 +33,14 @@ export function DenominationCounter({ value, onChange, expectedTotal, disabled }
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {RD_DENOMINATIONS.map((d) => {
           const count = value[String(d.value)] ?? 0;
           const contribution = count * d.value;
           return (
             <div
               key={d.value}
-              className="flex items-center gap-2 rounded-lg border bg-background px-2 py-1.5"
+              className="flex items-center gap-2 overflow-hidden rounded-lg border bg-background px-2 py-1.5"
             >
               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                 {d.kind === 'bill' ? (
@@ -49,7 +49,17 @@ export function DenominationCounter({ value, onChange, expectedTotal, disabled }
                   <Coins className="h-4 w-4" />
                 )}
               </span>
-              <span className="w-12 text-sm font-medium">RD$ {d.label}</span>
+              {/* Etiqueta + aporte apilados; min-w-0 permite encoger sin desbordar. */}
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium tabular-nums">
+                  RD$ {d.label}
+                </div>
+                {count > 0 && (
+                  <div className="truncate text-[10px] tabular-nums text-muted-foreground">
+                    {formatMoney(contribution)}
+                  </div>
+                )}
+              </div>
               <input
                 type="number"
                 min={0}
@@ -59,13 +69,8 @@ export function DenominationCounter({ value, onChange, expectedTotal, disabled }
                 onFocus={selectAllOnFocus}
                 disabled={disabled}
                 placeholder="0"
-                className="ml-auto w-16 rounded-lg border border-border/60 bg-background/60 px-2 py-1 text-right text-sm shadow-sm transition-all outline-none hover:border-border focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20 disabled:opacity-50"
+                className="w-14 flex-shrink-0 rounded-lg border border-border/60 bg-background/60 px-2 py-1 text-right text-sm shadow-sm transition-all outline-none hover:border-border focus:border-brand-from/60 focus:ring-2 focus:ring-brand-from/20 disabled:opacity-50"
               />
-              {count > 0 && (
-                <span className="w-20 text-right text-xs text-muted-foreground">
-                  {formatMoney(contribution)}
-                </span>
-              )}
             </div>
           );
         })}
