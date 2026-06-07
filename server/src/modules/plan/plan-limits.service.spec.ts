@@ -6,7 +6,9 @@ import type { UserOrmEntity } from '../auth/infrastructure/persistence/typeorm/u
 import type { BranchOrmEntity } from '../branches/branch.orm-entity';
 
 function makeService(
-  limits: { maxUsers: number | null; maxBranches: number | null } | null,
+  limits:
+    | { maxUsers: number | null; maxBranches: number | null; multiBranchEnabled?: boolean }
+    | null,
   userCount: number,
   branchCount: number,
 ): PlanLimitsService {
@@ -53,14 +55,31 @@ describe('PlanLimitsService', () => {
     await expect(s.getUsage()).resolves.toEqual({
       maxUsers: 5,
       maxBranches: 10,
+      multiBranchEnabled: true,
       usedUsers: 3,
       usedBranches: 7,
     });
   });
 
-  it('sin fila de plan_limits → ilimitado', async () => {
+  it('sin fila de plan_limits → ilimitado y multi-sucursal ON', async () => {
     const s = makeService(null, 50, 50);
-    await expect(s.getLimits()).resolves.toEqual({ maxUsers: null, maxBranches: null });
+    await expect(s.getLimits()).resolves.toEqual({
+      maxUsers: null,
+      maxBranches: null,
+      multiBranchEnabled: true,
+    });
+    await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
+  });
+
+  it('multi-sucursal OFF → no se puede crear sucursal (aunque haya cupo)', async () => {
+    const s = makeService(
+      { maxUsers: null, maxBranches: null, multiBranchEnabled: false },
+      0,
+      0,
+    );
+    await expect(s.isMultiBranchEnabled()).resolves.toBe(false);
+    await expect(s.assertCanCreateBranch()).rejects.toBeInstanceOf(ForbiddenException);
+    // Usuarios no se ven afectados por el flag de sucursales.
     await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
   });
 

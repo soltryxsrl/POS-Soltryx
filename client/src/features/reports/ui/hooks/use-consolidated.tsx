@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import { useMultiBranch } from '@/features/plan/application/hooks/use-plan';
 import { Switch } from '@/shared/ui/controls/Switch';
 
 /**
@@ -13,7 +14,9 @@ import { Switch } from '@/shared/ui/controls/Switch';
  * toggle para incluir en la barra de filtros.
  */
 export function useConsolidated() {
-  const canConsolidate = useHasPermission('branches.switch');
+  // Sin multi-sucursal no hay nada que consolidar → no se ofrece el toggle.
+  const multiBranch = useMultiBranch();
+  const canConsolidate = useHasPermission('branches.switch') && multiBranch;
   const [allBranches, setAllBranches] = useState(false);
   const branchId = canConsolidate && allBranches ? 'all' : undefined;
   const toggle = canConsolidate ? (

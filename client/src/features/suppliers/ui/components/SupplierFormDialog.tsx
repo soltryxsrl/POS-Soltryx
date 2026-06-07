@@ -83,9 +83,9 @@ export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Pro
       title={readOnly ? 'Proveedor' : isEdit ? 'Editar proveedor' : 'Nuevo proveedor'}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
-        <fieldset disabled={readOnly} className="contents">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <form onSubmit={onSubmit} className="space-y-5">
+        <fieldset disabled={readOnly} className="contents space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Nombre comercial" required>
             <Input
               autoFocus
@@ -105,7 +105,7 @@ export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Pro
           </FormField>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="RNC" hint={`${rnc.replace(/\D/g, '').length}/9 dígitos`}>
             <Input
               value={rnc}
@@ -124,7 +124,7 @@ export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Pro
           </FormField>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Teléfono">
             <Input
               value={phone}

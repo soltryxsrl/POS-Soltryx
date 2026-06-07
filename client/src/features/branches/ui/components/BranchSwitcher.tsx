@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Building2, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import { useMultiBranch } from '@/features/plan/application/hooks/use-plan';
 import { cn } from '@/shared/lib/cn';
 import { useBranches } from '../../application/hooks/use-branches';
 import { useActiveBranchStore } from '../../application/stores/active-branch.store';
@@ -20,10 +21,14 @@ import { useActiveBranchStore } from '../../application/stores/active-branch.sto
 export function BranchSwitcher({ className }: { className?: string }) {
   const { user } = useAuth();
   const canSwitch = useHasPermission('branches.switch');
+  const multiBranch = useMultiBranch();
   const branches = useBranches({ isActive: 'true', limit: 100 });
   const activeBranchId = useActiveBranchStore((s) => s.activeBranchId);
   const setActiveBranch = useActiveBranchStore((s) => s.setActiveBranch);
   const qc = useQueryClient();
+
+  // Multi-sucursal apagado → no se muestra el selector (opera mono-sucursal).
+  if (!multiBranch) return null;
 
   const items = branches.data?.items ?? [];
   const currentId = activeBranchId ?? user?.branchId ?? null;

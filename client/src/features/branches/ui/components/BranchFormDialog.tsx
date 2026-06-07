@@ -81,8 +81,8 @@ export function BranchFormDialog({ branch, readOnly, onClose }: Props) {
       title={readOnly ? 'Sucursal' : isEdit ? 'Editar sucursal' : 'Nueva sucursal'}
       size="md"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
-        <fieldset disabled={readOnly} className="contents">
+      <form onSubmit={onSubmit} className="space-y-5">
+        <fieldset disabled={readOnly} className="contents space-y-5">
           <FormField label="Nombre" required>
             <Input
               autoFocus
@@ -92,7 +92,7 @@ export function BranchFormDialog({ branch, readOnly, onClose }: Props) {
               placeholder="Ej: Sucursal Norte"
             />
           </FormField>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="RNC">
               <Input
                 value={rnc}

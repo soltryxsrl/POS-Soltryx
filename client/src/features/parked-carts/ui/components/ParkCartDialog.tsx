@@ -64,7 +64,7 @@ export function ParkCartDialog({ cashSessionId, onClose, onParked }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Guardar carrito para después" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-sm text-muted-foreground">
           El carrito ({items.length} ítem{items.length === 1 ? '' : 's'}) se guardará en
           espera. Lo retomas más tarde sin perder los ajustes.

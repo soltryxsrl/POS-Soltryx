@@ -255,7 +255,7 @@ function VariantDialog({ product, variant, onClose }: DialogProps) {
       title={isEdit ? `Editar variante · ${variant?.name}` : 'Nueva variante'}
       size="md"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Nombre" required hint="Ej: Mediano, Rojo M, Vainilla">
           <Input
             autoFocus
@@ -264,7 +264,7 @@ function VariantDialog({ product, variant, onClose }: DialogProps) {
             maxLength={120}
           />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <FormField label="SKU" required>
             <Input value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} />
           </FormField>
@@ -276,7 +276,7 @@ function VariantDialog({ product, variant, onClose }: DialogProps) {
             />
           </FormField>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <FormField
             label="Precio venta override"
             hint={`Si vacío, hereda ${product.salePrice}`}
@@ -297,7 +297,7 @@ function VariantDialog({ product, variant, onClose }: DialogProps) {
             />
           </FormField>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           {!isEdit && (
             <FormField label="Stock inicial">
               <Input

@@ -66,7 +66,7 @@ export function AdjustStockDialog({ productId, variantId, contextLabel, onClose 
       title={contextLabel ? `Ajustar stock · ${contextLabel}` : 'Ajustar stock'}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Cantidad" required htmlFor="qty">
           <Input
             id="qty"

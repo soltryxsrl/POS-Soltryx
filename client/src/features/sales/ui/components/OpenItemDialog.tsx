@@ -62,7 +62,7 @@ export function OpenItemDialog({ onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Venta de monto libre" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-sm text-muted-foreground">
           Agrega una línea sin producto del catálogo: tú tecleas el precio. No
           mueve inventario ni aplica promociones.
@@ -78,7 +78,7 @@ export function OpenItemDialog({ onClose }: Props) {
           />
         </FormField>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <FormField label="Precio unitario (RD$)" required>
             <Input
               value={amount}

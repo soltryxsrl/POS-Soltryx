@@ -131,7 +131,7 @@ export function ReturnDialog({
       title={`Devolución sobre ${saleNumber}`}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-sm text-muted-foreground">
           Selecciona los ítems y la cantidad a devolver. Puede ser parcial.
           El stock se restituye automáticamente.

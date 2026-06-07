@@ -93,7 +93,7 @@ export function CustomerFormDialog({ customer, onClose, onSaved }: Props) {
       title={isEdit ? 'Editar cliente' : 'Nuevo cliente'}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Nombre completo" required>
           <Input
             autoFocus
@@ -103,7 +103,7 @@ export function CustomerFormDialog({ customer, onClose, onSaved }: Props) {
           />
         </FormField>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Tipo de documento">
             <Select
               value={documentType}
@@ -143,7 +143,7 @@ export function CustomerFormDialog({ customer, onClose, onSaved }: Props) {
           </FormField>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Teléfono">
             <Input
               value={phone}

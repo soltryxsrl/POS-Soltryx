@@ -42,7 +42,7 @@ export function SetRateDialog({ currency, onClose }: Props) {
       title={`Tasa de cambio · ${currency.code}`}
       size="sm"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-sm text-muted-foreground">
           Cuánto vale <strong>1 {currency.symbol}</strong> en pesos dominicanos.
           Esta tasa se usará en cada cobro en {currency.code} hasta que la cambies.

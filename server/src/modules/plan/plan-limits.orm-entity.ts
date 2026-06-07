@@ -17,6 +17,10 @@ export class PlanLimitsOrmEntity {
   @Column({ name: 'max_branches', type: 'int', nullable: true })
   maxBranches!: number | null;
 
+  /** Interruptor de la función multi-sucursal. false = opera como mono-sucursal. */
+  @Column({ name: 'multi_branch_enabled', type: 'boolean', default: true })
+  multiBranchEnabled!: boolean;
+
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

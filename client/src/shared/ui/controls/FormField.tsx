@@ -21,7 +21,7 @@ export function FormField({
   children,
 }: Props) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('space-y-2', className)}>
       <label htmlFor={htmlFor} className="block text-xs font-medium text-muted-foreground">
         {label}
         {required && (

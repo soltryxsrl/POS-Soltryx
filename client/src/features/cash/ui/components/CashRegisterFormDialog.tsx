@@ -37,7 +37,7 @@ export function CashRegisterFormDialog({ branchName, onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Nueva caja" size="sm">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-xs text-muted-foreground">
           Se crea en la sucursal activa:{' '}
           <span className="font-medium text-foreground">{branchName}</span>.

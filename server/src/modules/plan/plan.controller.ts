@@ -60,6 +60,7 @@ export class PlanController {
     await this.plan.updateLimits({
       maxUsers: body.maxUsers,
       maxBranches: body.maxBranches,
+      multiBranchEnabled: body.multiBranchEnabled,
     });
     return this.plan.getUsage();
   }

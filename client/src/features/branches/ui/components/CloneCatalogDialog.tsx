@@ -49,7 +49,7 @@ export function CloneCatalogDialog({ onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Copiar catálogo" size="md">
-      <form onSubmit={onClone} className="space-y-4">
+      <form onSubmit={onClone} className="space-y-5">
         <p className="text-xs text-muted-foreground">
           Copia categorías, productos (simples, con variantes y kits), variantes,
           códigos de barras y recetas de kit —con stock en 0— hacia la sucursal

@@ -19,6 +19,16 @@ export function usePlan() {
   });
 }
 
+/**
+ * ¿Está habilitada la función multi-sucursal? Default `true` mientras carga
+ * (para no ocultar UI por un parpadeo). Lo usan el nav, el selector de sucursal
+ * y el toggle consolidado de reportes.
+ */
+export function useMultiBranch(): boolean {
+  const plan = usePlan();
+  return plan.data?.multiBranchEnabled ?? true;
+}
+
 /** Upsell del plan (super-admin). Requiere el secreto; refresca el plan al éxito. */
 export function useUpdatePlan() {
   const qc = useQueryClient();
@@ -27,10 +37,12 @@ export function useUpdatePlan() {
       secret: string;
       maxUsers: number | null;
       maxBranches: number | null;
+      multiBranchEnabled?: boolean;
     }) =>
       planApiHttp.update(input.secret, {
         maxUsers: input.maxUsers,
         maxBranches: input.maxBranches,
+        multiBranchEnabled: input.multiBranchEnabled,
       }),
     onSuccess: (data) => {
       qc.setQueryData(planKey, data);

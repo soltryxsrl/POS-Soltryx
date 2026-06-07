@@ -51,6 +51,69 @@ export function DataTable<T>({
     onSortChange(col.key, nextDir);
   };
 
+  // Agrupación de columnas: recorre `columns` EN ORDEN juntando columnas
+  // consecutivas con la misma etiqueta `group`. Cada segmento es o un grupo
+  // (varias columnas bajo una cabecera) o una columna suelta (sin `group`).
+  const hasGroups = columns.some((c) => c.group);
+  const segments: Array<{ group?: string; cols: typeof columns }> = [];
+  for (const col of columns) {
+    const last = segments[segments.length - 1];
+    if (col.group && last && last.group === col.group) {
+      last.cols.push(col);
+    } else {
+      segments.push({ group: col.group, cols: [col] });
+    }
+  }
+  // Claves de la primera columna de cada segmento (menos el primero): ahí va el
+  // divisor vertical que se prolonga por el cuerpo de la tabla.
+  const dividerKeys = new Set<string>(segments.slice(1).map((s) => s.cols[0].key));
+
+  // Render del `<th>` de una columna; reutilizado por el header de una fila y
+  // por la fila inferior del header agrupado. `rowSpan`/divisor son opcionales.
+  const renderColumnHeader = (
+    col: (typeof columns)[number],
+    opts: { rowSpan?: number; divider?: boolean } = {},
+  ) => {
+    const isSorted = col.sortable && sortKey === col.key;
+    return (
+      <th
+        key={col.key}
+        rowSpan={opts.rowSpan}
+        style={col.width ? { width: col.width } : undefined}
+        className={cn(
+          'px-4 py-2 font-medium select-none',
+          col.align === 'right' && 'text-right',
+          col.align === 'center' && 'text-center',
+          col.sortable && 'cursor-pointer hover:text-foreground',
+          opts.divider && 'border-l',
+        )}
+        onClick={() => handleSortClick(col)}
+      >
+        <span
+          className={cn(
+            'inline-flex items-center gap-1',
+            col.align === 'right' && 'flex-row-reverse',
+          )}
+        >
+          {col.header}
+          {col.sortable && (
+            <span className="inline-flex flex-col leading-none text-muted-foreground/60">
+              {isSorted ? (
+                sortDir === 'asc' ? (
+                  <ChevronUp className="h-3 w-3 text-foreground" />
+                ) : (
+                  <ChevronDown className="h-3 w-3 text-foreground" />
+                )
+              ) : (
+                <ChevronDown className="h-3 w-3 opacity-40" />
+              )}
+            </span>
+          )}
+        </span>
+      </th>
+    );
+  };
+
   return (
     <div className={fillHeight ? 'flex min-h-0 flex-1 flex-col gap-3' : 'space-y-3'}>
       {(title || toolbar) &&

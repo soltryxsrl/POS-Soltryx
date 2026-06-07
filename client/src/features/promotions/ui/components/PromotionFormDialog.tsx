@@ -161,7 +161,7 @@ export function PromotionFormDialog({ promotion, onClose }: Props) {
       title={isEdit ? 'Editar promoción' : 'Nueva promoción'}
       size="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Nombre" required>
           <Input
             autoFocus
@@ -280,7 +280,7 @@ export function PromotionFormDialog({ promotion, onClose }: Props) {
         )}
 
         {needsBxGy && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Compra (cantidad)" required hint="Ej: 2 para '2x1'">
               <Input
                 type="number"
@@ -314,7 +314,7 @@ export function PromotionFormDialog({ promotion, onClose }: Props) {
           </FormField>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <FormField label="Válido desde">
             <Input
               type="date"

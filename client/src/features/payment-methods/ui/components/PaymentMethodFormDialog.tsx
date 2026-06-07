@@ -62,7 +62,7 @@ export function PaymentMethodFormDialog({ method, onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Editar forma de pago" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Nombre">
           <Input
             autoFocus

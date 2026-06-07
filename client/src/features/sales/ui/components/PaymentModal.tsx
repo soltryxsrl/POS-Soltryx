@@ -745,7 +745,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+      <form onSubmit={onSubmit} className="mt-5 space-y-5">
         <div className="space-y-3">
           {tenders.map((t, idx) => (
             <div
@@ -806,7 +806,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
                 )}
               </FormField>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField label="Monto" required>
                   <div className="flex gap-2">
                     <Input

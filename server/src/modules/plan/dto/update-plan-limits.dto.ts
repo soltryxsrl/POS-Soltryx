@@ -1,4 +1,4 @@
-import { IsInt, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
 
 /**
  * Cambio de plan (upsell). Cada campo:
@@ -16,4 +16,9 @@ export class UpdatePlanLimitsDto {
   @IsInt()
   @Min(1)
   maxBranches?: number | null;
+
+  /** Interruptor de la función multi-sucursal. */
+  @IsOptional()
+  @IsBoolean()
+  multiBranchEnabled?: boolean;
 }

@@ -46,7 +46,7 @@ export function CashMovementDialog({ sessionId, onClose }: Props) {
 
   return (
     <MaintenanceShell open onClose={onClose} title="Movimiento de caja" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Tipo">
           <div className="grid grid-cols-2 gap-2">
             <TypeButton

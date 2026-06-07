@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { Input } from '@/shared/ui/controls/Input';
+import { Switch } from '@/shared/ui/controls/Switch';
 import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 /**
@@ -23,6 +24,7 @@ export default function SuperAdminPlanPage() {
 
   const [maxUsers, setMaxUsers] = useState('');
   const [maxBranches, setMaxBranches] = useState('');
+  const [multiBranch, setMultiBranch] = useState(true);
   const [secret, setSecret] = useState('');
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -32,6 +34,7 @@ export default function SuperAdminPlanPage() {
     if (!plan.data) return;
     setMaxUsers(plan.data.maxUsers == null ? '' : String(plan.data.maxUsers));
     setMaxBranches(plan.data.maxBranches == null ? '' : String(plan.data.maxBranches));
+    setMultiBranch(plan.data.multiBranchEnabled);
   }, [plan.data]);
 
   if (!canManagePlan) {
@@ -62,6 +65,7 @@ export default function SuperAdminPlanPage() {
         secret: secret.trim(),
         maxUsers: parse(maxUsers),
         maxBranches: parse(maxBranches),
+        multiBranchEnabled: multiBranch,
       });
       setOk(true);
       setSecret('');
@@ -112,6 +116,24 @@ export default function SuperAdminPlanPage() {
           Cambiar plan
         </div>
 
+        {/* Interruptor de la función multi-sucursal. OFF = el sistema opera
+            mono-sucursal: se ocultan selector, Sucursales, Transferencias y el
+            consolidado, y no se pueden crear sucursales. */}
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-muted/30 p-3">
+          <div>
+            <div className="text-sm font-medium text-foreground">Multi-sucursal</div>
+            <p className="text-[11px] text-muted-foreground">
+              Apágalo para que la instancia opere como mono-sucursal (oculta
+              sucursales, transferencias y consolidados).
+            </p>
+          </div>
+          <Switch
+            checked={multiBranch}
+            onChange={setMultiBranch}
+            label="Multi-sucursal habilitado"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Máx. usuarios" hint="Vacío = ilimitado">
             <Input
@@ -121,12 +143,16 @@ export default function SuperAdminPlanPage() {
               placeholder="Ilimitado"
             />
           </FormField>
-          <FormField label="Máx. sucursales" hint="Vacío = ilimitado">
+          <FormField
+            label="Máx. sucursales"
+            hint={multiBranch ? 'Vacío = ilimitado' : 'Multi-sucursal apagado'}
+          >
             <Input
               inputMode="numeric"
               value={maxBranches}
               onChange={(e) => setMaxBranches(e.target.value)}
               placeholder="Ilimitado"
+              disabled={!multiBranch}
             />
           </FormField>
         </div>

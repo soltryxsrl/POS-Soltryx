@@ -10,6 +10,8 @@ import { PlanLimitsOrmEntity } from './plan-limits.orm-entity';
 export interface PlanLimits {
   maxUsers: number | null;
   maxBranches: number | null;
+  /** Interruptor de la función multi-sucursal. false = opera mono-sucursal. */
+  multiBranchEnabled: boolean;
 }
 
 /** Topes + uso actual, para mostrar al cliente (solo lectura). */
@@ -42,7 +44,13 @@ export class PlanLimitsService {
     return {
       maxUsers: row?.maxUsers ?? null,
       maxBranches: row?.maxBranches ?? null,
+      multiBranchEnabled: row?.multiBranchEnabled ?? true,
     };
+  }
+
+  /** ¿Está habilitada la función multi-sucursal en esta instancia? */
+  async isMultiBranchEnabled(): Promise<boolean> {
+    return (await this.getLimits()).multiBranchEnabled;
   }
 
   /**
@@ -84,13 +92,22 @@ export class PlanLimitsService {
   async updateLimits(patch: {
     maxUsers?: number | null;
     maxBranches?: number | null;
+    multiBranchEnabled?: boolean;
   }): Promise<void> {
     let row = await this.repo.findOne({ where: { id: SINGLETON_ID } });
     if (!row) {
-      row = this.repo.create({ id: SINGLETON_ID, maxUsers: null, maxBranches: null });
+      row = this.repo.create({
+        id: SINGLETON_ID,
+        maxUsers: null,
+        maxBranches: null,
+        multiBranchEnabled: true,
+      });
     }
     if (patch.maxUsers !== undefined) row.maxUsers = patch.maxUsers;
     if (patch.maxBranches !== undefined) row.maxBranches = patch.maxBranches;
+    if (patch.multiBranchEnabled !== undefined) {
+      row.multiBranchEnabled = patch.multiBranchEnabled;
+    }
     await this.repo.save(row);
   }
 
@@ -110,9 +127,19 @@ export class PlanLimitsService {
     }
   }
 
-  /** Lanza 403 si crear una sucursal excedería el plan. No-op si es ilimitado. */
+  /**
+   * Lanza 403 si no se puede crear una sucursal: porque la función multi-sucursal
+   * está apagada, o porque se alcanzó el tope del plan.
+   */
   async assertCanCreateBranch(): Promise<void> {
-    const { maxBranches } = await this.getLimits();
+    const { maxBranches, multiBranchEnabled } = await this.getLimits();
+    if (!multiBranchEnabled) {
+      throw new ForbiddenException({
+        code: 'MULTI_BRANCH_DISABLED',
+        message:
+          'La función multi-sucursal está desactivada en esta instancia. No se pueden crear sucursales.',
+      });
+    }
     if (maxBranches == null) return;
     const used = await this.branches.count();
     if (used >= maxBranches) {

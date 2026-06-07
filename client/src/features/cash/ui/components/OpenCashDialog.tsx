@@ -63,7 +63,7 @@ export function OpenCashDialog({ onClose, onOpened, defaultCashRegisterId }: Pro
 
   return (
     <MaintenanceShell open onClose={onClose} title="Abrir caja" size="lg">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Caja registradora" required>
           <Select
             required

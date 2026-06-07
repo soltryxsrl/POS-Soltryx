@@ -5,6 +5,7 @@ import type { PlanLimitsService, PlanUsage } from './plan-limits.service';
 const USAGE: PlanUsage = {
   maxUsers: 5,
   maxBranches: 10,
+  multiBranchEnabled: true,
   usedUsers: 1,
   usedBranches: 1,
 };
@@ -55,7 +56,9 @@ describe('PlanController.update (candado super-admin)', () => {
     process.env.SUPERADMIN_SECRET = 'correcto';
     const { ctrl, updateLimits } = makeController();
     const res = await ctrl.update('correcto', { maxUsers: 5, maxBranches: 10 });
-    expect(updateLimits).toHaveBeenCalledWith({ maxUsers: 5, maxBranches: 10 });
+    expect(updateLimits).toHaveBeenCalledWith(
+      expect.objectContaining({ maxUsers: 5, maxBranches: 10 }),
+    );
     expect(res).toEqual(USAGE);
   });
 });

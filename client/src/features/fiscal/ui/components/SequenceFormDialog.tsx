@@ -83,7 +83,7 @@ export function SequenceFormDialog({ renewFrom, onClose }: Props) {
       title={isRenew ? `Renovar secuencia ${renewFrom!.docType}` : 'Nueva secuencia fiscal'}
       size="md"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Tipo de comprobante" required>
           <Select
             value={docType}
@@ -116,7 +116,7 @@ export function SequenceFormDialog({ renewFrom, onClose }: Props) {
           />
         </FormField>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <FormField label="Desde" required>
             <Input
               type="number"

@@ -15,6 +15,17 @@ export interface DataTableColumn<T> {
   render: (row: T) => ReactNode;
   /** Clase opcional para la celda (no para el header). */
   cellClassName?: string;
+  /**
+   * Etiqueta de grupo opcional. Columnas CONSECUTIVAS con la misma etiqueta se
+   * agrupan bajo una cabecera común, volviendo el header de dos filas: arriba el
+   * nombre del grupo (abarcando sus columnas con `colSpan`) y debajo cada
+   * columna. Las columnas sin `group` ocupan ambas filas (`rowSpan`). Entre
+   * grupos/columnas-sueltas se dibuja un divisor vertical sutil. Si NINGUNA
+   * columna define `group`, el header es de una sola fila (comportamiento previo
+   * intacto). Importante: para agruparse, las columnas deben ser adyacentes en
+   * el array `columns`.
+   */
+  group?: string;
 }
 
 export interface DataTableProps<T> {

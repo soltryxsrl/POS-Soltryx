@@ -112,8 +112,8 @@ export function StandaloneDocForm({
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border bg-card p-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border bg-card p-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Tipo de comprobante"
           required

@@ -119,7 +119,7 @@ export function CloseCashDialog({ sessionId, onClose, onClosed }: Props) {
         </dl>
       )}
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-4">
+      <form onSubmit={onSubmit} className="mt-4 space-y-5">
         <FormField label="Cómo registrar el conteo">
           <div className="grid grid-cols-2 gap-2">
             <ModeButton

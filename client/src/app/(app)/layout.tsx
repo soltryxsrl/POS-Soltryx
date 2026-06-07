@@ -32,6 +32,7 @@ import { AuthGuard } from '@/features/auth/ui/components/AuthGuard';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { useLogout } from '@/features/auth/application/hooks/use-logout';
 import { useActiveSessionMine } from '@/features/cash/application/hooks/use-cash';
+import { useMultiBranch } from '@/features/plan/application/hooks/use-plan';
 import { BranchSwitcher } from '@/features/branches/ui/components/BranchSwitcher';
 import { POSHeader } from '@/features/sales/ui/components/POSHeader';
 import { OfflineSyncBadge } from '@/features/sales/ui/components/OfflineSyncBadge';
@@ -43,6 +44,8 @@ interface NavChild {
   label: string;
   /** Si se define, el usuario debe tener al menos uno de estos permisos. */
   permissions?: string[];
+  /** Solo visible con la función multi-sucursal habilitada. */
+  multiBranch?: boolean;
 }
 
 /** Enlace suelto de primer nivel (Inicio, POS, Reportes). */
@@ -102,7 +105,7 @@ const NAV_ITEMS: NavEntry[] = [
     icon: Boxes,
     children: [
       { href: '/inventory', label: 'Existencias', permissions: ['inventory.read'] },
-      { href: '/transferencias', label: 'Transferencias', permissions: ['inventory.read'] },
+      { href: '/transferencias', label: 'Transferencias', permissions: ['inventory.read'], multiBranch: true },
       { href: '/conteos', label: 'Conteo físico', permissions: ['inventory.read'] },
       { href: '/purchases', label: 'Compras', permissions: ['purchases.read'] },
     ],
@@ -192,7 +195,7 @@ const NAV_ITEMS: NavEntry[] = [
     children: [
       { href: '/admin/users', label: 'Usuarios', permissions: ['users.read'] },
       { href: '/admin/roles', label: 'Roles', permissions: ['roles.read'] },
-      { href: '/admin/branches', label: 'Sucursales', permissions: ['branches.read'] },
+      { href: '/admin/branches', label: 'Sucursales', permissions: ['branches.read'], multiBranch: true },
       { href: '/admin/customers', label: 'Clientes', permissions: ['customers.read'] },
       { href: '/admin/suppliers', label: 'Proveedores', permissions: ['suppliers.read'] },
       { href: '/admin/business', label: 'Datos del negocio', permissions: ['settings.read'] },
@@ -211,16 +214,20 @@ function hasAnyPermission(required: string[] | undefined, userPerms: string[]): 
   return required.some((p) => userPerms.includes(p));
 }
 
-function filterNav(items: NavEntry[], userPerms: string[]): NavEntry[] {
+function filterNav(
+  items: NavEntry[],
+  userPerms: string[],
+  multiBranch: boolean,
+): NavEntry[] {
+  const allowed = (c: { permissions?: string[]; multiBranch?: boolean }) =>
+    hasAnyPermission(c.permissions, userPerms) && (multiBranch || !c.multiBranch);
   const visible: NavEntry[] = [];
   for (const item of items) {
     if (item.kind === 'group') {
       // El grupo se muestra solo si al menos un hijo es visible.
-      const children = item.children.filter((c) =>
-        hasAnyPermission(c.permissions, userPerms),
-      );
+      const children = item.children.filter(allowed);
       if (children.length) visible.push({ ...item, children });
-    } else if (hasAnyPermission(item.permissions, userPerms)) {
+    } else if (allowed(item)) {
       visible.push(item);
     }
   }
@@ -343,11 +350,19 @@ function resolveRoutePermissions(pathname: string): string[] | undefined {
  * (el menú las oculta, pero escribir la URL las abría). Defensa de navegación;
  * el backend ya rechaza los datos vía permisos.
  */
+/** Rutas que solo existen con la función multi-sucursal habilitada. */
+const MULTI_BRANCH_ROUTES = ['/admin/branches', '/transferencias'];
+
 function RouteGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const multiBranch = useMultiBranch();
   // Si el usuario aún no cargó, no bloquear (AuthGuard maneja el no-login).
   if (!user) return <>{children}</>;
+  // Multi-sucursal apagado → bloquea las rutas de sucursales/transferencias.
+  if (!multiBranch && MULTI_BRANCH_ROUTES.some((r) => matchesRoute(pathname, r))) {
+    return <AccessDenied />;
+  }
   const required = resolveRoutePermissions(pathname);
   if (hasAnyPermission(required, user.permissions ?? [])) return <>{children}</>;
   return <AccessDenied />;
@@ -502,10 +517,11 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const multiBranch = useMultiBranch();
   const [openGroups, setOpenGroup] = useOpenGroups();
   const visibleNav = useMemo(
-    () => filterNav(NAV_ITEMS, user?.permissions ?? []),
-    [user?.permissions],
+    () => filterNav(NAV_ITEMS, user?.permissions ?? [], multiBranch),
+    [user?.permissions, multiBranch],
   );
   const isDrawer = variant === 'drawer';
 

@@ -85,7 +85,7 @@ export function ShareReceiptDialog({
 
   return (
     <MaintenanceShell open onClose={onClose} title={`Compartir recibo ${sale.saleNumber}`} size="md">
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="rounded-2xl border bg-gradient-to-br from-brand-tint via-card to-brand-soft p-4">
           <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Link público

@@ -69,7 +69,7 @@ export function CategoryFormDialog({ category, categories, onClose }: Props) {
       title={isEdit ? 'Editar categoría' : 'Nueva categoría'}
       size="md"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <FormField label="Nombre" required>
           <Input
             autoFocus

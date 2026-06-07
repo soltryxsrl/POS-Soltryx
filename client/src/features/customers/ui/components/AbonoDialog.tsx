@@ -84,7 +84,7 @@ export function AbonoDialog({
 
   return (
     <MaintenanceShell open onClose={onClose} title="Registrar abono" size="md">
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <div className="rounded-xl border bg-muted/40 p-3 text-sm">
           <div className="text-xs text-muted-foreground">Cliente</div>
           <div className="font-medium">{customerName}</div>
