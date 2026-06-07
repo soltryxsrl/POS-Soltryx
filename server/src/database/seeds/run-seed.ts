@@ -118,14 +118,15 @@ async function run(): Promise<void> {
         [roleCode, codes],
       );
     }
-    // SUPERADMIN (Soltryx): solo los permisos super-admin (plan.manage).
+    // SUPERADMIN (Soltryx): TODOS los permisos, incluidos los super-admin
+    // (plan.manage). Es god-mode de Soltryx, por encima del ADMIN del cliente.
     await m.query(
       `INSERT INTO role_permissions (role_id, permission_id)
        SELECT r.id, p.id
-       FROM roles r, permissions p
-       WHERE r.code = $1 AND p.code = ANY($2::varchar[])
+       FROM roles r CROSS JOIN permissions p
+       WHERE r.code = $1
        ON CONFLICT DO NOTHING`,
-      [SUPERADMIN_ROLE_CODE, SUPERADMIN_PERMISSION_CODES],
+      [SUPERADMIN_ROLE_CODE],
     );
     // eslint-disable-next-line no-console
     console.log('[seed] role-permissions assigned');

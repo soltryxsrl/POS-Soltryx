@@ -24,6 +24,7 @@ import {
   ScanLine,
   Settings2,
   Shield,
+  ShieldAlert,
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
@@ -306,7 +307,65 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isPos = pathname === '/pos' || pathname.startsWith('/pos/');
-  return isPos ? <PosShell>{children}</PosShell> : <DashboardShell>{children}</DashboardShell>;
+  const guarded = <RouteGuard>{children}</RouteGuard>;
+  return isPos ? <PosShell>{guarded}</PosShell> : <DashboardShell>{guarded}</DashboardShell>;
+}
+
+/**
+ * Permisos requeridos por ruta, derivados del propio NAV (cada item ya declara
+ * sus permisos) más unas rutas índice/detalle que no están en el menú. Si la
+ * ruta no está mapeada, no se restringe (el backend sigue siendo el candado real
+ * vía @RequirePermissions; esto es protección de navegación/UX).
+ */
+const EXTRA_ROUTE_PERMS: { href: string; permissions: string[] }[] = [
+  { href: '/reports', permissions: ['reports.read'] },
+];
+
+function resolveRoutePermissions(pathname: string): string[] | undefined {
+  const flat: { href: string; permissions?: string[] }[] = [];
+  for (const item of NAV_ITEMS) {
+    if (item.kind === 'group') {
+      for (const c of item.children) flat.push({ href: c.href, permissions: c.permissions });
+    } else {
+      flat.push({ href: item.href, permissions: item.permissions });
+    }
+  }
+  flat.push(...EXTRA_ROUTE_PERMS);
+  // La coincidencia más específica (href más largo) gana.
+  const match = flat
+    .filter((e) => matchesRoute(pathname, e.href))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+  return match?.permissions;
+}
+
+/**
+ * Bloquea el acceso por URL a rutas para las que el usuario no tiene permiso
+ * (el menú las oculta, pero escribir la URL las abría). Defensa de navegación;
+ * el backend ya rechaza los datos vía permisos.
+ */
+function RouteGuard({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  // Si el usuario aún no cargó, no bloquear (AuthGuard maneja el no-login).
+  if (!user) return <>{children}</>;
+  const required = resolveRoutePermissions(pathname);
+  if (hasAnyPermission(required, user.permissions ?? [])) return <>{children}</>;
+  return <AccessDenied />;
+}
+
+function AccessDenied() {
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+      <ShieldAlert className="h-10 w-10 text-muted-foreground" />
+      <h2 className="text-lg font-semibold text-foreground">No tienes acceso a esta página</h2>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Tu rol no incluye el permiso necesario para ver esta sección.
+      </p>
+      <Link href="/" className="text-sm font-medium text-brand-from hover:underline">
+        Volver al inicio
+      </Link>
+    </div>
+  );
 }
 
 /**
