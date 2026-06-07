@@ -1,17 +1,11 @@
 'use client';
 
 import { DocTypesTable } from '@/features/fiscal/ui/components/DocTypesTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function FiscalDocTypesPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Tipos de Comprobantes"
-        description="Catálogo DGII de tipos de e-CF. Activa solo los que tu negocio emite."
-        crumbs={[{ label: 'Impuestos' }]}
-      />
-      <DocTypesTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <DocTypesTable fillHeight title="Tipos de Comprobantes" />
     </div>
   );
 }

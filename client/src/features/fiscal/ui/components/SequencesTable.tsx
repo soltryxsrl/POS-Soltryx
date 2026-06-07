@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -17,7 +17,13 @@ import { SequenceFormDialog } from './SequenceFormDialog';
 const EXPIRE_WARN_DAYS = 30;
 const LOW_REMAINING_PCT = 10;
 
-export function SequencesTable() {
+export function SequencesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const { user } = useAuth();
   const canManage = !!user && user.permissions.includes('fiscal.sequences.manage');
   const sequences = useFiscalSequences();
@@ -189,6 +195,8 @@ export function SequencesTable() {
         isFetching={sequences.isFetching}
         errorMessage={sequences.isError ? getErrorMessage(sequences.error) : null}
         emptyState={'Sin secuencias todavía. Crea la primera con "Nueva secuencia".'}
+        title={title}
+        fillHeight={fillHeight}
       />
 
       {showCreate && <SequenceFormDialog onClose={() => setShowCreate(false)} />}

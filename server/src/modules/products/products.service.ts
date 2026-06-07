@@ -1072,6 +1072,8 @@ export class ProductsService {
             taxRate: p.taxRate,
             taxTypeCode: p.taxTypeCode,
             minStock: p.minStock,
+            maxStock: p.maxStock,
+            reorderPoint: p.reorderPoint,
             stock: '0.000',
             isActive: p.isActive,
             isKit: p.isKit,

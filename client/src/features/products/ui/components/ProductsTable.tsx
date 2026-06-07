@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Layers, Package, Pencil, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { Layers, Package, Pencil, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
@@ -22,11 +23,18 @@ import { ProductFormDialog } from './ProductFormDialog';
 
 const FILTER_KEYS = ['q', 'categoryId', 'isActive', 'lowStock', 'type'] as const;
 
-export function ProductsTable() {
+export function ProductsTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const table = useTableQueryState({
     defaultSort: 'name',
     defaultSortDir: 'asc',
     filterKeys: FILTER_KEYS,
+    defaultFilters: { isActive: 'true' },
   });
 
   const products = useProducts({
@@ -201,6 +209,8 @@ export function ProductsTable() {
 
   const categories = useCategories();
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  // Filtros no-búsqueda (todos menos 'q') → cuenta para el badge del popover.
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   // Mismos filtros aplicados que la tabla, para que "Exportar maestro" respete
   // lo que el usuario está viendo (sin límite/offset: la exportación pagina sola).
@@ -222,51 +232,56 @@ export function ProductsTable() {
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-72"
       />
-      <Chip
-        label="Stock bajo"
-        active={table.filterDraft.lowStock === 'true'}
-        onClick={() =>
-          table.setFilter(
-            'lowStock',
-            table.filterDraft.lowStock === 'true' ? undefined : 'true',
-          )
-        }
-      />
-      <StatusFilter
-        value={table.filterDraft.isActive}
-        onChange={(v) => table.setFilter('isActive', v)}
-      />
-      <Select
-        value={table.filterDraft.categoryId ?? ''}
-        onChange={(e) => table.setFilter('categoryId', e.target.value)}
-        className="w-44"
-      >
-        <option value="">Todas las categorías</option>
-        {categories.data?.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </Select>
-      <Select
-        value={table.filterDraft.type ?? ''}
-        onChange={(e) => table.setFilter('type', e.target.value)}
-        className="w-36"
-      >
-        <option value="">Todos los tipos</option>
-        <option value="simple">Simples</option>
-        <option value="kit">Kits</option>
-        <option value="variant">Con variantes</option>
-      </Select>
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => table.clearFilters()}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Stock</div>
+          <Chip
+            label="Stock bajo"
+            active={table.filterDraft.lowStock === 'true'}
+            onClick={() =>
+              table.setFilter(
+                'lowStock',
+                table.filterDraft.lowStock === 'true' ? undefined : 'true',
+              )
+            }
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <StatusFilter
+            value={table.filterDraft.isActive}
+            onChange={(v) => table.setFilter('isActive', v)}
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Categoría</div>
+          <Select
+            value={table.filterDraft.categoryId ?? ''}
+            onChange={(e) => table.setFilter('categoryId', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todas las categorías</option>
+            {categories.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Tipo</div>
+          <Select
+            value={table.filterDraft.type ?? ''}
+            onChange={(e) => table.setFilter('type', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="simple">Simples</option>
+            <option value="kit">Kits</option>
+            <option value="variant">Con variantes</option>
+          </Select>
+        </div>
+      </FilterPopover>
       <div className="ml-auto flex items-center gap-2">
         <CatalogExportButton params={exportParams} />
         {canUpdate && (
@@ -301,7 +316,9 @@ export function ProductsTable() {
         isFetching={products.isFetching}
         errorMessage={products.isError ? getErrorMessage(products.error) : null}
         emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'No hay productos.'}
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {adjustingId && (

@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Eye, Pencil, Trash2, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
@@ -15,7 +16,13 @@ import { SupplierFormDialog } from './SupplierFormDialog';
 
 const FILTER_KEYS = ['q', 'isActive'] as const;
 
-export function SuppliersTable() {
+export function SuppliersTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const { user } = useAuth();
   const canDelete = !!user && user.permissions.includes('suppliers.delete');
   const [showCreate, setShowCreate] = useState(false);
@@ -28,6 +35,7 @@ export function SuppliersTable() {
     defaultSort: 'tradeName',
     defaultSortDir: 'asc',
     filterKeys: FILTER_KEYS,
+    defaultFilters: { isActive: 'true' },
   });
 
   const suppliers = useSuppliers({
@@ -118,6 +126,7 @@ export function SuppliersTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
@@ -127,19 +136,15 @@ export function SuppliersTable() {
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-80"
       />
-      <StatusFilter
-        value={table.filterDraft.isActive}
-        onChange={(v) => table.setFilter('isActive', v)}
-      />
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => table.clearFilters()}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <StatusFilter
+            value={table.filterDraft.isActive}
+            onChange={(v) => table.setFilter('isActive', v)}
+          />
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -163,7 +168,9 @@ export function SuppliersTable() {
         emptyState={
           hasFilters ? 'Sin resultados con esos filtros.' : 'Sin proveedores todavía.'
         }
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {showCreate && <SupplierFormDialog onClose={() => setShowCreate(false)} />}

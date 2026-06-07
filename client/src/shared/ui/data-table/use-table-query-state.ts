@@ -22,6 +22,14 @@ export interface UseTableQueryStateOptions {
   filterKeys?: readonly string[];
   /** ms para debounce de cambios en filtros (no se aplica a sort/page). */
   filterDebounceMs?: number;
+  /**
+   * Valores iniciales de filtros. Se SIEMBRAN una sola vez al montar y solo si
+   * la URL viene "limpia" para esta tabla (sin filtros/sort/page). Permite que
+   * un filtro arranque en un valor (p. ej. `isActive: 'true'` → mostrar Activos
+   * por defecto) y que el usuario aún pueda limpiarlo a "Todos": como la siembra
+   * solo ocurre al montar, limpiar el filtro NO vuelve a reaplicar el default.
+   */
+  defaultFilters?: Record<string, string>;
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -42,6 +50,7 @@ export function useTableQueryState({
   defaultSortDir,
   filterKeys = [],
   filterDebounceMs = DEFAULT_FILTER_DEBOUNCE_MS,
+  defaultFilters,
 }: UseTableQueryStateOptions = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -128,6 +137,27 @@ export function useTableQueryState({
       filterKeys,
     ],
   );
+
+  // Siembra los filtros por defecto UNA vez al montar, solo si la URL viene
+  // limpia para esta tabla. Así el filtro arranca en su valor por defecto
+  // (p. ej. Activos) sin atrapar al usuario: si luego limpia a "Todos", no se
+  // re-siembra (la siembra es solo de montaje).
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (!defaultFilters || Object.keys(defaultFilters).length === 0) return;
+    const pristine =
+      !filterKeys.some((fk) => searchParams.get(key(fk)) != null) &&
+      searchParams.get(key('page')) == null &&
+      searchParams.get(key('pageSize')) == null &&
+      searchParams.get(key('sort')) == null &&
+      searchParams.get(key('sortDir')) == null;
+    if (!pristine) return;
+    setFilterDraft((prev) => ({ ...defaultFilters, ...prev }));
+    writeToUrl({ filters: defaultFilters });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounce push de filtros al URL.
   useEffect(() => {

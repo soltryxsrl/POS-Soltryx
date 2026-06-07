@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Pencil } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import {
@@ -15,7 +15,13 @@ import {
 import type { Currency } from '../../domain/types';
 import { SetRateDialog } from './SetRateDialog';
 
-export function CurrenciesTable() {
+export function CurrenciesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const currencies = useCurrencies();
   const toggle = useToggleCurrency();
   const [editing, setEditing] = useState<Currency | null>(null);
@@ -145,7 +151,7 @@ export function CurrenciesTable() {
   );
 
   return (
-    <div className="space-y-3">
+    <div className={fillHeight ? 'flex min-h-0 flex-1 flex-col gap-3' : 'space-y-3'}>
       {actionError && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {actionError}
@@ -167,6 +173,8 @@ export function CurrenciesTable() {
         isFetching={currencies.isFetching}
         errorMessage={currencies.isError ? getErrorMessage(currencies.error) : null}
         emptyState="No hay monedas."
+        title={title}
+        fillHeight={fillHeight}
       />
 
       {editing && <SetRateDialog currency={editing} onClose={() => setEditing(null)} />}

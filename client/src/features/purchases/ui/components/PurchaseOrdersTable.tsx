@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -32,7 +32,13 @@ const STATUSES: PurchaseOrderStatus[] = ['PENDING', 'PARTIAL', 'RECEIVED', 'CANC
 
 const FILTER_KEYS = ['q', 'status', 'supplierId', 'from', 'to'] as const;
 
-export function PurchaseOrdersTable() {
+export function PurchaseOrdersTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const router = useRouter();
   const table = useTableQueryState({
     defaultSort: 'createdAt',
@@ -113,64 +119,66 @@ export function PurchaseOrdersTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Buscar # de orden..."
-          value={table.filterDraft.q ?? ''}
-          onChange={(e) => table.setFilter('q', e.target.value)}
-          className="w-56"
-        />
-        {STATUSES.map((s) => (
-          <Chip
-            key={s}
-            label={STATUS_LABEL[s]}
-            active={table.filterDraft.status === s}
-            onClick={() =>
-              table.setFilter('status', table.filterDraft.status === s ? undefined : s)
-            }
-          />
-        ))}
-        <Select
-          value={table.filterDraft.supplierId ?? ''}
-          onChange={(e) => table.setFilter('supplierId', e.target.value)}
-          className="w-52"
-        >
-          <option value="">Todos los proveedores</option>
-          {suppliers.data?.items.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.tradeName}
-            </option>
-          ))}
-        </Select>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => table.clearFilters()}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        placeholder="Buscar # de orden..."
+        value={table.filterDraft.q ?? ''}
+        onChange={(e) => table.setFilter('q', e.target.value)}
+        className="w-56"
+      />
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <div className="flex flex-wrap gap-2">
+            {STATUSES.map((s) => (
+              <Chip
+                key={s}
+                label={STATUS_LABEL[s]}
+                active={table.filterDraft.status === s}
+                onClick={() =>
+                  table.setFilter('status', table.filterDraft.status === s ? undefined : s)
+                }
+              />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Proveedor</div>
+          <Select
+            value={table.filterDraft.supplierId ?? ''}
+            onChange={(e) => table.setFilter('supplierId', e.target.value)}
+            className="w-full"
           >
-            <X className="h-3 w-3" /> Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Rango fecha:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-        <span>—</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-      </div>
+            <option value="">Todos los proveedores</option>
+            {suppliers.data?.items.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.tradeName}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango de fecha</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={table.filterDraft.from ?? ''}
+              onChange={(e) => table.setFilter('from', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={table.filterDraft.to ?? ''}
+              onChange={(e) => table.setFilter('to', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+          </div>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -196,7 +204,9 @@ export function PurchaseOrdersTable() {
             ? 'Sin resultados con esos filtros.'
             : 'Sin órdenes todavía. Crea la primera con "Nueva orden".'
         }
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       <Fab label="Nueva orden" onClick={() => router.push('/purchases/new')} />

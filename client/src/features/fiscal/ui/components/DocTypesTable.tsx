@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -21,7 +21,13 @@ const APPLIES_LABEL: Record<string, string> = {
   BOTH: 'Ambos',
 };
 
-export function DocTypesTable() {
+export function DocTypesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const { user } = useAuth();
   const canManage = !!user && user.permissions.includes('fiscal.types.manage');
   const types = useFiscalDocTypes();
@@ -128,6 +134,8 @@ export function DocTypesTable() {
       isFetching={types.isFetching}
       errorMessage={types.isError ? getErrorMessage(types.error) : null}
       emptyState="No hay tipos de comprobante."
+      title={title}
+      fillHeight={fillHeight}
     />
   );
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Can } from '@/features/auth/ui/components/Can';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
@@ -29,11 +30,18 @@ function formatDate(iso: string | null): string {
   }
 }
 
-export function UsersTable() {
+export function UsersTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const table = useTableQueryState({
     defaultSort: 'username',
     defaultSortDir: 'asc',
     filterKeys: FILTER_KEYS,
+    defaultFilters: { isActive: 'true' },
   });
 
   const users = useAdminUsers({
@@ -155,40 +163,40 @@ export function UsersTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2">
       <Input
         placeholder="Buscar por email, username o nombre..."
         value={table.filterDraft.q ?? ''}
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-80"
       />
-      <StatusFilter
-        value={table.filterDraft.isActive}
-        onChange={(v) => table.setFilter('isActive', v)}
-      />
-      <Select
-        value={table.filterDraft.roleId ?? ''}
-        onChange={(e) => table.setFilter('roleId', e.target.value)}
-        className="w-44"
-      >
-        <option value="">Todos los roles</option>
-        {roles.data?.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.name}
-          </option>
-        ))}
-      </Select>
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => table.clearFilters()}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <StatusFilter
+            value={table.filterDraft.isActive}
+            onChange={(v) => table.setFilter('isActive', v)}
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rol</div>
+          <Select
+            value={table.filterDraft.roleId ?? ''}
+            onChange={(e) => table.setFilter('roleId', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todos los roles</option>
+            {roles.data?.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -210,7 +218,9 @@ export function UsersTable() {
         isFetching={users.isFetching}
         errorMessage={users.isError ? getErrorMessage(users.error) : null}
         emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'No hay usuarios.'}
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {formState && (

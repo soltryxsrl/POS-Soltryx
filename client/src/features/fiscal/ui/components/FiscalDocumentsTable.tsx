@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Button } from '@/shared/ui/controls/Button';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
@@ -133,7 +133,13 @@ function formatIssueDate(iso: string): string {
   });
 }
 
-export function FiscalDocumentsTable() {
+export function FiscalDocumentsTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const table = useTableQueryState({
     defaultSort: 'issueDate',
     defaultSortDir: 'desc',
@@ -234,67 +240,68 @@ export function FiscalDocumentsTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  // Filtros no-búsqueda activos (excluye 'q', que vive inline en la barra).
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2">
       <Input
         placeholder="Buscar por NCF, nombre o RNC..."
         value={table.filterDraft.q ?? ''}
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-72"
       />
-      <Select
-        value={table.filterDraft.docType ?? ''}
-        onChange={(e) => table.setFilter('docType', e.target.value)}
-        className="w-44"
-      >
-        <option value="">Todos los tipos</option>
-        {docTypes.data
-          ?.filter((dt) => dt.appliesTo === 'SALE' || dt.appliesTo === 'BOTH')
-          .map((dt) => (
-            <option key={dt.code} value={dt.code}>
-              {dt.code} — {dt.name}
-            </option>
-          ))}
-      </Select>
-      <Select
-        value={table.filterDraft.status ?? ''}
-        onChange={(e) => table.setFilter('status', e.target.value)}
-        className="w-40"
-      >
-        <option value="">Todos los estados</option>
-        <option value="ISSUED">Emitido</option>
-        <option value="PUBLISHED">Enviado a DGII</option>
-        <option value="REJECTED">Rechazado</option>
-        <option value="CANCELLED">Anulado</option>
-      </Select>
-      <div className="flex items-center gap-1">
-        <span className="text-xs text-muted-foreground">Desde:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="w-36"
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-xs text-muted-foreground">Hasta:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="w-36"
-        />
-      </div>
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => table.clearFilters()}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Tipo</div>
+          <Select
+            value={table.filterDraft.docType ?? ''}
+            onChange={(e) => table.setFilter('docType', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todos los tipos</option>
+            {docTypes.data
+              ?.filter((dt) => dt.appliesTo === 'SALE' || dt.appliesTo === 'BOTH')
+              .map((dt) => (
+                <option key={dt.code} value={dt.code}>
+                  {dt.code} — {dt.name}
+                </option>
+              ))}
+          </Select>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <Select
+            value={table.filterDraft.status ?? ''}
+            onChange={(e) => table.setFilter('status', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todos los estados</option>
+            <option value="ISSUED">Emitido</option>
+            <option value="PUBLISHED">Enviado a DGII</option>
+            <option value="REJECTED">Rechazado</option>
+            <option value="CANCELLED">Anulado</option>
+          </Select>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango de fecha</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={table.filterDraft.from ?? ''}
+              onChange={(e) => table.setFilter('from', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={table.filterDraft.to ?? ''}
+              onChange={(e) => table.setFilter('to', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+          </div>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -319,7 +326,9 @@ export function FiscalDocumentsTable() {
           ? 'Sin resultados con esos filtros.'
           : 'No hay comprobantes emitidos. Emite uno desde el POS seleccionando un tipo de comprobante al cobrar.'
       }
+      title={title}
       toolbar={toolbar}
+      fillHeight={fillHeight}
     />
   );
 }

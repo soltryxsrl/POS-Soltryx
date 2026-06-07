@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
 import { formatDateTime, formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
 import { StockMovementType } from '@/shared/types/enums';
@@ -36,7 +36,15 @@ const TYPE_CHIPS: Array<{ value: StockMovementType; label: string }> = [
   { value: StockMovementType.CANCELLED_SALE, label: 'Anulada' },
 ];
 
-export function StockMovementsTable({ productId }: { productId?: string }) {
+export function StockMovementsTable({
+  productId,
+  fillHeight,
+  title,
+}: {
+  productId?: string;
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const table = useTableQueryState({
     defaultSort: 'createdAt',
     defaultSortDir: 'desc',
@@ -54,8 +62,8 @@ export function StockMovementsTable({ productId }: { productId?: string }) {
     offset: (table.page - 1) * table.pageSize,
   });
 
-  const columns = useMemo<DataTableColumn<StockMovement>[]>(
-    () => [
+  const columns = useMemo<DataTableColumn<StockMovement>[]>(() => {
+    const base: DataTableColumn<StockMovement>[] = [
       {
         key: 'createdAt',
         header: 'Fecha',
@@ -143,52 +151,70 @@ export function StockMovementsTable({ productId }: { productId?: string }) {
         header: 'Motivo',
         render: (m) => <span className="text-muted-foreground">{m.reason ?? '—'}</span>,
       },
-    ],
-    [],
-  );
+    ];
+    // En la vista global (sin productId) anteponemos la columna "Producto" para
+    // saber a qué ítem corresponde cada movimiento. En el kardex por-producto se
+    // omite (sería redundante).
+    if (productId) return base;
+    return [
+      {
+        key: 'product',
+        header: 'Producto',
+        render: (m) => (
+          <div className="min-w-0">
+            <div className="truncate font-medium">{m.productName ?? '—'}</div>
+            {(m.sku || m.variantName) && (
+              <div className="truncate text-[11px] text-muted-foreground">
+                {m.sku ?? ''}
+                {m.variantName ? ` · ${m.variantName}` : ''}
+              </div>
+            )}
+          </div>
+        ),
+      },
+      ...base,
+    ];
+  }, [productId]);
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => !!table.filters[k]).length;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {TYPE_CHIPS.map((c) => (
-          <Chip
-            key={c.value}
-            label={c.label}
-            active={table.filterDraft.type === c.value}
-            onClick={() =>
-              table.setFilter('type', table.filterDraft.type === c.value ? undefined : c.value)
-            }
+    <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-foreground">Tipo de movimiento</div>
+        <div className="flex flex-wrap gap-2">
+          {TYPE_CHIPS.map((c) => (
+            <Chip
+              key={c.value}
+              label={c.label}
+              active={table.filterDraft.type === c.value}
+              onClick={() =>
+                table.setFilter('type', table.filterDraft.type === c.value ? undefined : c.value)
+              }
+            />
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-foreground">Rango de fecha</div>
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={table.filterDraft.from ?? ''}
+            onChange={(e) => table.setFilter('from', e.target.value)}
+            className="h-8 min-w-0 flex-1 text-xs"
           />
-        ))}
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => table.clearFilters()}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3 w-3" /> Limpiar
-          </button>
-        )}
+          <span className="text-muted-foreground">—</span>
+          <Input
+            type="date"
+            value={table.filterDraft.to ?? ''}
+            onChange={(e) => table.setFilter('to', e.target.value)}
+            className="h-8 min-w-0 flex-1 text-xs"
+          />
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Rango fecha:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-        <span>—</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-      </div>
-    </div>
+    </FilterPopover>
   );
 
   return (
@@ -208,7 +234,9 @@ export function StockMovementsTable({ productId }: { productId?: string }) {
       isFetching={movements.isFetching}
       errorMessage={movements.isError ? getErrorMessage(movements.error) : null}
       emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'Sin movimientos.'}
+      title={title}
       toolbar={toolbar}
+      fillHeight={fillHeight}
     />
   );
 }

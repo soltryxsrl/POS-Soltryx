@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, Pencil, Star, XCircle } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -22,7 +22,13 @@ const KIND_LABEL: Record<string, string> = {
   OTHER: 'Otro',
 };
 
-export function PaymentMethodsTable() {
+export function PaymentMethodsTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const { user } = useAuth();
   const canManage =
     !!user && user.permissions.includes('payment-methods.manage');
@@ -153,6 +159,8 @@ export function PaymentMethodsTable() {
         isFetching={methods.isFetching}
         errorMessage={methods.isError ? getErrorMessage(methods.error) : null}
         emptyState="No hay formas de pago."
+        title={title}
+        fillHeight={fillHeight}
       />
 
       {editing && (

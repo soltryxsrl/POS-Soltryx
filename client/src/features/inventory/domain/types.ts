@@ -19,6 +19,12 @@ export interface StockMovement {
   saleId: string | null;
   userId: string;
   createdAt: string;
+  /** Nombre del producto del movimiento (kardex global). */
+  productName: string | null;
+  /** SKU del producto. */
+  sku: string | null;
+  /** Nombre de la variante, si el movimiento fue de una variante. */
+  variantName: string | null;
 }
 
 export interface StockMovementsList {

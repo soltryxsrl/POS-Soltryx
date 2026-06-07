@@ -20,4 +20,10 @@ export interface StockMovement {
   readonly saleId: string | null;
   readonly userId: string;
   readonly createdAt: Date;
+  /** Nombre del producto. Sólo se puebla en la consulta de lista (kardex). */
+  readonly productName?: string | null;
+  /** SKU del producto. Sólo en lista. */
+  readonly sku?: string | null;
+  /** Nombre de la variante, si el movimiento fue de una variante. Sólo en lista. */
+  readonly variantName?: string | null;
 }

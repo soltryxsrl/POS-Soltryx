@@ -1,13 +1,11 @@
 'use client';
 
 import { SalesTable } from '@/features/sales/ui/components/SalesTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function SalesPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Ventas" />
-      <SalesTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <SalesTable fillHeight title="Ventas" />
     </div>
   );
 }

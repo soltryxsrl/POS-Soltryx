@@ -1,17 +1,11 @@
 'use client';
 
 import { CurrenciesTable } from '@/features/currencies/ui/components/CurrenciesTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function MonedasPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Monedas y tasas de cambio"
-        description="Activa monedas extranjeras y actualiza sus tasas. DOP es la moneda base del sistema."
-        crumbs={[{ label: 'Administración' }]}
-      />
-      <CurrenciesTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <CurrenciesTable fillHeight title="Monedas y tasas de cambio" />
     </div>
   );
 }

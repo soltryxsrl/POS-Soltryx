@@ -14,7 +14,6 @@ import {
 import { http } from '@/shared/lib/http-client';
 import { formatDateTime } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 interface AuditEvent {
   id: string;
@@ -90,51 +89,49 @@ export default function AuditPage() {
   const canNext = page < totalPages;
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Bitácora de auditoría"
-        description="Registro inmutable de acciones sensibles del sistema."
-        crumbs={[{ label: 'Administración' }]}
-      />
-
-      <div className="flex items-center gap-2 rounded-xl border bg-card p-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xs font-medium text-muted-foreground">Filtrar por acción:</span>
-        <select
-          value={actionFilter}
-          onChange={(e) => {
-            setActionFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus:border-brand-from"
-        >
-          <option value="">Todas</option>
-          <optgroup label="Acceso">
-            <option value="auth.login.success">Inicios de sesión</option>
-            <option value="auth.login.failed">Intentos fallidos</option>
-          </optgroup>
-          <optgroup label="Ventas">
-            <option value="sales.cancel">Ventas anuladas</option>
-            <option value="sales.return">Devoluciones</option>
-            <option value="sales.discount.override">Descuentos autorizados</option>
-          </optgroup>
-          <optgroup label="Compras">
-            <option value="purchases.receive">Recepciones de compra</option>
-            <option value="purchases.cancel">Compras canceladas</option>
-          </optgroup>
-          <optgroup label="Usuarios y roles">
-            <option value="users.created">Usuarios creados</option>
-            <option value="users.updated">Usuarios actualizados</option>
-            <option value="users.deactivated">Usuarios desactivados</option>
-            <option value="users.deleted">Usuarios eliminados</option>
-            <option value="roles.created">Roles creados</option>
-            <option value="roles.updated">Roles actualizados</option>
-            <option value="roles.deleted">Roles eliminados</option>
-          </optgroup>
-        </select>
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Bitácora de auditoría</h1>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Filtrar por acción:</span>
+          <select
+            value={actionFilter}
+            onChange={(e) => {
+              setActionFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm outline-none focus:border-brand-from"
+          >
+            <option value="">Todas</option>
+            <optgroup label="Acceso">
+              <option value="auth.login.success">Inicios de sesión</option>
+              <option value="auth.login.failed">Intentos fallidos</option>
+            </optgroup>
+            <optgroup label="Ventas">
+              <option value="sales.cancel">Ventas anuladas</option>
+              <option value="sales.return">Devoluciones</option>
+              <option value="sales.discount.override">Descuentos autorizados</option>
+            </optgroup>
+            <optgroup label="Compras">
+              <option value="purchases.receive">Recepciones de compra</option>
+              <option value="purchases.cancel">Compras canceladas</option>
+            </optgroup>
+            <optgroup label="Usuarios y roles">
+              <option value="users.created">Usuarios creados</option>
+              <option value="users.updated">Usuarios actualizados</option>
+              <option value="users.deactivated">Usuarios desactivados</option>
+              <option value="users.deleted">Usuarios eliminados</option>
+              <option value="roles.created">Roles creados</option>
+              <option value="roles.updated">Roles actualizados</option>
+              <option value="roles.deleted">Roles eliminados</option>
+            </optgroup>
+          </select>
+        </div>
       </div>
 
-      <div className="rounded-2xl border bg-card">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-card">
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {events.isLoading && (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">Cargando...</p>
         )}
@@ -216,6 +213,7 @@ export default function AuditPage() {
             );
           })}
         </ul>
+        </div>
         {total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
             <div>

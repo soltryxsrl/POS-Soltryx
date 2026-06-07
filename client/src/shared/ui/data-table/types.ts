@@ -36,7 +36,22 @@ export interface DataTableProps<T> {
   isFetching?: boolean;
   emptyState?: ReactNode;
   errorMessage?: string | null;
+  /**
+   * Título slim de la pantalla, renderizado a la IZQUIERDA de la misma fila que
+   * el `toolbar` (los filtros quedan a la derecha). Reemplaza al `SectionHeader`
+   * grande en páginas de tabla para recuperar alto vertical.
+   */
+  title?: ReactNode;
   toolbar?: ReactNode;
   onRowClick?: (row: T) => void;
   rowKey: (row: T) => string;
+
+  /**
+   * Modo "alto completo": la tabla llena la altura disponible y su cuerpo
+   * scrollea internamente (con el `thead` sticky) en vez de crecer y hacer
+   * scrollear la página. El contenedor padre debe tener una altura definida
+   * (ej. una columna flex de alto fijo). El toolbar y la paginación quedan
+   * fijos arriba/abajo. Opt-in: por defecto la tabla crece como siempre.
+   */
+  fillHeight?: boolean;
 }

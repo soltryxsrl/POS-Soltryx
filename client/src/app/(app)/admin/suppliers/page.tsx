@@ -1,17 +1,11 @@
 'use client';
 
 import { SuppliersTable } from '@/features/suppliers/ui/components/SuppliersTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function SuppliersPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Proveedores"
-        description="Listado de proveedores con datos de contacto y RNC."
-        crumbs={[{ label: 'Administración' }]}
-      />
-      <SuppliersTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <SuppliersTable fillHeight title="Proveedores" />
     </div>
   );
 }

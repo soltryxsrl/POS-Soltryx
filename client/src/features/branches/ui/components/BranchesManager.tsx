@@ -7,8 +7,10 @@ import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/controls/Button';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
+import { DataTable, type DataTableColumn } from '@/shared/ui/data-table';
 import { useAuth, useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { useCashRegisters } from '@/features/cash/application/hooks/use-cash';
+import type { CashRegister } from '@/features/cash/domain/types';
 import { CashRegisterFormDialog } from '@/features/cash/ui/components/CashRegisterFormDialog';
 import { useBranches, useUpdateBranch } from '../../application/hooks/use-branches';
 import { useActiveBranchStore } from '../../application/stores/active-branch.store';
@@ -69,7 +71,7 @@ function SucursalesTab() {
   const canCreate = useHasPermission('branches.create');
   const canManage = useHasPermission('branches.update');
   const isAdminOrManager = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
-  const [status, setStatus] = useState<'true' | 'false' | undefined>(undefined);
+  const [status, setStatus] = useState<'true' | 'false' | undefined>('true');
   const branches = useBranches({ limit: 100, isActive: status });
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
@@ -78,63 +80,96 @@ function SucursalesTab() {
 
   const items = branches.data?.items ?? [];
 
+  const columns: DataTableColumn<Branch>[] = [
+    {
+      key: 'name',
+      header: 'Sucursal',
+      render: (b) => (
+        <span className="inline-flex items-center gap-2 font-medium text-foreground">
+          <Building2 className="h-4 w-4 text-brand-from" />
+          {b.name}
+        </span>
+      ),
+    },
+    {
+      key: 'code',
+      header: 'Código',
+      cellClassName: 'font-mono text-xs text-muted-foreground',
+      render: (b) => b.code,
+    },
+    {
+      key: 'rnc',
+      header: 'RNC',
+      cellClassName: 'text-muted-foreground',
+      render: (b) => b.rnc ?? '—',
+    },
+    {
+      key: 'isActive',
+      header: 'Activa',
+      align: 'right',
+      render: (b) => (
+        <span
+          className={
+            b.isActive
+              ? 'inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+              : 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+          }
+        >
+          {b.isActive ? 'Activa' : 'Inactiva'}
+        </span>
+      ),
+    },
+    ...(canManage
+      ? ([
+          {
+            key: 'actions',
+            header: 'Acciones',
+            align: 'right',
+            render: (b) => (
+              <BranchActions branch={b} onView={() => setViewing(b)} onEdit={() => setEditing(b)} />
+            ),
+          },
+        ] satisfies DataTableColumn<Branch>[])
+      : []),
+  ];
+
+  const toolbar = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <StatusFilter
+        value={status}
+        onChange={(v) => setStatus(v as 'true' | 'false' | undefined)}
+      />
+      {isAdminOrManager && (
+        <Button variant="outline" onClick={() => setShowClone(true)}>
+          <Copy className="h-4 w-4" />
+          Copiar catálogo
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <StatusFilter
-          value={status}
-          onChange={(v) => setStatus(v as 'true' | 'false' | undefined)}
-        />
-        {isAdminOrManager && (
-          <Button variant="outline" onClick={() => setShowClone(true)}>
-            <Copy className="h-4 w-4" />
-            Copiar catálogo
-          </Button>
-        )}
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5">Sucursal</th>
-              <th className="px-4 py-2.5">Código</th>
-              <th className="px-4 py-2.5">RNC</th>
-              <th className="px-4 py-2.5 text-right">Activa</th>
-              {canManage && <th className="px-4 py-2.5 text-right">Acciones</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {branches.isLoading && (
-              <tr>
-                <td colSpan={canManage ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando...
-                </td>
-              </tr>
-            )}
-            {!branches.isLoading && items.length === 0 && (
-              <tr>
-                <td colSpan={canManage ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">
-                  {status === 'false'
-                    ? 'No hay sucursales inactivas.'
-                    : status === 'true'
-                    ? 'No hay sucursales activas.'
-                    : 'No hay sucursales.'}
-                </td>
-              </tr>
-            )}
-            {items.map((b) => (
-              <BranchRow
-                key={b.id}
-                branch={b}
-                canManage={canManage}
-                onView={() => setViewing(b)}
-                onEdit={() => setEditing(b)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<Branch>
+        columns={columns}
+        rows={items}
+        total={items.length}
+        rowKey={(b) => b.id}
+        page={1}
+        pageSize={Math.max(items.length, 25)}
+        onPageChange={() => undefined}
+        isLoading={branches.isLoading}
+        isFetching={branches.isFetching}
+        errorMessage={branches.isError ? getErrorMessage(branches.error) : null}
+        toolbar={toolbar}
+        emptyState={
+          status === 'false'
+            ? 'No hay sucursales inactivas.'
+            : status === 'true'
+            ? 'No hay sucursales activas.'
+            : 'No hay sucursales.'
+        }
+      />
 
       {canCreate && (
         <Fab label="Nueva sucursal" onClick={() => setShowCreate(true)} />
@@ -151,15 +186,19 @@ function SucursalesTab() {
   );
 }
 
-/** Fila de sucursal (solo lectura) con acciones Ver / Editar / activar-desactivar. */
-function BranchRow({
+/**
+ * Acciones por fila de una sucursal: Ver / Editar / activar-desactivar.
+ *
+ * Vive como componente propio (no como render() de columna) porque el toggle
+ * usa el hook por-fila useUpdateBranch(branch.id), y los hooks no pueden
+ * llamarse dentro de la función render() de una columna del DataTable.
+ */
+function BranchActions({
   branch,
-  canManage,
   onView,
   onEdit,
 }: {
   branch: Branch;
-  canManage: boolean;
   onView: () => void;
   onEdit: () => void;
 }) {
@@ -176,65 +215,42 @@ function BranchRow({
   };
 
   return (
-    <tr className="hover:bg-muted/30">
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center gap-2 font-medium text-foreground">
-          <Building2 className="h-4 w-4 text-brand-from" />
-          {branch.name}
-        </span>
-      </td>
-      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{branch.code}</td>
-      <td className="px-4 py-3 text-muted-foreground">{branch.rnc ?? '—'}</td>
-      <td className="px-4 py-3 text-right">
-        <span
+    <>
+      <div className="flex items-center justify-end gap-0.5">
+        <button
+          type="button"
+          title="Ver"
+          aria-label="Ver"
+          onClick={onView}
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          title="Editar"
+          aria-label="Editar"
+          onClick={onEdit}
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleActive}
+          disabled={update.isPending}
+          title={branch.isActive ? 'Desactivar' : 'Activar'}
+          aria-label={branch.isActive ? 'Desactivar' : 'Activar'}
           className={
-            branch.isActive
-              ? 'inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-              : 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+            'rounded-md p-1.5 transition hover:bg-muted disabled:opacity-50 ' +
+            (branch.isActive ? 'text-amber-600' : 'text-emerald-600')
           }
         >
-          {branch.isActive ? 'Activa' : 'Inactiva'}
-        </span>
-      </td>
-      {canManage && (
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-0.5">
-            <button
-              type="button"
-              title="Ver"
-              aria-label="Ver"
-              onClick={onView}
-              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              title="Editar"
-              aria-label="Editar"
-              onClick={onEdit}
-              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onToggleActive}
-              disabled={update.isPending}
-              title={branch.isActive ? 'Desactivar' : 'Activar'}
-              aria-label={branch.isActive ? 'Desactivar' : 'Activar'}
-              className={
-                'rounded-md p-1.5 transition hover:bg-muted disabled:opacity-50 ' +
-                (branch.isActive ? 'text-amber-600' : 'text-emerald-600')
-              }
-            >
-              <Power className="h-4 w-4" />
-            </button>
-          </div>
-          {error && <p className="mt-1 text-right text-xs text-destructive">{error}</p>}
-        </td>
-      )}
-    </tr>
+          <Power className="h-4 w-4" />
+        </button>
+      </div>
+      {error && <p className="mt-1 text-right text-xs text-destructive">{error}</p>}
+    </>
   );
 }
 
@@ -255,6 +271,21 @@ function CajasTab() {
     branches.data?.items.find((b) => b.id === currentId)?.name ?? 'actual';
   const items = registers.data ?? [];
 
+  const columns: DataTableColumn<CashRegister>[] = [
+    {
+      key: 'name',
+      header: 'Caja',
+      cellClassName: 'font-medium text-foreground',
+      render: (r) => r.name,
+    },
+    {
+      key: 'code',
+      header: 'Código',
+      cellClassName: 'font-mono text-xs text-muted-foreground',
+      render: (r) => r.code,
+    },
+  ];
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -263,41 +294,23 @@ function CajasTab() {
         sucursal necesita al menos una caja para poder abrir turno.
       </p>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5">Caja</th>
-              <th className="px-4 py-2.5">Código</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {registers.isLoading && (
-              <tr>
-                <td colSpan={2} className="px-4 py-6 text-center text-muted-foreground">
-                  Cargando...
-                </td>
-              </tr>
-            )}
-            {!registers.isLoading && items.length === 0 && (
-              <tr>
-                <td colSpan={2} className="px-4 py-6 text-center text-muted-foreground">
-                  Esta sucursal no tiene cajas.
-                  {isAdminOrManager ? ' Crea una con el botón +.' : ''}
-                </td>
-              </tr>
-            )}
-            {items.map((r) => (
-              <tr key={r.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                  {r.code}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<CashRegister>
+        columns={columns}
+        rows={items}
+        total={items.length}
+        rowKey={(r) => r.id}
+        page={1}
+        pageSize={Math.max(items.length, 25)}
+        onPageChange={() => undefined}
+        isLoading={registers.isLoading}
+        isFetching={registers.isFetching}
+        emptyState={
+          <>
+            Esta sucursal no tiene cajas.
+            {isAdminOrManager ? ' Crea una con el botón +.' : ''}
+          </>
+        }
+      />
 
       {isAdminOrManager && (
         <Fab label="Nueva caja" onClick={() => setShowCreate(true)} />

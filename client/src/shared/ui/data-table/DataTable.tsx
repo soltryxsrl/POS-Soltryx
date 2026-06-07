@@ -22,14 +22,27 @@ export function DataTable<T>({
   isFetching = false,
   emptyState,
   errorMessage,
+  title,
   toolbar,
   onRowClick,
   rowKey,
+  fillHeight = false,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const to = Math.min(safePage * pageSize, total);
+
+  // Fila de encabezado: con `title` se vuelve una barra slim "título … filtros"
+  // (justify-between); sin título, es el toolbar tal cual (comportamiento previo).
+  const headerContent = title ? (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+      {toolbar}
+    </div>
+  ) : (
+    toolbar
+  );
 
   const handleSortClick = (col: (typeof columns)[number]) => {
     if (!col.sortable || !onSortChange) return;
@@ -39,17 +52,26 @@ export function DataTable<T>({
   };
 
   return (
-    <div className="space-y-3">
-      {toolbar && (
-        // Toolbar pegado: queda fijo arriba al hacer scroll de tablas largas,
-        // así los filtros (búsqueda / estado / fechas) están siempre a mano sin
-        // tapar las filas. Fondo translúcido + blur para enmascarar lo que pasa
-        // por detrás. z-20 < diálogos (z-50) y Fab (z-40).
-        <div className="sticky top-0 z-20 bg-card/90 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/70">
-          {toolbar}
-        </div>
-      )}
-      <div className="relative rounded-lg border bg-card">
+    <div className={fillHeight ? 'flex min-h-0 flex-1 flex-col gap-3' : 'space-y-3'}>
+      {(title || toolbar) &&
+        // En modo fillHeight el encabezado ya queda fijo arriba (vive fuera de la
+        // zona que scrollea), así que no necesita `sticky`. En modo normal lo
+        // dejamos pegado para tablas largas que hacen scrollear la página:
+        // fondo translúcido + blur para enmascarar lo que pasa por detrás.
+        // z-20 < diálogos (z-50) y Fab (z-40).
+        (fillHeight ? (
+          <div>{headerContent}</div>
+        ) : (
+          <div className="sticky top-0 z-20 bg-card/90 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/70">
+            {headerContent}
+          </div>
+        ))}
+      <div
+        className={cn(
+          'relative rounded-lg border bg-card',
+          fillHeight && 'flex min-h-0 flex-1 flex-col',
+        )}
+      >
         {isFetching && !isLoading && (
           <div className="absolute inset-0 z-10 flex items-start justify-center pt-2 pointer-events-none">
             <span className="rounded-full bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm border">
@@ -57,9 +79,14 @@ export function DataTable<T>({
             </span>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <div className={cn('overflow-x-auto', fillHeight && 'min-h-0 flex-1 overflow-y-auto')}>
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-xs text-muted-foreground">
+            <thead
+              className={cn(
+                'border-b text-left text-xs text-muted-foreground',
+                fillHeight && 'sticky top-0 z-10 bg-card',
+              )}
+            >
               <tr>
                 {columns.map((col) => {
                   const isSorted = col.sortable && sortKey === col.key;

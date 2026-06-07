@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -64,7 +65,13 @@ function computeStatus(p: Promotion): PromotionStatusFilter {
   return 'active';
 }
 
-export function PromotionsTable() {
+export function PromotionsTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [deleting, setDeleting] = useState<Promotion | null>(null);
@@ -74,6 +81,7 @@ export function PromotionsTable() {
     defaultSort: 'createdAt',
     defaultSortDir: 'desc',
     filterKeys: FILTER_KEYS,
+    defaultFilters: { status: 'active' },
   });
 
   const promotions = usePromotions({
@@ -183,6 +191,7 @@ export function PromotionsTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const sortMaps = (() => {
     // Map UI column key to backend sort key
@@ -197,50 +206,51 @@ export function PromotionsTable() {
     : undefined;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Buscar por nombre..."
-          value={table.filterDraft.q ?? ''}
-          onChange={(e) => table.setFilter('q', e.target.value)}
-          className="w-64"
-        />
-        {STATUS_CHIPS.map((c) => (
-          <Chip
-            key={c.value}
-            label={c.label}
-            active={table.filterDraft.status === c.value}
-            onClick={() =>
-              table.setFilter('status', table.filterDraft.status === c.value ? undefined : c.value)
-            }
-          />
-        ))}
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => table.clearFilters()}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3 w-3" /> Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Rango creación:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-        <span>—</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        placeholder="Buscar por nombre..."
+        value={table.filterDraft.q ?? ''}
+        onChange={(e) => table.setFilter('q', e.target.value)}
+        className="w-64"
+      />
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_CHIPS.map((c) => (
+              <Chip
+                key={c.value}
+                label={c.label}
+                active={table.filterDraft.status === c.value}
+                onClick={() =>
+                  table.setFilter(
+                    'status',
+                    table.filterDraft.status === c.value ? undefined : c.value,
+                  )
+                }
+              />
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango creación</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={table.filterDraft.from ?? ''}
+              onChange={(e) => table.setFilter('from', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={table.filterDraft.to ?? ''}
+              onChange={(e) => table.setFilter('to', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+          </div>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -266,7 +276,9 @@ export function PromotionsTable() {
             ? 'Sin resultados con esos filtros.'
             : 'Sin promociones todavía. Crea la primera con "Nueva promoción".'
         }
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {showCreate && <PromotionFormDialog onClose={() => setShowCreate(false)} />}

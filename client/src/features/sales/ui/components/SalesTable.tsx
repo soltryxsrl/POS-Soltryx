@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -35,7 +35,13 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 const FILTER_KEYS = ['q', 'status', 'paymentMethod', 'userId', 'from', 'to'] as const;
 
-export function SalesTable() {
+export function SalesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const { user } = useAuth();
   const canFilterByCashier =
     !!user?.roles.includes('ADMIN') || !!user?.roles.includes('MANAGER');
@@ -131,88 +137,98 @@ export function SalesTable() {
     !!table.filters.from ||
     !!table.filters.to;
 
+  // Cuenta de filtros activos sin la búsqueda ('q' queda inline fuera del panel).
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
+
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Buscar # de venta..."
-          value={table.filterDraft.q ?? ''}
-          onChange={(e) => table.setFilter('q', e.target.value)}
-          className="w-56"
-        />
-        <DateChip
-          label="Hoy"
-          active={activeChip === 'today'}
-          onClick={() => applyDateRange(table.setFilters, 'today', table.filterDraft)}
-        />
-        <DateChip
-          label="Ayer"
-          active={activeChip === 'yesterday'}
-          onClick={() => applyDateRange(table.setFilters, 'yesterday', table.filterDraft)}
-        />
-        <DateChip
-          label="Semana"
-          active={activeChip === 'week'}
-          onClick={() => applyDateRange(table.setFilters, 'week', table.filterDraft)}
-        />
-        <DateChip
-          label="Mes"
-          active={activeChip === 'month'}
-          onClick={() => applyDateRange(table.setFilters, 'month', table.filterDraft)}
-        />
-        <Select
-          value={table.filterDraft.status ?? ''}
-          onChange={(e) => table.setFilter('status', e.target.value)}
-          className="w-36"
-        >
-          <option value="">Todos los estados</option>
-          <option value={SaleStatus.COMPLETED}>Completadas</option>
-          <option value={SaleStatus.CANCELLED}>Canceladas</option>
-          <option value={SaleStatus.REFUNDED}>Devueltas</option>
-        </Select>
-        <Select
-          value={table.filterDraft.paymentMethod ?? ''}
-          onChange={(e) => table.setFilter('paymentMethod', e.target.value)}
-          className="w-40"
-        >
-          <option value="">Todos los pagos</option>
-          <option value={PaymentMethod.CASH}>{PAYMENT_LABEL.CASH}</option>
-          <option value={PaymentMethod.CARD}>{PAYMENT_LABEL.CARD}</option>
-          <option value={PaymentMethod.TRANSFER}>{PAYMENT_LABEL.TRANSFER}</option>
-          <option value={PaymentMethod.OTHER}>{PAYMENT_LABEL.OTHER}</option>
-        </Select>
-        {canFilterByCashier && (
-          <CashierSelect
-            value={table.filterDraft.userId ?? ''}
-            onChange={(v) => table.setFilter('userId', v)}
-          />
-        )}
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => table.clearFilters()}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        placeholder="Buscar # de venta..."
+        value={table.filterDraft.q ?? ''}
+        onChange={(e) => table.setFilter('q', e.target.value)}
+        className="w-56"
+      />
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango rápido</div>
+          <div className="flex flex-wrap gap-2">
+            <DateChip
+              label="Hoy"
+              active={activeChip === 'today'}
+              onClick={() => applyDateRange(table.setFilters, 'today', table.filterDraft)}
+            />
+            <DateChip
+              label="Ayer"
+              active={activeChip === 'yesterday'}
+              onClick={() => applyDateRange(table.setFilters, 'yesterday', table.filterDraft)}
+            />
+            <DateChip
+              label="Semana"
+              active={activeChip === 'week'}
+              onClick={() => applyDateRange(table.setFilters, 'week', table.filterDraft)}
+            />
+            <DateChip
+              label="Mes"
+              active={activeChip === 'month'}
+              onClick={() => applyDateRange(table.setFilters, 'month', table.filterDraft)}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <Select
+            value={table.filterDraft.status ?? ''}
+            onChange={(e) => table.setFilter('status', e.target.value)}
+            className="w-full"
           >
-            <X className="h-3 w-3" /> Limpiar
-          </button>
+            <option value="">Todos los estados</option>
+            <option value={SaleStatus.COMPLETED}>Completadas</option>
+            <option value={SaleStatus.CANCELLED}>Canceladas</option>
+            <option value={SaleStatus.REFUNDED}>Devueltas</option>
+          </Select>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Método de pago</div>
+          <Select
+            value={table.filterDraft.paymentMethod ?? ''}
+            onChange={(e) => table.setFilter('paymentMethod', e.target.value)}
+            className="w-full"
+          >
+            <option value="">Todos los pagos</option>
+            <option value={PaymentMethod.CASH}>{PAYMENT_LABEL.CASH}</option>
+            <option value={PaymentMethod.CARD}>{PAYMENT_LABEL.CARD}</option>
+            <option value={PaymentMethod.TRANSFER}>{PAYMENT_LABEL.TRANSFER}</option>
+            <option value={PaymentMethod.OTHER}>{PAYMENT_LABEL.OTHER}</option>
+          </Select>
+        </div>
+        {canFilterByCashier && (
+          <div>
+            <div className="mb-1.5 text-xs font-medium text-foreground">Cajero</div>
+            <CashierSelect
+              value={table.filterDraft.userId ?? ''}
+              onChange={(v) => table.setFilter('userId', v)}
+            />
+          </div>
         )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Rango personalizado:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-        <span>—</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-      </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango personalizado</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={table.filterDraft.from ?? ''}
+              onChange={(e) => table.setFilter('from', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={table.filterDraft.to ?? ''}
+              onChange={(e) => table.setFilter('to', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+          </div>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -233,7 +249,9 @@ export function SalesTable() {
       isFetching={sales.isFetching}
       errorMessage={sales.isError ? getErrorMessage(sales.error) : null}
       emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'Sin ventas todavía.'}
+      title={title}
       toolbar={toolbar}
+      fillHeight={fillHeight}
     />
   );
 }
@@ -250,7 +268,7 @@ function CashierSelect({
     <Select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-44"
+      className="w-full"
     >
       <option value="">Todos los cajeros</option>
       {cashiers.data?.items.map((u) => (

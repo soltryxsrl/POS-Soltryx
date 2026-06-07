@@ -1,16 +1,11 @@
 'use client';
 
 import { RolesTable } from '@/features/admin/ui/components/RolesTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function AdminRolesPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Roles y permisos"
-        crumbs={[{ label: 'Administración' }]}
-      />
-      <RolesTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <RolesTable fillHeight title="Roles y permisos" />
     </div>
   );
 }

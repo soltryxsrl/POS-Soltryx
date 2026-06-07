@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { CheckCircle2, Star, XCircle } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -16,7 +16,13 @@ import {
 } from '../../application/hooks/use-tax-types';
 import type { TaxType } from '../../domain/types';
 
-export function TaxTypesTable() {
+export function TaxTypesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const { user } = useAuth();
   const canManage = !!user && user.permissions.includes('tax-types.manage');
   const types = useTaxTypes();
@@ -139,6 +145,8 @@ export function TaxTypesTable() {
       isFetching={types.isFetching}
       errorMessage={types.isError ? getErrorMessage(types.error) : null}
       emptyState="No hay tipos de ITBIS."
+      title={title}
+      fillHeight={fillHeight}
     />
   );
 }

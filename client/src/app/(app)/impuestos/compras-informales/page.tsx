@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { formatMoney } from '@/shared/lib/format';
 import { Fab } from '@/shared/ui/controls/Fab';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 import { useFiscalDocuments } from '@/features/fiscal/application/hooks/use-fiscal';
 import { StandaloneDocFormDialog } from '@/features/fiscal/ui/components/StandaloneDocFormDialog';
 
@@ -26,14 +25,12 @@ export default function ProveedoresInformalesPage() {
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Compras a proveedores informales"
-        description="Registra una compra a un proveedor sin NCF propio. Soltryx emite un E41 o B11 desde su secuencia y la compra aparece en el 606."
-        crumbs={[{ label: 'Impuestos' }]}
-      />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col gap-3">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Compras a proveedores informales
+      </h1>
 
-      <div className="rounded-2xl border bg-card">
+      <div className="flex min-h-0 flex-1 flex-col rounded-2xl border bg-card">
         <div className="border-b border-border px-4 py-2.5 text-sm font-semibold">
           Últimos comprobantes emitidos
         </div>
@@ -43,9 +40,9 @@ export default function ProveedoresInformalesPage() {
             <strong>Emitir comprobante</strong> abajo a la derecha para empezar.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             <table className="w-full text-xs">
-              <thead className="border-b border-border bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <thead className="sticky top-0 z-10 border-b border-border bg-muted text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Tipo</th>
                   <th className="px-3 py-2 text-left">NCF</th>

@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Pencil, X } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { formatDateTime } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -15,7 +16,13 @@ import { CustomerFormDialog } from './CustomerFormDialog';
 
 const FILTER_KEYS = ['q', 'isActive'] as const;
 
-export function CustomersTable() {
+export function CustomersTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
 
@@ -23,6 +30,7 @@ export function CustomersTable() {
     defaultSort: 'fullName',
     defaultSortDir: 'asc',
     filterKeys: FILTER_KEYS,
+    defaultFilters: { isActive: 'true' },
   });
 
   const customers = useCustomers({
@@ -110,6 +118,7 @@ export function CustomersTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
@@ -119,19 +128,15 @@ export function CustomersTable() {
         onChange={(e) => table.setFilter('q', e.target.value)}
         className="w-80"
       />
-      <StatusFilter
-        value={table.filterDraft.isActive}
-        onChange={(v) => table.setFilter('isActive', v)}
-      />
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => table.clearFilters()}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <StatusFilter
+            value={table.filterDraft.isActive}
+            onChange={(v) => table.setFilter('isActive', v)}
+          />
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -155,7 +160,9 @@ export function CustomersTable() {
         emptyState={
           hasFilters ? 'Sin resultados con esos filtros.' : 'Sin clientes todavía.'
         }
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {showCreate && <CustomerFormDialog onClose={() => setShowCreate(false)} />}

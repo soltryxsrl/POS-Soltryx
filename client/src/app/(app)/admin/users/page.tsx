@@ -1,16 +1,11 @@
 'use client';
 
 import { UsersTable } from '@/features/admin/ui/components/UsersTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function AdminUsersPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Usuarios"
-        crumbs={[{ label: 'Administración' }]}
-      />
-      <UsersTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <UsersTable fillHeight title="Usuarios" />
     </div>
   );
 }

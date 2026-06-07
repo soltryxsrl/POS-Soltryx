@@ -1,17 +1,11 @@
 'use client';
 
 import { SequencesTable } from '@/features/fiscal/ui/components/SequencesTable';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 export default function FiscalSequencesPage() {
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        title="Secuencias Fiscales"
-        description="Rangos NCF autorizados por DGII. Al renovar, la secuencia activa anterior queda como histórica."
-        crumbs={[{ label: 'Impuestos' }]}
-      />
-      <SequencesTable />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <SequencesTable fillHeight title="Secuencias Fiscales" />
     </div>
   );
 }

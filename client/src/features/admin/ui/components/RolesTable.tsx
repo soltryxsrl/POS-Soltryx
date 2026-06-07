@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Lock, Pencil, Trash2 } from 'lucide-react';
 import { Can } from '@/features/auth/ui/components/Can';
 import { getErrorMessage } from '@/shared/lib/error-message';
@@ -20,7 +20,13 @@ import { RoleFormDialog } from './RoleFormDialog';
 
 const SYSTEM_ROLE_CODES = new Set(['ADMIN']);
 
-export function RolesTable() {
+export function RolesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+} = {}) {
   const roles = useAdminRoles();
   const remove = useRemoveAdminRole();
   const [formState, setFormState] = useState<
@@ -136,6 +142,8 @@ export function RolesTable() {
         isFetching={roles.isFetching}
         errorMessage={roles.isError ? getErrorMessage(roles.error) : null}
         emptyState="No hay roles."
+        title={title}
+        fillHeight={fillHeight}
       />
 
       {formState && (

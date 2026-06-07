@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Fab } from '@/shared/ui/controls/Fab';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
@@ -13,7 +14,13 @@ import { useCategories, useDeleteCategory } from '../../application/hooks/use-ca
 import type { Category } from '../../domain/types';
 import { CategoryFormDialog } from './CategoryFormDialog';
 
-export function CategoriesTable() {
+export function CategoriesTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const canCreate = useHasPermission('categories.create');
   const canUpdate = useHasPermission('categories.update');
   const canDelete = useHasPermission('categories.delete');
@@ -26,7 +33,7 @@ export function CategoriesTable() {
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [delError, setDelError] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<string | undefined>('true');
 
   const all = useMemo(() => categories.data ?? [], [categories.data]);
   const nameById = useMemo(() => new Map(all.map((c) => [c.id, c.name])), [all]);
@@ -121,6 +128,7 @@ export function CategoriesTable() {
   );
 
   const hasFilters = !!q || !!status;
+  const activeCount = status ? 1 : 0;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
@@ -130,19 +138,12 @@ export function CategoriesTable() {
         onChange={(e) => setQ(e.target.value)}
         className="w-80"
       />
-      <StatusFilter value={status} onChange={(v) => setStatus(v)} />
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() => {
-            setQ('');
-            setStatus(undefined);
-          }}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-3 w-3" /> Limpiar
-        </button>
-      )}
+      <FilterPopover activeCount={activeCount} onClear={() => setStatus(undefined)}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
+          <StatusFilter value={status} onChange={(v) => setStatus(v)} />
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -167,7 +168,9 @@ export function CategoriesTable() {
             ? 'Sin resultados con esos filtros.'
             : 'Sin categorías todavía. Crea la primera con "Nueva categoría".'
         }
+        title={title}
         toolbar={toolbar}
+        fillHeight={fillHeight}
       />
 
       {showCreate && (

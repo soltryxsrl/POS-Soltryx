@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
 import { Fab } from '@/shared/ui/controls/Fab';
-import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
+import { DataTable, type DataTableColumn } from '@/shared/ui/data-table';
 import { useAuth, useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
 import {
@@ -14,7 +14,7 @@ import {
   useStockTransfers,
 } from '@/features/stock-transfers/application/hooks/use-stock-transfers';
 import { TransferFormDialog } from '@/features/stock-transfers/ui/components/TransferFormDialog';
-import type { StockTransferStatus } from '@/features/stock-transfers/domain/types';
+import type { StockTransfer, StockTransferStatus } from '@/features/stock-transfers/domain/types';
 
 const STATUS: Record<StockTransferStatus, { label: string; cls: string }> = {
   IN_TRANSIT: { label: 'En tránsito', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
@@ -30,10 +30,8 @@ export default function TransferenciasPage() {
   const [showCreate, setShowCreate] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Transferencias de stock" />
-
-      <TransfersList active={active} canManage={canManage} />
+    <div className="flex h-[calc(100vh-6.5rem)] min-h-[480px] flex-col">
+      <TransfersList active={active} canManage={canManage} fillHeight title="Transferencias de stock" />
 
       {canManage && (
         <Fab label="Nueva transferencia" onClick={() => setShowCreate(true)} />
@@ -45,7 +43,17 @@ export default function TransferenciasPage() {
   );
 }
 
-function TransfersList({ active, canManage }: { active: string | null; canManage: boolean }) {
+function TransfersList({
+  active,
+  canManage,
+  fillHeight,
+  title,
+}: {
+  active: string | null;
+  canManage: boolean;
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const transfers = useStockTransfers();
   const receive = useReceiveStockTransfer();
   const cancel = useCancelStockTransfer();
@@ -65,62 +73,80 @@ function TransfersList({ active, canManage }: { active: string | null; canManage
     }
   };
 
+  const columns: DataTableColumn<StockTransfer>[] = [
+    {
+      key: 'transferNumber',
+      header: 'N°',
+      render: (t) => <span className="font-mono text-xs">{t.transferNumber}</span>,
+    },
+    {
+      key: 'route',
+      header: 'Ruta',
+      render: (t) => (
+        <span className="inline-flex items-center gap-1.5 text-xs">
+          {t.sourceBranchName ?? '—'} <ArrowRight className="h-3 w-3 text-muted-foreground" /> {t.destBranchName ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'items',
+      header: 'Ítems',
+      align: 'right',
+      render: (t) => <span className="text-muted-foreground">{t.items.length}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      render: (t) => (
+        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[t.status].cls}`}>
+          {STATUS[t.status].label}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      align: 'right',
+      render: (t) => {
+        const canReceive = canManage && t.status === 'IN_TRANSIT' && t.destBranchId === active;
+        const canCancel = canManage && t.status === 'IN_TRANSIT' && t.sourceBranchId === active;
+        if (!canReceive && !canCancel) return null;
+        return (
+          <div className="flex items-center justify-end gap-2">
+            {canReceive && (
+              <Button variant="outline" disabled={busyId === t.id} onClick={() => act(() => receive.mutateAsync(t.id), t.id)}>
+                Recibir
+              </Button>
+            )}
+            {canCancel && (
+              <Button variant="ghost" className="text-amber-600" disabled={busyId === t.id} onClick={() => act(() => cancel.mutateAsync({ id: t.id }), t.id)}>
+                Cancelar
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2.5">N°</th>
-            <th className="px-4 py-2.5">Ruta</th>
-            <th className="px-4 py-2.5 text-right">Ítems</th>
-            <th className="px-4 py-2.5">Estado</th>
-            <th className="px-4 py-2.5 text-right">Acciones</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {transfers.isLoading && (
-            <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Cargando…</td></tr>
-          )}
-          {!transfers.isLoading && items.length === 0 && (
-            <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Sin transferencias.</td></tr>
-          )}
-          {items.map((t) => {
-            const canReceive = canManage && t.status === 'IN_TRANSIT' && t.destBranchId === active;
-            const canCancel = canManage && t.status === 'IN_TRANSIT' && t.sourceBranchId === active;
-            return (
-              <tr key={t.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3 font-mono text-xs">{t.transferNumber}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1.5 text-xs">
-                    {t.sourceBranchName ?? '—'} <ArrowRight className="h-3 w-3 text-muted-foreground" /> {t.destBranchName ?? '—'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right text-muted-foreground">{t.items.length}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[t.status].cls}`}>
-                    {STATUS[t.status].label}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
-                    {canReceive && (
-                      <Button variant="outline" disabled={busyId === t.id} onClick={() => act(() => receive.mutateAsync(t.id), t.id)}>
-                        Recibir
-                      </Button>
-                    )}
-                    {canCancel && (
-                      <Button variant="ghost" className="text-amber-600" disabled={busyId === t.id} onClick={() => act(() => cancel.mutateAsync({ id: t.id }), t.id)}>
-                        Cancelar
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {err && <p className="px-4 py-2 text-sm text-destructive">{err}</p>}
-    </div>
+    <>
+      <DataTable<StockTransfer>
+        columns={columns}
+        rows={items}
+        total={items.length}
+        rowKey={(t) => t.id}
+        page={1}
+        pageSize={Math.max(items.length, 25)}
+        onPageChange={() => undefined}
+        isLoading={transfers.isLoading}
+        isFetching={transfers.isFetching}
+        errorMessage={transfers.isError ? getErrorMessage(transfers.error) : null}
+        emptyState="Sin transferencias."
+        title={title}
+        fillHeight={fillHeight}
+      />
+      {err && <p className="px-1 pt-2 text-sm text-destructive">{err}</p>}
+    </>
   );
 }

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { ProductOrmEntity } from '../../../../products/product.orm-entity';
+import { ProductVariantOrmEntity } from '../../../../products/product-variant.orm-entity';
 import { resolveSort } from '../../../../../common/dto/pagination-sort.query';
 import type { TransactionContext } from '../../../../../common/persistence/unit-of-work.port';
 import type { StockMovement } from '../../../domain/entities/stock-movement.entity';
@@ -79,8 +81,47 @@ export class StockMovementRepositoryTypeOrm implements StockMovementRepository {
     if (input.type) qb.andWhere('m.type = :type', { type: input.type });
     if (input.from) qb.andWhere('m.created_at >= :from', { from: input.from });
     if (input.to) qb.andWhere('m.created_at <= :to', { to: input.to });
-    const [items, total] = await qb.getManyAndCount();
-    return { items: items.map(toDomain), total };
+    const [rows, total] = await qb.getManyAndCount();
+    const items = await this.attachItemLabels(rows.map(toDomain));
+    return { items, total };
+  }
+
+  /**
+   * Enriquece los movimientos con el nombre/SKU del producto (y nombre de la
+   * variante). Lote por `IN` sobre los ids de la página — no hace JOIN para no
+   * arriesgar el conteo ni multiplicar filas. `withDeleted` para que un producto
+   * dado de baja siga mostrando su nombre en el histórico.
+   */
+  private async attachItemLabels(items: StockMovement[]): Promise<StockMovement[]> {
+    if (items.length === 0) return items;
+
+    const productIds = [...new Set(items.map((m) => m.productId))];
+    const variantIds = [
+      ...new Set(items.map((m) => m.variantId).filter((v): v is string => !!v)),
+    ];
+
+    const products = await this.repo.manager.getRepository(ProductOrmEntity).find({
+      where: { id: In(productIds) },
+      select: { id: true, name: true, sku: true },
+      withDeleted: true,
+    });
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    const variants = variantIds.length
+      ? await this.repo.manager.getRepository(ProductVariantOrmEntity).find({
+          where: { id: In(variantIds) },
+          select: { id: true, name: true },
+          withDeleted: true,
+        })
+      : [];
+    const variantById = new Map(variants.map((v) => [v.id, v]));
+
+    return items.map((m) => ({
+      ...m,
+      productName: productById.get(m.productId)?.name ?? null,
+      sku: productById.get(m.productId)?.sku ?? null,
+      variantName: m.variantId ? (variantById.get(m.variantId)?.name ?? null) : null,
+    }));
   }
 
   async listChronological(productId: string, branchId: string): Promise<StockMovement[]> {

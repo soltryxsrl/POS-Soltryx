@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
 import { formatDateTime, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
@@ -37,7 +37,13 @@ const FILTERABLE_METHODS: RefundMethod[] = ['CASH', 'CARD', 'TRANSFER', 'STORE_C
 
 const FILTER_KEYS = ['q', 'refundMethod', 'userId', 'from', 'to'] as const;
 
-export function ReturnsTable() {
+export function ReturnsTable({
+  fillHeight,
+  title,
+}: {
+  fillHeight?: boolean;
+  title?: ReactNode;
+}) {
   const { user } = useAuth();
   const isPriv = !!user?.roles.includes('ADMIN') || !!user?.roles.includes('MANAGER');
 
@@ -122,60 +128,61 @@ export function ReturnsTable() {
   );
 
   const hasFilters = FILTER_KEYS.some((k) => !!table.filters[k]);
+  // activeCount cuenta solo filtros no-búsqueda (excluye 'q', que va inline).
+  const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && !!table.filters[k]).length;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Buscar # de devolución..."
-          value={table.filterDraft.q ?? ''}
-          onChange={(e) => table.setFilter('q', e.target.value)}
-          className="w-56"
-        />
-        <Select
-          value={table.filterDraft.refundMethod ?? ''}
-          onChange={(e) => table.setFilter('refundMethod', e.target.value)}
-          className="w-40"
-        >
-          <option value="">Todos los métodos</option>
-          {FILTERABLE_METHODS.map((m) => (
-            <option key={m} value={m}>
-              {REFUND_LABEL[m]}
-            </option>
-          ))}
-        </Select>
-        {isPriv && (
-          <UserSelect
-            value={table.filterDraft.userId ?? ''}
-            onChange={(v) => table.setFilter('userId', v)}
-          />
-        )}
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => table.clearFilters()}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        placeholder="Buscar # de devolución..."
+        value={table.filterDraft.q ?? ''}
+        onChange={(e) => table.setFilter('q', e.target.value)}
+        className="w-56"
+      />
+      <FilterPopover activeCount={activeCount} onClear={() => table.clearFilters()}>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Método de reembolso</div>
+          <Select
+            value={table.filterDraft.refundMethod ?? ''}
+            onChange={(e) => table.setFilter('refundMethod', e.target.value)}
+            className="w-full"
           >
-            <X className="h-3 w-3" /> Limpiar
-          </button>
+            <option value="">Todos los métodos</option>
+            {FILTERABLE_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {REFUND_LABEL[m]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {isPriv && (
+          <div>
+            <div className="mb-1.5 text-xs font-medium text-foreground">Usuario</div>
+            <UserSelect
+              value={table.filterDraft.userId ?? ''}
+              onChange={(v) => table.setFilter('userId', v)}
+            />
+          </div>
         )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Rango fecha:</span>
-        <Input
-          type="date"
-          value={table.filterDraft.from ?? ''}
-          onChange={(e) => table.setFilter('from', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-        <span>—</span>
-        <Input
-          type="date"
-          value={table.filterDraft.to ?? ''}
-          onChange={(e) => table.setFilter('to', e.target.value)}
-          className="h-8 w-40 text-xs"
-        />
-      </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-foreground">Rango de fecha</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={table.filterDraft.from ?? ''}
+              onChange={(e) => table.setFilter('from', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+            <span className="text-muted-foreground">—</span>
+            <Input
+              type="date"
+              value={table.filterDraft.to ?? ''}
+              onChange={(e) => table.setFilter('to', e.target.value)}
+              className="h-8 min-w-0 flex-1 text-xs"
+            />
+          </div>
+        </div>
+      </FilterPopover>
     </div>
   );
 
@@ -196,7 +203,9 @@ export function ReturnsTable() {
       isFetching={returns.isFetching}
       errorMessage={returns.isError ? getErrorMessage(returns.error) : null}
       emptyState={hasFilters ? 'Sin resultados con esos filtros.' : 'Sin devoluciones todavía.'}
+      title={title}
       toolbar={toolbar}
+      fillHeight={fillHeight}
     />
   );
 }
@@ -210,7 +219,7 @@ function UserSelect({
 }) {
   const users = useAdminUsers({ limit: 200 });
   return (
-    <Select value={value} onChange={(e) => onChange(e.target.value)} className="w-44">
+    <Select value={value} onChange={(e) => onChange(e.target.value)} className="w-full">
       <option value="">Todos los usuarios</option>
       {users.data?.items.map((u) => (
         <option key={u.id} value={u.id}>
