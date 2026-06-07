@@ -73,7 +73,7 @@ export default function SuperAdminPlanPage() {
   const fmt = (v: number | null | undefined) => (v == null ? 'Ilimitado' : String(v));
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="space-y-6">
       <SectionHeader
         title="Plan & Licencia"
         description="Gestión del plan contratado (Super Admin). Requiere la clave super-admin para modificar."
