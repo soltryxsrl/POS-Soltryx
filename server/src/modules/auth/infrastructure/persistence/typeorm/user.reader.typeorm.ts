@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthUser } from '../../../domain/entities/auth-user.entity';
 import type { UserReader } from '../../../domain/ports/user-reader.port';
+import { SUPERADMIN_ROLE_CODE } from '../../../domain/permissions.catalog';
 import { UserOrmEntity } from './user.orm-entity';
 
 function toDomain(u: UserOrmEntity): AuthUser {
@@ -10,6 +11,13 @@ function toDomain(u: UserOrmEntity): AuthUser {
   const permissions = new Set<string>();
   for (const r of roles) {
     for (const p of r.permissions ?? []) permissions.add(p.code);
+  }
+  // SUPERADMIN (Soltryx) es un superconjunto de ADMIN: además de tener todos los
+  // permisos, debe pasar TODO chequeo de rol (@Roles('ADMIN'), roles.includes
+  // ('ADMIN'), etc.). Por eso su rol efectivo incluye también 'ADMIN'.
+  const roleCodes = roles.map((r) => r.code);
+  if (roleCodes.includes(SUPERADMIN_ROLE_CODE) && !roleCodes.includes('ADMIN')) {
+    roleCodes.push('ADMIN');
   }
   return {
     id: u.id,
@@ -19,7 +27,7 @@ function toDomain(u: UserOrmEntity): AuthUser {
     passwordHash: u.passwordHash,
     isActive: u.isActive,
     branchId: u.branchId,
-    roles: roles.map((r) => r.code),
+    roles: roleCodes,
     permissions: [...permissions],
   };
 }
