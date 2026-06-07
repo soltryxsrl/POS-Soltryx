@@ -37,6 +37,14 @@ const envSchema = z.object({
     .transform((v) => (typeof v === 'string' ? v === 'true' : v))
     .default(false),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+
+  // Super-admin (Soltryx). Deben declararse aquí o la validación Zod las elimina
+  // de process.env (safeParse descarta claves desconocidas). Si SUPERADMIN_SECRET
+  // queda vacío, el cambio de plan por UI queda deshabilitado (se usa SQL).
+  SUPERADMIN_SECRET: z.string().default(''),
+  SUPERADMIN_EMAIL: z.string().optional(),
+  SUPERADMIN_PASSWORD: z.string().optional(),
+  SUPERADMIN_USERNAME: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
