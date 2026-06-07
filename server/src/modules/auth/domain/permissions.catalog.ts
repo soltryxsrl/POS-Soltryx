@@ -134,6 +134,29 @@ export const ALL_PERMISSIONS: readonly PermissionDefinition[] = Object.values(PE
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]['code'];
 
 /**
+ * Permisos de SUPER-ADMIN (Soltryx). A propósito FUERA de `PERMISSIONS`/
+ * `ALL_PERMISSIONS`: así NO se auto-otorgan al ADMIN del cliente (el seed los
+ * excluye del grant de ADMIN) ni aparecen en la UI de Roles. Se siembran en la
+ * tabla `permissions` aparte y se asignan a mano (SQL) a la cuenta de Soltryx.
+ *
+ *   - `plan.manage`: ver/usar la página oculta /admin/plan (cambiar el plan).
+ *     El cambio real igual exige el secreto `SUPERADMIN_SECRET`.
+ */
+export const PLAN_MANAGE: PermissionDefinition = {
+  code: 'plan.manage',
+  name: 'Gestionar plan (super-admin)',
+  module: 'plan',
+  description:
+    'Ver y cambiar los topes del plan. Solo Soltryx; no se otorga por defecto.',
+};
+
+export const SUPERADMIN_PERMISSIONS: readonly PermissionDefinition[] = [PLAN_MANAGE];
+
+/** Códigos de permisos super-admin (para excluirlos del grant automático). */
+export const SUPERADMIN_PERMISSION_CODES: readonly string[] =
+  SUPERADMIN_PERMISSIONS.map((p) => p.code);
+
+/**
  * Asignaciones por defecto que aplica el seed.
  * ADMIN obtiene todos los permisos automáticamente (no listado aquí).
  */

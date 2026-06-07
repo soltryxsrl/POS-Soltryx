@@ -198,6 +198,9 @@ const NAV_ITEMS: NavEntry[] = [
       { href: '/admin/monedas', label: 'Monedas y tasas', permissions: ['currencies.read'] },
       { href: '/admin/formas-pago', label: 'Formas de pago', permissions: ['payment-methods.read'] },
       { href: '/admin/audit', label: 'Auditoría', permissions: ['audit.read'] },
+      // Solo visible para super-admin (Soltryx): el permiso plan.manage no se
+      // otorga por defecto; se asigna por SQL. Oculto para el admin del cliente.
+      { href: '/admin/plan', label: 'Plan & Licencia', permissions: ['plan.manage'] },
     ],
   },
 ];

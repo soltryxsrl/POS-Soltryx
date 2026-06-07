@@ -4,6 +4,8 @@ import { AppDataSource } from '../data-source';
 import {
   ALL_PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
+  SUPERADMIN_PERMISSIONS,
+  SUPERADMIN_PERMISSION_CODES,
 } from '../../modules/auth/domain/permissions.catalog';
 
 /**
@@ -66,18 +68,36 @@ async function run(): Promise<void> {
         [p.code, p.name, p.module, p.description ?? null],
       );
     }
+    // Permisos SUPER-ADMIN: existen en la tabla (para poder asignarlos por SQL
+    // a Soltryx y que el JWT/useHasPermission los reconozca) pero NO se otorgan
+    // a ningún rol por defecto — ni siquiera a ADMIN (se excluyen abajo).
+    for (const p of SUPERADMIN_PERMISSIONS) {
+      await m.query(
+        `INSERT INTO permissions (code, name, module, description)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (code) DO UPDATE
+         SET name = EXCLUDED.name, module = EXCLUDED.module, description = EXCLUDED.description`,
+        [p.code, p.name, p.module, p.description ?? null],
+      );
+    }
     // eslint-disable-next-line no-console
-    console.log(`[seed] ${ALL_PERMISSIONS.length} permissions ensured`);
+    console.log(
+      `[seed] ${ALL_PERMISSIONS.length} permissions + ${SUPERADMIN_PERMISSIONS.length} super-admin ensured`,
+    );
 
-    // ADMIN: todos los permisos
-    await m.query(`
+    // ADMIN: todos los permisos EXCEPTO los super-admin (esos son solo de Soltryx).
+    await m.query(
+      `
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id
       FROM roles r
       CROSS JOIN permissions p
       WHERE r.code = 'ADMIN'
+        AND p.code <> ALL($1::varchar[])
       ON CONFLICT DO NOTHING
-    `);
+    `,
+      [SUPERADMIN_PERMISSION_CODES],
+    );
 
     // Otros roles: catálogo por defecto
     for (const [roleCode, codes] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {

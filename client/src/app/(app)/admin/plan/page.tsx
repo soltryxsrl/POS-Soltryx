@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { KeyRound, ShieldCheck } from 'lucide-react';
-import { useAuth } from '@/features/auth/application/hooks/use-auth';
+import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { usePlan, useUpdatePlan } from '@/features/plan/application/hooks/use-plan';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
@@ -17,8 +17,7 @@ import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
  * el plan sin la clave.
  */
 export default function SuperAdminPlanPage() {
-  const { user } = useAuth();
-  const isAdmin = !!user?.roles.some((r) => r === 'ADMIN');
+  const canManagePlan = useHasPermission('plan.manage');
   const plan = usePlan();
   const update = useUpdatePlan();
 
@@ -35,7 +34,7 @@ export default function SuperAdminPlanPage() {
     setMaxBranches(plan.data.maxBranches == null ? '' : String(plan.data.maxBranches));
   }, [plan.data]);
 
-  if (!isAdmin) {
+  if (!canManagePlan) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
         No autorizado.
