@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import { BranchOrmEntity } from './branch.orm-entity';
 import type { CreateBranchDto } from './dto/create-branch.dto';
 import type { ListBranchesQuery } from './dto/list-branches.query';
@@ -24,6 +25,7 @@ export class BranchesService {
   constructor(
     @InjectRepository(BranchOrmEntity)
     private readonly repo: Repository<BranchOrmEntity>,
+    private readonly plan: PlanLimitsService,
   ) {}
 
   // Cache corto de IDs de sucursales activas, para que el interceptor de
@@ -69,6 +71,7 @@ export class BranchesService {
   }
 
   async create(dto: CreateBranchDto): Promise<BranchResponse> {
+    await this.plan.assertCanCreateBranch();
     await this.assertCodeAvailable(dto.code);
     const entity = this.repo.create({
       code: dto.code.toUpperCase(),

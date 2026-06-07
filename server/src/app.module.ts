@@ -18,6 +18,7 @@ import { FiscalModule } from './modules/fiscal/fiscal.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ParkedCartsModule } from './modules/parked-carts/parked-carts.module';
 import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
+import { PlanModule } from './modules/plan/plan.module';
 import { ProductsModule } from './modules/products/products.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
@@ -68,6 +69,7 @@ import { PersistenceModule } from './common/persistence/persistence.module';
     CurrenciesModule,
     TaxTypesModule,
     PaymentMethodsModule,
+    PlanModule,
   ],
 })
 export class AppModule {}

@@ -9,6 +9,7 @@ import { In, IsNull, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import { AuditService } from '../audit/audit.service';
 import { BranchesService } from '../branches/branches.service';
+import { PlanLimitsService } from '../plan/plan-limits.service';
 import {
   PASSWORD_HASHER,
   type PasswordHasher,
@@ -38,6 +39,7 @@ export class UsersService {
     private readonly refreshRepo: RefreshTokenRepository,
     private readonly audit: AuditService,
     private readonly branches: BranchesService,
+    private readonly plan: PlanLimitsService,
   ) {}
 
   /** Actor que ejecuta la acción (para auditoría). */
@@ -110,6 +112,7 @@ export class UsersService {
     dto: CreateUserDto,
     actor?: { id: string; username?: string },
   ): Promise<UserResponse> {
+    await this.plan.assertCanCreateUser();
     await this.assertEmailAvailable(dto.email);
     await this.assertUsernameAvailable(dto.username);
 

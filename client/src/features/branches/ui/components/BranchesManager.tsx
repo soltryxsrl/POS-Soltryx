@@ -8,6 +8,8 @@ import { Button } from '@/shared/ui/controls/Button';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { DataTable, type DataTableColumn } from '@/shared/ui/data-table';
+import { usePlan } from '@/features/plan/application/hooks/use-plan';
+import { PlanUsageBadge } from '@/features/plan/ui/PlanUsageBadge';
 import { useAuth, useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { useCashRegisters } from '@/features/cash/application/hooks/use-cash';
 import type { CashRegister } from '@/features/cash/domain/types';
@@ -77,6 +79,9 @@ function SucursalesTab() {
   const [editing, setEditing] = useState<Branch | null>(null);
   const [viewing, setViewing] = useState<Branch | null>(null);
   const [showClone, setShowClone] = useState(false);
+  const plan = usePlan();
+  const atBranchCap =
+    plan.data?.maxBranches != null && plan.data.usedBranches >= plan.data.maxBranches;
 
   const items = branches.data?.items ?? [];
 
@@ -135,10 +140,19 @@ function SucursalesTab() {
 
   const toolbar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <StatusFilter
-        value={status}
-        onChange={(v) => setStatus(v as 'true' | 'false' | undefined)}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusFilter
+          value={status}
+          onChange={(v) => setStatus(v as 'true' | 'false' | undefined)}
+        />
+        {plan.data && (
+          <PlanUsageBadge
+            used={plan.data.usedBranches}
+            max={plan.data.maxBranches}
+            noun="Sucursales"
+          />
+        )}
+      </div>
       {isAdminOrManager && (
         <Button variant="outline" onClick={() => setShowClone(true)}>
           <Copy className="h-4 w-4" />
@@ -172,7 +186,16 @@ function SucursalesTab() {
       />
 
       {canCreate && (
-        <Fab label="Nueva sucursal" onClick={() => setShowCreate(true)} />
+        <Fab
+          label="Nueva sucursal"
+          disabled={atBranchCap}
+          title={
+            atBranchCap
+              ? `Alcanzaste el límite de tu plan (${plan.data?.maxBranches} sucursales). Contacta a Soltryx para ampliarlo.`
+              : 'Nueva sucursal'
+          }
+          onClick={() => setShowCreate(true)}
+        />
       )}
       {showCreate && <BranchFormDialog onClose={() => setShowCreate(false)} />}
       {editing && (

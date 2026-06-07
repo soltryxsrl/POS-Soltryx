@@ -11,6 +11,8 @@ import { Select } from '@/shared/ui/controls/Select';
 import { StatusFilter } from '@/shared/ui/controls/StatusFilter';
 import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { DataTable, useTableQueryState, type DataTableColumn } from '@/shared/ui/data-table';
+import { usePlan } from '@/features/plan/application/hooks/use-plan';
+import { PlanUsageBadge } from '@/features/plan/ui/PlanUsageBadge';
 import { useAdminRoles } from '../../application/hooks/use-admin-roles';
 import {
   useAdminUsers,
@@ -56,6 +58,9 @@ export function UsersTable({
 
   const remove = useRemoveAdminUser();
   const roles = useAdminRoles();
+  const plan = usePlan();
+  const atUserCap =
+    plan.data?.maxUsers != null && plan.data.usedUsers >= plan.data.maxUsers;
   const [formState, setFormState] = useState<
     { mode: 'create' } | { mode: 'edit'; id: string } | null
   >(null);
@@ -197,6 +202,13 @@ export function UsersTable({
           </Select>
         </div>
       </FilterPopover>
+      {plan.data && (
+        <PlanUsageBadge
+          used={plan.data.usedUsers}
+          max={plan.data.maxUsers}
+          noun="Usuarios"
+        />
+      )}
     </div>
   );
 
@@ -257,7 +269,16 @@ export function UsersTable({
       )}
 
       <Can permission="users.create">
-        <Fab label="Nuevo usuario" onClick={() => setFormState({ mode: 'create' })} />
+        <Fab
+          label="Nuevo usuario"
+          disabled={atUserCap}
+          title={
+            atUserCap
+              ? `Alcanzaste el límite de tu plan (${plan.data?.maxUsers} usuarios). Contacta a Soltryx para ampliarlo.`
+              : 'Nuevo usuario'
+          }
+          onClick={() => setFormState({ mode: 'create' })}
+        />
       </Can>
     </>
   );
