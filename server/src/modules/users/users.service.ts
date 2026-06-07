@@ -9,6 +9,7 @@ import { In, IsNull, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import { AuditService } from '../audit/audit.service';
 import { BranchesService } from '../branches/branches.service';
+import { SUPERADMIN_ROLE_CODE } from '../auth/domain/permissions.catalog';
 import { PlanLimitsService } from '../plan/plan-limits.service';
 import {
   PASSWORD_HASHER,
@@ -73,6 +74,17 @@ export class UsersService {
       .orderBy(sortColumnMap[sort.column], sort.dir.toUpperCase() as 'ASC' | 'DESC')
       .skip(offset)
       .take(limit);
+
+    // Oculta la(s) cuenta(s) de Soltryx (rol SUPERADMIN): el cliente no debe
+    // verlas ni gestionarlas.
+    qb.andWhere(
+      `NOT EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN roles rr ON rr.id = ur.role_id
+        WHERE ur.user_id = u.id AND rr.code = :superadmin
+      )`,
+      { superadmin: SUPERADMIN_ROLE_CODE },
+    );
 
     if (q.q) {
       const search = `%${q.q.toLowerCase()}%`;

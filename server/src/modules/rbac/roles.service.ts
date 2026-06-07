@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
+import { SUPERADMIN_ROLE_CODE } from '../auth/domain/permissions.catalog';
 import { PermissionOrmEntity } from '../auth/infrastructure/persistence/typeorm/permission.orm-entity';
 import { RoleOrmEntity } from '../auth/infrastructure/persistence/typeorm/role.orm-entity';
 import { UserOrmEntity } from '../auth/infrastructure/persistence/typeorm/user.orm-entity';
@@ -14,7 +15,9 @@ import type { CreateRoleDto } from './dto/create-role.dto';
 import { toRoleResponse, type RoleResponse } from './dto/role.response';
 import type { UpdateRoleDto } from './dto/update-role.dto';
 
-const SYSTEM_ROLE_CODES = new Set(['ADMIN']);
+// ADMIN y el rol de Soltryx (SUPERADMIN) son de sistema: no se editan/eliminan
+// desde la UI. SUPERADMIN además se OCULTA por completo del cliente (ver list()).
+const SYSTEM_ROLE_CODES = new Set(['ADMIN', SUPERADMIN_ROLE_CODE]);
 
 type Actor = { id: string; username?: string } | undefined;
 
@@ -33,6 +36,7 @@ export class RolesService {
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.permissions', 'p')
       .where('r.deletedAt IS NULL')
+      .andWhere('r.code != :superadmin', { superadmin: SUPERADMIN_ROLE_CODE })
       .orderBy('r.code', 'ASC')
       .getMany();
 

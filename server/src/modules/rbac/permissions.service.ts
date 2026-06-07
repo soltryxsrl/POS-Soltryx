@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
+import { SUPERADMIN_PERMISSION_CODES } from '../auth/domain/permissions.catalog';
 import { PermissionOrmEntity } from '../auth/infrastructure/persistence/typeorm/permission.orm-entity';
 import { toPermissionResponse, type PermissionResponse } from './dto/permission.response';
 
@@ -12,7 +13,12 @@ export class PermissionsService {
   ) {}
 
   async list(): Promise<PermissionResponse[]> {
-    const rows = await this.repo.find({ order: { module: 'ASC', code: 'ASC' } });
+    // Oculta los permisos super-admin (plan.manage): no deben aparecer en el
+    // selector de permisos de la UI de Roles del cliente.
+    const rows = await this.repo.find({
+      where: { code: Not(In([...SUPERADMIN_PERMISSION_CODES])) },
+      order: { module: 'ASC', code: 'ASC' },
+    });
     return rows.map(toPermissionResponse);
   }
 }

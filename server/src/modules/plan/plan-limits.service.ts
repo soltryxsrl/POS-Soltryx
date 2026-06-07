@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SUPERADMIN_ROLE_CODE } from '../auth/domain/permissions.catalog';
 import { UserOrmEntity } from '../auth/infrastructure/persistence/typeorm/user.orm-entity';
 import { BranchOrmEntity } from '../branches/branch.orm-entity';
 import { PlanLimitsOrmEntity } from './plan-limits.orm-entity';
@@ -45,14 +46,32 @@ export class PlanLimitsService {
   }
 
   /**
-   * Uso actual. Los conteos usan `count()`, que excluye filas borradas
-   * (soft-delete vía @DeleteDateColumn en users y branches), así que un usuario
-   * o sucursal eliminado libera su cupo.
+   * Cuenta los usuarios del CLIENTE: no-borrados y SIN el rol SUPERADMIN (las
+   * cuentas de Soltryx no consumen el cupo del plan del cliente).
+   */
+  private countClientUsers(): Promise<number> {
+    return this.users
+      .createQueryBuilder('u')
+      .where('u.deletedAt IS NULL')
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM user_roles ur
+          JOIN roles rr ON rr.id = ur.role_id
+          WHERE ur.user_id = u.id AND rr.code = :superadmin
+        )`,
+        { superadmin: SUPERADMIN_ROLE_CODE },
+      )
+      .getCount();
+  }
+
+  /**
+   * Uso actual. Usuarios = cuentas del cliente (excluye Soltryx); sucursales =
+   * `count()` (excluye borradas vía @DeleteDateColumn). Borrar libera cupo.
    */
   async getUsage(): Promise<PlanUsage> {
     const [limits, usedUsers, usedBranches] = await Promise.all([
       this.getLimits(),
-      this.users.count(),
+      this.countClientUsers(),
       this.branches.count(),
     ]);
     return { ...limits, usedUsers, usedBranches };
@@ -79,7 +98,7 @@ export class PlanLimitsService {
   async assertCanCreateUser(): Promise<void> {
     const { maxUsers } = await this.getLimits();
     if (maxUsers == null) return;
-    const used = await this.users.count();
+    const used = await this.countClientUsers();
     if (used >= maxUsers) {
       throw new ForbiddenException({
         code: 'PLAN_LIMIT_REACHED',

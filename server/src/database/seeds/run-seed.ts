@@ -6,6 +6,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   SUPERADMIN_PERMISSIONS,
   SUPERADMIN_PERMISSION_CODES,
+  SUPERADMIN_ROLE_CODE,
 } from '../../modules/auth/domain/permissions.catalog';
 
 /**
@@ -48,6 +49,12 @@ async function run(): Promise<void> {
       { code: 'ADMIN', name: 'Administrador', description: 'Acceso total al sistema' },
       { code: 'MANAGER', name: 'Gerente', description: 'Gestión operativa y reportes' },
       { code: 'CASHIER', name: 'Cajero', description: 'Operación de caja y ventas' },
+      // Rol de SOLTRYX (super-admin). Oculto de la UI del cliente.
+      {
+        code: SUPERADMIN_ROLE_CODE,
+        name: 'Super Admin (Soltryx)',
+        description: 'Gestión de plan/licencia — solo Soltryx',
+      },
     ];
     for (const r of roles) {
       await m.query(
@@ -111,8 +118,42 @@ async function run(): Promise<void> {
         [roleCode, codes],
       );
     }
+    // SUPERADMIN (Soltryx): solo los permisos super-admin (plan.manage).
+    await m.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id
+       FROM roles r, permissions p
+       WHERE r.code = $1 AND p.code = ANY($2::varchar[])
+       ON CONFLICT DO NOTHING`,
+      [SUPERADMIN_ROLE_CODE, SUPERADMIN_PERMISSION_CODES],
+    );
     // eslint-disable-next-line no-console
     console.log('[seed] role-permissions assigned');
+
+    // Usuario SUPER-ADMIN de Soltryx, provisionado por env (opcional). Si no se
+    // configuran las variables, NO se crea (el plan se gestiona por SQL). Sus
+    // credenciales las define Soltryx por instancia; nunca van en el repo.
+    const saEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+    const saPassword = process.env.SUPERADMIN_PASSWORD;
+    if (saEmail && saPassword) {
+      const saHash = await bcrypt.hash(saPassword, 10);
+      const saUsername = process.env.SUPERADMIN_USERNAME?.trim() || 'soltryx';
+      await m.query(
+        `INSERT INTO users (email, username, full_name, password_hash, is_active, branch_id)
+         VALUES ($1, $2, $3, $4, true, NULL)
+         ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_active = true`,
+        [saEmail, saUsername, 'Soltryx Super Admin', saHash],
+      );
+      await m.query(
+        `INSERT INTO user_roles (user_id, role_id)
+         SELECT u.id, r.id FROM users u, roles r
+         WHERE u.email = $1 AND r.code = $2
+         ON CONFLICT DO NOTHING`,
+        [saEmail, SUPERADMIN_ROLE_CODE],
+      );
+      // eslint-disable-next-line no-console
+      console.log(`[seed] super-admin user ensured (${saEmail})`);
+    }
 
     const passwordHash = await bcrypt.hash('Admin123!', 10);
     await m.query(

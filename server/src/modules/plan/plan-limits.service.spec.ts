@@ -11,7 +11,16 @@ function makeService(
   branchCount: number,
 ): PlanLimitsService {
   const repo = { findOne: async () => limits } as unknown as Repository<PlanLimitsOrmEntity>;
-  const users = { count: async () => userCount } as unknown as Repository<UserOrmEntity>;
+  // countClientUsers() usa un QueryBuilder encadenable que termina en getCount().
+  const qb = {
+    where: () => qb,
+    andWhere: () => qb,
+    getCount: async () => userCount,
+  } as unknown as ReturnType<Repository<UserOrmEntity>['createQueryBuilder']>;
+  const users = {
+    count: async () => userCount,
+    createQueryBuilder: () => qb,
+  } as unknown as Repository<UserOrmEntity>;
   const branches = { count: async () => branchCount } as unknown as Repository<BranchOrmEntity>;
   return new PlanLimitsService(repo, users, branches);
 }

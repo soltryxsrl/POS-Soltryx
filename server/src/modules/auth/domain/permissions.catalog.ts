@@ -157,6 +157,14 @@ export const SUPERADMIN_PERMISSION_CODES: readonly string[] =
   SUPERADMIN_PERMISSIONS.map((p) => p.code);
 
 /**
+ * Rol dedicado de SOLTRYX. Tiene los permisos super-admin (plan.manage) y se
+ * provisiona por env (SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD). Se OCULTA de la UI
+ * del cliente (listas de roles/usuarios) y no consume el cupo de usuarios del
+ * plan, para que el ADMIN del cliente ni lo vea ni lo pueda usar.
+ */
+export const SUPERADMIN_ROLE_CODE = 'SUPERADMIN';
+
+/**
  * Asignaciones por defecto que aplica el seed.
  * ADMIN obtiene todos los permisos automáticamente (no listado aquí).
  */
