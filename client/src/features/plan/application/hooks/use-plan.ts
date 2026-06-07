@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { planApiHttp } from '../../infrastructure/api/plan.api.http';
 
 export const planKey = ['plan'] as const;
@@ -16,5 +16,25 @@ export function usePlan() {
     queryFn: planApiHttp.get,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+  });
+}
+
+/** Upsell del plan (super-admin). Requiere el secreto; refresca el plan al éxito. */
+export function useUpdatePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      secret: string;
+      maxUsers: number | null;
+      maxBranches: number | null;
+    }) =>
+      planApiHttp.update(input.secret, {
+        maxUsers: input.maxUsers,
+        maxBranches: input.maxBranches,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(planKey, data);
+      void qc.invalidateQueries({ queryKey: planKey });
+    },
   });
 }

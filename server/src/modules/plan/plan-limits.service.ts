@@ -58,6 +58,23 @@ export class PlanLimitsService {
     return { ...limits, usedUsers, usedBranches };
   }
 
+  /**
+   * Cambia los topes del plan (upsell). Solo los campos provistos se modifican;
+   * `null` = ilimitado. Lo invoca el endpoint super-admin.
+   */
+  async updateLimits(patch: {
+    maxUsers?: number | null;
+    maxBranches?: number | null;
+  }): Promise<void> {
+    let row = await this.repo.findOne({ where: { id: SINGLETON_ID } });
+    if (!row) {
+      row = this.repo.create({ id: SINGLETON_ID, maxUsers: null, maxBranches: null });
+    }
+    if (patch.maxUsers !== undefined) row.maxUsers = patch.maxUsers;
+    if (patch.maxBranches !== undefined) row.maxBranches = patch.maxBranches;
+    await this.repo.save(row);
+  }
+
   /** Lanza 403 si crear un usuario excedería el plan. No-op si es ilimitado. */
   async assertCanCreateUser(): Promise<void> {
     const { maxUsers } = await this.getLimits();

@@ -24,3 +24,11 @@ test('GET /plan devuelve límites + uso', async () => {
   expect(plan.usedUsers).toBeGreaterThanOrEqual(1);
   expect(plan.usedBranches).toBeGreaterThanOrEqual(1);
 });
+
+test('PATCH /plan sin secreto super-admin es rechazado (403)', async () => {
+  // El admin del cliente NO puede cambiar su propio plan: sin el secreto
+  // super-admin el endpoint responde 403 (deshabilitado o clave inválida).
+  await expect(
+    api('/plan', { method: 'PATCH', body: JSON.stringify({ maxBranches: 99 }) }),
+  ).rejects.toThrow(/403/);
+});

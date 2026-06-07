@@ -54,4 +54,21 @@ describe('PlanLimitsService', () => {
     await expect(s.getLimits()).resolves.toEqual({ maxUsers: null, maxBranches: null });
     await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
   });
+
+  it('updateLimits modifica solo los campos provistos y guarda', async () => {
+    const row = { id: 1, maxUsers: null, maxBranches: null };
+    const save = jest.fn(async (r: typeof row) => r);
+    const repo = {
+      findOne: async () => row,
+      create: (x: Partial<typeof row>) => ({ ...row, ...x }),
+      save,
+    } as unknown as Repository<PlanLimitsOrmEntity>;
+    const noop = { count: async () => 0 } as unknown as Repository<UserOrmEntity>;
+    const s = new PlanLimitsService(repo, noop, noop as unknown as Repository<BranchOrmEntity>);
+
+    await s.updateLimits({ maxUsers: 5 });
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ maxUsers: 5, maxBranches: null }),
+    );
+  });
 });
