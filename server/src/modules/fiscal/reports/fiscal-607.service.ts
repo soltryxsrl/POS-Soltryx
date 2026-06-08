@@ -275,9 +275,13 @@ export class Fiscal607Service {
 
       const propinaLegal = sale?.tipTotal ?? '0.00';
 
-      totalFacturadoCents += Math.round(Number(d.total) * 100);
-      totalItbisCents += Math.round(Number(d.taxTotal) * 100);
-      totalPropinaCents += Math.round(Number(propinaLegal) * 100);
+      // Las notas de crédito (E34/B04) RESTAN del total del período (reducen
+      // ventas). Las filas del .txt quedan positivas — es la DGII quien netea por
+      // el "NCF modificado" — pero el RESUMEN que ve el negocio debe netearlas.
+      const sign = isCreditNote ? -1 : 1;
+      totalFacturadoCents += sign * Math.round(Number(d.total) * 100);
+      totalItbisCents += sign * Math.round(Number(d.taxTotal) * 100);
+      totalPropinaCents += sign * Math.round(Number(propinaLegal) * 100);
 
       return {
         tipoIdentificacion: tipoId,

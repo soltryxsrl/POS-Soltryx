@@ -10,6 +10,7 @@ import {
 import type { UpdateBusinessInput } from '@/features/config/domain/types';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { uploadImage } from '@/shared/lib/http-client';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { Input } from '@/shared/ui/controls/Input';
@@ -40,6 +41,7 @@ export default function BusinessSettingsPage() {
   const [form, setForm] = useState<UpdateBusinessInput>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Inicializa el form con los valores que vinieron del server cuando llegan,
   // pero no pisa lo que el usuario ya tecleó (savedAt nulo = nunca guardado todavía).
@@ -57,9 +59,9 @@ export default function BusinessSettingsPage() {
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((s) => ({ ...s, [key]: e.target.checked }));
 
-  // Sube un logo desde el dispositivo: lo reescala (lado mayor 240px) y lo
-  // guarda como data URI PNG, así viaja embebido sin necesitar un CDN externo.
-  const onLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Sube el logo al CDN (MinIO/S3) y guarda la URL pública. Antes se guardaba
+  // como data-URI base64 dentro de la BD; ahora vive en el almacén de objetos.
+  const onLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // permite volver a elegir el mismo archivo
     if (!file) return;
@@ -68,30 +70,15 @@ export default function BusinessSettingsPage() {
       return;
     }
     setError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onload = () => {
-        const MAX = 240;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setForm((s) => ({ ...s, logoUrl: String(reader.result) }));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, w, h);
-        setForm((s) => ({ ...s, logoUrl: canvas.toDataURL('image/png') }));
-      };
-      img.onerror = () => setError('No se pudo leer la imagen seleccionada.');
-      img.src = String(reader.result);
-    };
-    reader.onerror = () => setError('No se pudo leer el archivo.');
-    reader.readAsDataURL(file);
+    setUploadingLogo(true);
+    try {
+      const url = await uploadImage(file, 'business');
+      setForm((s) => ({ ...s, logoUrl: url }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -223,7 +210,7 @@ export default function BusinessSettingsPage() {
           <FormField
             label="Logo del negocio (opcional)"
             className="sm:col-span-2"
-            hint="Se imprime arriba del nombre en cada recibo. PNG o JPG; se reescala automáticamente."
+            hint="Se imprime arriba del nombre en cada recibo. PNG/JPG/WEBP; se guarda en el CDN."
           >
             <div className="flex items-center gap-4">
               {form.logoUrl ? (
@@ -242,17 +229,17 @@ export default function BusinessSettingsPage() {
                 <label
                   className={
                     'inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium transition hover:border-brand-from/50 hover:bg-brand-tint ' +
-                    (!canEdit ? 'pointer-events-none opacity-50' : '')
+                    (!canEdit || uploadingLogo ? 'pointer-events-none opacity-50' : '')
                   }
                 >
                   <Upload className="h-4 w-4" />
-                  {form.logoUrl ? 'Cambiar imagen' : 'Subir imagen'}
+                  {uploadingLogo ? 'Subiendo…' : form.logoUrl ? 'Cambiar imagen' : 'Subir imagen'}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     className="hidden"
                     onChange={onLogoFile}
-                    disabled={!canEdit}
+                    disabled={!canEdit || uploadingLogo}
                   />
                 </label>
                 {form.logoUrl && canEdit && (

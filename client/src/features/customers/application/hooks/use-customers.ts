@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { customersApiHttp } from '../../infrastructure/api/customers.api.http';
 import type {
   CreateCustomerInput,
@@ -16,10 +17,19 @@ export const customersKey = {
   account: (id: string) => ['customers', 'account', id] as const,
 };
 
-export function useCustomers(params: ListCustomersParams = {}) {
+export function useCustomers(
+  params: ListCustomersParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: customersKey.list(params),
-    queryFn: () => customersApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...customersKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => customersApiHttp.list(p), params, { cap })
+        : customersApiHttp.list(params),
   });
 }
 

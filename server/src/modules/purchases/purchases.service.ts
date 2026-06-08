@@ -6,8 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
+import { fromCents, toCents } from '../../common/money';
 import {
   applyBranchFilter,
   assertSameBranch,
@@ -28,6 +29,7 @@ import type { CancelPurchaseOrderRequestDto } from './dto/cancel-purchase-order.
 import type { CreatePurchaseOrderRequestDto } from './dto/create-purchase-order.request-dto';
 import type { ListPurchaseOrdersQuery } from './dto/list-purchase-orders.query';
 import type { ReceivePurchaseOrderRequestDto } from './dto/receive-purchase-order.request-dto';
+import type { UpdateFiscalDataRequestDto } from './dto/update-fiscal-data.request-dto';
 import { PurchaseOrderItemOrmEntity } from './purchase-order-item.orm-entity';
 import {
   PurchaseOrderOrmEntity,
@@ -159,30 +161,14 @@ export class PurchasesService {
       throw new ConflictException(`Proveedor ${supplier.tradeName} está inactivo`);
     }
 
-    // Validación fiscal: si viene tipo de comprobante, los otros 2 fields
-    // son obligatorios (NCF + fecha del comprobante). Y si el tipo es B01/B14
-    // (crédito fiscal / régimen especial) el proveedor DEBE tener RNC para
-    // que el 606 sea válido.
+    this.assertFiscalDataValid(
+      dto.supplierFiscalDocTypeCode,
+      dto.supplierNcf,
+      dto.supplierInvoiceDate,
+      supplier,
+    );
     if (dto.supplierFiscalDocTypeCode) {
-      if (!dto.supplierNcf?.trim()) {
-        throw new BadRequestException(
-          'supplierNcf es obligatorio cuando se indica tipo de comprobante',
-        );
-      }
-      if (!dto.supplierInvoiceDate) {
-        throw new BadRequestException(
-          'supplierInvoiceDate es obligatorio cuando se indica tipo de comprobante',
-        );
-      }
-      const requiresSupplierRnc =
-        dto.supplierFiscalDocTypeCode === 'B01' ||
-        dto.supplierFiscalDocTypeCode === 'B14' ||
-        dto.supplierFiscalDocTypeCode === 'E31';
-      if (requiresSupplierRnc && !supplier.rnc) {
-        throw new BadRequestException(
-          `Tipo ${dto.supplierFiscalDocTypeCode} requiere RNC del proveedor. Asigna el RNC en la ficha del proveedor antes.`,
-        );
-      }
+      await this.assertNcfUnique(supplier.id, dto.supplierNcf!.trim());
     }
 
     // Cargar productos snapshot (nombre/sku/tax) + validar que existan
@@ -243,6 +229,13 @@ export class PurchasesService {
         );
       }
 
+      this.assertRetentionsValid(
+        dto.itbisRetenido,
+        dto.isrRetenido,
+        dto.isrRetentionType,
+        taxC,
+      );
+
       const po = ordersRepo.create({
         branchId,
         orderNumber,
@@ -251,7 +244,7 @@ export class PurchasesService {
         expectedDate: dto.expectedDate ?? null,
         supplierInvoice: dto.supplierInvoice?.trim() || null,
         supplierFiscalDocTypeCode: dto.supplierFiscalDocTypeCode ?? null,
-        supplierNcf: dto.supplierNcf?.trim() || null,
+        supplierNcf: dto.supplierNcf?.trim().toUpperCase() || null,
         supplierInvoiceDate: dto.supplierInvoiceDate ?? null,
         paymentMethod: dto.paymentMethod ?? null,
         itbisRetenido: dto.itbisRetenido ?? '0.00',
@@ -349,15 +342,17 @@ export class PurchasesService {
           if (prod) {
             const newStock = parseFloat(prod.stock);
             const oldStock = newStock - recvNow;
-            const oldCost = parseFloat(prod.costPrice);
-            const recvCost = parseFloat(it.unitCost);
-            const blended =
+            // Promedio móvil en CENTAVOS para no acumular error de float:
+            // costoNuevo = (stockAntes×costoAntes + recibido×costoRecibido) / stockNuevo.
+            const oldCostC = toCents(prod.costPrice);
+            const recvCostC = toCents(it.unitCost);
+            const blendedC =
               oldStock > 0 && newStock > 0
-                ? (oldStock * oldCost + recvNow * recvCost) / newStock
-                : recvCost;
+                ? Math.round((oldStock * oldCostC + recvNow * recvCostC) / newStock)
+                : recvCostC;
             await productsRepo.update(
               { id: it.productId },
-              { costPrice: blended.toFixed(2) },
+              { costPrice: fromCents(blendedC) },
             );
           }
         }
@@ -365,7 +360,13 @@ export class PurchasesService {
 
       // 2) Recalcular status: si Σ received == Σ ordered → RECEIVED, sino PARTIAL
       const refreshed = await itemsRepo.find({ where: { purchaseOrderId: po.id } });
-      const allReceived = refreshed.every((i) => i.receivedQuantity === i.orderedQuantity);
+      // Comparación numérica en milésimas (las cantidades son NUMERIC(14,3));
+      // comparar strings con === es frágil. >= cubre la recepción completa.
+      const allReceived = refreshed.every(
+        (i) =>
+          Math.round(parseFloat(i.receivedQuantity) * 1000) >=
+          Math.round(parseFloat(i.orderedQuantity) * 1000),
+      );
       const newStatus = allReceived
         ? PurchaseOrderStatus.RECEIVED
         : PurchaseOrderStatus.PARTIAL;
@@ -455,6 +456,176 @@ export class PurchasesService {
     return toResponse(refreshed!, supplier?.tradeName ?? '?');
   }
 
+  /**
+   * Edita SOLO los datos fiscales (comprobante 606) de una orden existente, sin
+   * tocar líneas ni totales. Permite que una compra entre al 606 sin cancelarla
+   * y recrearla. Bloqueada si la orden está cancelada. Misma validación fiscal
+   * que `create`. Dejar el tipo de comprobante en blanco limpia el comprobante.
+   */
+  async updateFiscalData(
+    id: string,
+    dto: UpdateFiscalDataRequestDto,
+    userId: string,
+    branchId: string,
+  ): Promise<PurchaseOrderResponse> {
+    const po = await this.orders.findOne({ where: { id }, relations: { items: true } });
+    if (!po) throw new NotFoundException(`Orden ${id} no encontrada`);
+    assertSameBranch(po.branchId, branchId);
+    if (po.status === PurchaseOrderStatus.CANCELLED) {
+      throw new ConflictException(
+        'No se puede editar el comprobante de una orden cancelada',
+      );
+    }
+    const supplier = await this.suppliers.findOne({ where: { id: po.supplierId } });
+
+    this.assertFiscalDataValid(
+      dto.supplierFiscalDocTypeCode,
+      dto.supplierNcf,
+      dto.supplierInvoiceDate,
+      supplier,
+    );
+
+    // Sin tipo de comprobante ⇒ se limpia todo el bloque fiscal (sale del 606).
+    const hasFiscal = !!dto.supplierFiscalDocTypeCode;
+    if (hasFiscal) {
+      this.assertRetentionsValid(
+        dto.itbisRetenido,
+        dto.isrRetenido,
+        dto.isrRetentionType,
+        toCents(po.taxTotal),
+      );
+      await this.assertNcfUnique(po.supplierId, dto.supplierNcf!.trim(), po.id);
+    }
+    await this.orders.update(
+      { id: po.id },
+      {
+        supplierFiscalDocTypeCode: hasFiscal ? dto.supplierFiscalDocTypeCode! : null,
+        supplierNcf: hasFiscal ? dto.supplierNcf?.trim().toUpperCase() || null : null,
+        supplierInvoiceDate: hasFiscal ? dto.supplierInvoiceDate ?? null : null,
+        // paymentMethod no es parte del comprobante: si no viene en el patch se
+        // conserva el actual (evita borrarlo al limpiar el bloque fiscal).
+        paymentMethod: dto.paymentMethod ?? po.paymentMethod,
+        itbisRetenido: hasFiscal ? dto.itbisRetenido ?? '0.00' : '0.00',
+        isrRetenido: hasFiscal ? dto.isrRetenido ?? '0.00' : '0.00',
+        isrRetentionType: hasFiscal ? dto.isrRetentionType ?? null : null,
+      },
+    );
+    const refreshed = await this.orders.findOne({
+      where: { id: po.id },
+      relations: { items: true },
+    });
+
+    void this.audit.record({
+      actorUserId: userId,
+      action: 'purchases.update-fiscal',
+      entityType: 'purchase_order',
+      entityId: po.id,
+      payload: {
+        orderNumber: po.orderNumber,
+        supplierFiscalDocTypeCode: hasFiscal ? dto.supplierFiscalDocTypeCode : null,
+        supplierNcf: hasFiscal ? dto.supplierNcf ?? null : null,
+        supplierInvoiceDate: hasFiscal ? dto.supplierInvoiceDate ?? null : null,
+      },
+    });
+
+    return toResponse(refreshed!, supplier?.tradeName ?? '?');
+  }
+
+  /**
+   * Coherencia de retenciones (606): el ITBIS retenido no puede exceder el ITBIS
+   * facturado, y si hay ISR retenido debe indicarse el tipo de retención (01-08).
+   */
+  private assertRetentionsValid(
+    itbisRetenido: string | undefined,
+    isrRetenido: string | undefined,
+    isrRetentionType: string | undefined,
+    taxTotalCents: number,
+  ): void {
+    if (toCents(itbisRetenido ?? '0') > taxTotalCents) {
+      throw new BadRequestException(
+        `El ITBIS retenido (${itbisRetenido}) no puede exceder el ITBIS facturado (${fromCents(taxTotalCents)}).`,
+      );
+    }
+    if (toCents(isrRetenido ?? '0') > 0 && !isrRetentionType) {
+      throw new BadRequestException(
+        'Indica el tipo de retención de ISR cuando registras un monto de ISR retenido.',
+      );
+    }
+  }
+
+  /**
+   * Reglas fiscales compartidas (create + updateFiscalData): si hay tipo de
+   * comprobante, NCF y fecha son obligatorios; y B01/B14/E31 exigen RNC del
+   * proveedor para que el 606 sea válido.
+   */
+  private assertFiscalDataValid(
+    docTypeCode: string | undefined,
+    ncf: string | undefined,
+    invoiceDate: string | undefined,
+    supplier: { rnc: string | null } | null,
+  ): void {
+    if (!docTypeCode) return;
+    if (!ncf?.trim()) {
+      throw new BadRequestException(
+        'El NCF del proveedor es obligatorio cuando indicas un tipo de comprobante.',
+      );
+    }
+    if (!invoiceDate) {
+      throw new BadRequestException(
+        'La fecha del comprobante es obligatoria cuando indicas un tipo de comprobante.',
+      );
+    }
+    // Formato del NCF según el tipo: B + 10 dígitos (NCF físico, 11 caracteres) o
+    // E + 12 dígitos (e-CF, 13 caracteres), y debe empezar con el código del tipo
+    // seleccionado (B01, E41, ...) para que sea coherente con el 606.
+    const ncfVal = ncf.trim().toUpperCase();
+    const isECf = docTypeCode.startsWith('E');
+    const ncfFormat = isECf ? /^E\d{12}$/ : /^B\d{10}$/;
+    if (!ncfFormat.test(ncfVal) || !ncfVal.startsWith(docTypeCode)) {
+      throw new BadRequestException(
+        isECf
+          ? `NCF inválido para ${docTypeCode}: debe ser ${docTypeCode} + 10 dígitos (e-CF de 13 caracteres).`
+          : `NCF inválido para ${docTypeCode}: debe ser ${docTypeCode} + 8 dígitos (NCF de 11 caracteres).`,
+      );
+    }
+    const requiresSupplierRnc =
+      docTypeCode === 'B01' || docTypeCode === 'B14' || docTypeCode === 'E31';
+    if (requiresSupplierRnc && !supplier?.rnc) {
+      throw new BadRequestException(
+        `Tipo ${docTypeCode} requiere RNC del proveedor. Asigna el RNC en la ficha del proveedor antes.`,
+      );
+    }
+  }
+
+  /**
+   * El NCF de un proveedor no se repite: un mismo proveedor no puede tener dos
+   * compras (no canceladas) con el mismo NCF. Evita duplicar una factura en el
+   * 606. `excludeOrderId` se pasa al editar para no chocar consigo misma.
+   */
+  private async assertNcfUnique(
+    supplierId: string,
+    ncf: string,
+    excludeOrderId?: string,
+  ): Promise<void> {
+    // El NCF se guarda normalizado en mayúsculas (create/updateFiscalData), así
+    // que comparamos contra el valor normalizado con el API tipado de TypeORM
+    // (SQL parametrizado seguro — sin SQL crudo que pueda romper).
+    const normalized = ncf.trim().toUpperCase();
+    const existing = await this.orders.findOne({
+      where: {
+        supplierId,
+        supplierNcf: normalized,
+        status: Not(PurchaseOrderStatus.CANCELLED),
+        ...(excludeOrderId ? { id: Not(excludeOrderId) } : {}),
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `El NCF ${normalized} ya está registrado para este proveedor en la orden ${existing.orderNumber}.`,
+      );
+    }
+  }
+
   private async loadSupplierNames(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
     const rows = await this.suppliers.find({ where: { id: In(ids) } });
@@ -462,15 +633,6 @@ export class PurchasesService {
   }
 }
 
-function toCents(s: string | number): number {
-  return Math.round(Number(s) * 100);
-}
-
-function fromCents(c: number): string {
-  const sign = c < 0 ? '-' : '';
-  const abs = Math.abs(c);
-  return `${sign}${Math.trunc(abs / 100)}.${(abs % 100).toString().padStart(2, '0')}`;
-}
 
 function addMoney(a: string, b: string): string {
   // a y b en formato "x.yyy" (qty hasta 3 decimales)

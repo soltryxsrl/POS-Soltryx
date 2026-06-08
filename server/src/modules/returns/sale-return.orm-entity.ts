@@ -71,6 +71,10 @@ export class SaleReturnOrmEntity {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
+  /** Clave de idempotencia: evita duplicar la devolución si se reintenta. */
+  @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
+  idempotencyKey!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

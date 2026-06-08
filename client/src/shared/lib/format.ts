@@ -26,3 +26,21 @@ export function formatDateTime(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value;
   return d.toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+/**
+ * Clave de día en hora LOCAL (RD): `'YYYY-MM-DD'`. Ordena cronológicamente como
+ * string. Pensada para agrupar filas por día en las tablas (group-by Fecha).
+ */
+export function dayKey(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Convierte una clave de día `'YYYY-MM-DD'` a etiqueta legible `'DD/MM/YYYY'`. */
+export function formatDayLabel(key: string): string {
+  const [y, m, d] = key.split('-');
+  return `${d}/${m}/${y}`;
+}

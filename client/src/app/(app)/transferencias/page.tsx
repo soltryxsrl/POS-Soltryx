@@ -16,6 +16,8 @@ import {
 import { TransferFormDialog } from '@/features/stock-transfers/ui/components/TransferFormDialog';
 import type { StockTransfer, StockTransferStatus } from '@/features/stock-transfers/domain/types';
 
+const GROUP_FETCH_CAP = 2000;
+
 const STATUS: Record<StockTransferStatus, { label: string; cls: string }> = {
   IN_TRANSIT: { label: 'En tránsito', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
   RECEIVED: { label: 'Recibida', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' },
@@ -54,7 +56,11 @@ function TransfersList({
   fillHeight?: boolean;
   title?: ReactNode;
 }) {
-  const transfers = useStockTransfers();
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
+  // Al agrupar traemos el dataset completo (hasta el tope) para que los grupos y
+  // subtotales sean correctos; sin agrupar, la vista normal de 100.
+  const transfers = useStockTransfers({ fetchAll: !!groupBy, cap: GROUP_FETCH_CAP });
   const receive = useReceiveStockTransfer();
   const cancel = useCancelStockTransfer();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -92,11 +98,27 @@ function TransfersList({
       key: 'items',
       header: 'Ítems',
       align: 'right',
+      aggregate: (rows) => {
+        const sum = rows.reduce((acc, t) => acc + t.items.length, 0);
+        return <span className="font-medium">{sum}</span>;
+      },
       render: (t) => <span className="text-muted-foreground">{t.items.length}</span>,
     },
     {
       key: 'status',
       header: 'Estado',
+      grouping: {
+        key: (t) => t.status,
+        label: (key) => {
+          const s = STATUS[key as StockTransferStatus];
+          return (
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${s?.cls ?? ''}`}>
+              {s?.label ?? key}
+            </span>
+          );
+        },
+        sortValue: (key) => STATUS[key as StockTransferStatus]?.label ?? key,
+      },
       render: (t) => (
         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[t.status].cls}`}>
           {STATUS[t.status].label}
@@ -134,11 +156,15 @@ function TransfersList({
       <DataTable<StockTransfer>
         columns={columns}
         rows={items}
-        total={items.length}
+        total={groupBy ? (transfers.data?.total ?? items.length) : items.length}
         rowKey={(t) => t.id}
         page={1}
         pageSize={Math.max(items.length, 25)}
         onPageChange={() => undefined}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={transfers.isLoading}
         isFetching={transfers.isFetching}
         errorMessage={transfers.isError ? getErrorMessage(transfers.error) : null}

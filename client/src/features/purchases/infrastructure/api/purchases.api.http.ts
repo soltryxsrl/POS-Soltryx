@@ -5,6 +5,7 @@ import type {
   PurchaseOrder,
   PurchaseOrdersList,
   ReceivePurchaseOrderInput,
+  UpdateFiscalDataInput,
 } from '../../domain/types';
 
 export const purchasesApiHttp = {
@@ -28,5 +29,11 @@ export const purchasesApiHttp = {
     http<PurchaseOrder>(`/purchase-orders/${id}/cancel`, {
       method: 'POST',
       body: { reason },
+    }),
+
+  updateFiscal: (id: string, input: UpdateFiscalDataInput) =>
+    http<PurchaseOrder>(`/purchase-orders/${id}/fiscal`, {
+      method: 'PATCH',
+      body: input,
     }),
 };

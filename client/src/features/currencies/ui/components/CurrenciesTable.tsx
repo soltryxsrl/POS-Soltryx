@@ -15,6 +15,33 @@ import {
 import type { Currency } from '../../domain/types';
 import { SetRateDialog } from './SetRateDialog';
 
+type CurrencyStatus = 'base' | 'active' | 'inactive';
+
+const STATUS: Record<CurrencyStatus, { label: string; cls: string }> = {
+  base: {
+    label: 'Base',
+    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  active: {
+    label: 'Activa',
+    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  inactive: {
+    label: 'Inactiva',
+    cls: 'bg-muted text-muted-foreground',
+  },
+};
+
+const statusOf = (c: Currency): CurrencyStatus =>
+  c.isBase ? 'base' : c.isActive ? 'active' : 'inactive';
+
+function StatusBadge({ status }: { status: CurrencyStatus }) {
+  const s = STATUS[status];
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] ${s.cls}`}>{s.label}</span>
+  );
+}
+
 export function CurrenciesTable({
   fillHeight,
   title,
@@ -26,6 +53,8 @@ export function CurrenciesTable({
   const toggle = useToggleCurrency();
   const [editing, setEditing] = useState<Currency | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
 
   const sort = useClientSort<Currency>(currencies.data, 'code', 'asc', (c, k) => {
     if (k === 'rate') return c.rateToBase ? Number(c.rateToBase) : null;
@@ -101,20 +130,12 @@ export function CurrenciesTable({
       {
         key: 'status',
         header: 'Estado',
-        render: (c) =>
-          c.isBase ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-              Base
-            </span>
-          ) : c.isActive ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-              Activa
-            </span>
-          ) : (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-              Inactiva
-            </span>
-          ),
+        grouping: {
+          key: (c) => statusOf(c),
+          label: (key) => <StatusBadge status={key as CurrencyStatus} />,
+          sortValue: (key) => STATUS[key as CurrencyStatus]?.label ?? key,
+        },
+        render: (c) => <StatusBadge status={statusOf(c)} />,
       },
       {
         key: 'actions',
@@ -169,6 +190,10 @@ export function CurrenciesTable({
         sortKey={sort.sortKey}
         sortDir={sort.sortDir}
         onSortChange={sort.onSortChange}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={currencies.isLoading}
         isFetching={currencies.isFetching}
         errorMessage={currencies.isError ? getErrorMessage(currencies.error) : null}

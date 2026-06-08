@@ -35,7 +35,9 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
-  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+  // require_tld:false permite la URL del CDN propio en dev (http://localhost:9002/...);
+  // en prod el dominio real con TLD también pasa.
+  @IsUrl({ require_protocol: true, require_tld: false, protocols: ['http', 'https'] })
   @MaxLength(500)
   imageUrl?: string;
 

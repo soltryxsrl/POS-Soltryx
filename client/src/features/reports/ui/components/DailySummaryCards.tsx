@@ -22,8 +22,24 @@ export function DailySummaryCards({ date, branchId }: { date: string; branchId?:
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total vendido" value={formatMoney(d.total)} tone="success" hint={`${d.salesCount} venta(s)`} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Ventas netas"
+          value={formatMoney(d.netTotal)}
+          tone="success"
+          hint="Bruto − devoluciones"
+        />
+        <StatCard
+          label="Total vendido (bruto)"
+          value={formatMoney(d.total)}
+          hint={`${d.salesCount} venta(s)`}
+        />
+        <StatCard
+          label="Devoluciones"
+          value={formatMoney(d.returnsTotal)}
+          tone={Number(d.returnsTotal) > 0 ? 'warning' : 'default'}
+          hint={`${d.returnsCount} devolución(es)`}
+        />
         <StatCard label="ITBIS / Impuestos" value={formatMoney(d.taxTotal)} />
         <StatCard label="Descuentos" value={formatMoney(d.discountTotal)} />
         <StatCard

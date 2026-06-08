@@ -16,6 +16,9 @@ export interface DailySalesSummary {
   discountTotal: MoneyDto;
   taxTotal: MoneyDto;
   total: MoneyDto;
+  returnsCount: number;
+  returnsTotal: MoneyDto;
+  netTotal: MoneyDto;
   byMethod: Array<{ method: string; count: number; total: MoneyDto }>;
   byUser: Array<{
     userId: string;

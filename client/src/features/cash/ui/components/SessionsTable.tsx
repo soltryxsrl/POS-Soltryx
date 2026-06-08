@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { formatDateTime, formatMoney } from '@/shared/lib/format';
+import { dayKey, formatDateTime, formatDayLabel, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
@@ -15,6 +15,16 @@ import type { CashSession } from '../../domain/types';
 import { SessionReportDialog } from './SessionReportDialog';
 
 const FILTER_KEYS = ['status', 'cashRegisterId', 'openedById', 'from', 'to'] as const;
+
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más sesiones que esto, se agrupan las primeras N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
+const STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Abierta',
+  CLOSED: 'Cerrada',
+};
 
 export function SessionsTable({
   fillHeight,
@@ -33,17 +43,25 @@ export function SessionsTable({
     filterKeys: FILTER_KEYS,
   });
 
-  const sessions = useCashSessions({
-    status: (table.filters.status as CashSessionStatus) || undefined,
-    cashRegisterId: table.filters.cashRegisterId || undefined,
-    openedById: table.filters.openedById || undefined,
-    from: dateInputToIso(table.filters.from, 'start'),
-    to: dateInputToIso(table.filters.to, 'end'),
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request).
+  // Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const sessions = useCashSessions(
+    {
+      status: (table.filters.status as CashSessionStatus) || undefined,
+      cashRegisterId: table.filters.cashRegisterId || undefined,
+      openedById: table.filters.openedById || undefined,
+      from: dateInputToIso(table.filters.from, 'start'),
+      to: dateInputToIso(table.filters.to, 'end'),
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const registers = useCashRegisters();
   const [reportId, setReportId] = useState<string | null>(null);
@@ -54,6 +72,11 @@ export function SessionsTable({
         key: 'openedAt',
         header: 'Abierta',
         sortable: true,
+        grouping: {
+          key: (s) => dayKey(s.openedAt),
+          label: (key) => formatDayLabel(key),
+          sortValue: (key) => key, // 'YYYY-MM-DD' ⇒ orden cronológico
+        },
         render: (s) => <span className="text-xs">{formatDateTime(s.openedAt)}</span>,
       },
       {
@@ -70,6 +93,8 @@ export function SessionsTable({
         key: 'opening',
         header: 'Inicial',
         align: 'right',
+        aggregate: (rows) =>
+          formatMoney(rows.reduce((acc, s) => acc + Number(s.openingAmount), 0)),
         render: (s) => formatMoney(s.openingAmount),
       },
       {
@@ -77,18 +102,42 @@ export function SessionsTable({
         header: 'Esperado',
         sortable: true,
         align: 'right',
+        aggregate: (rows) =>
+          formatMoney(
+            rows.reduce((acc, s) => acc + (s.expectedAmount ? Number(s.expectedAmount) : 0), 0),
+          ),
         render: (s) => (s.expectedAmount ? formatMoney(s.expectedAmount) : '—'),
       },
       {
         key: 'counted',
         header: 'Contado',
         align: 'right',
+        aggregate: (rows) =>
+          formatMoney(
+            rows.reduce((acc, s) => acc + (s.countedAmount ? Number(s.countedAmount) : 0), 0),
+          ),
         render: (s) => (s.countedAmount ? formatMoney(s.countedAmount) : '—'),
       },
       {
         key: 'difference',
         header: 'Diferencia',
         align: 'right',
+        aggregate: (rows) => {
+          // Suma de las diferencias del grupo, con el mismo código de color que
+          // la celda: 0 verde, sobrante (>0) ámbar, faltante (<0) destructivo.
+          const sum = rows.reduce(
+            (acc, s) => acc + (s.difference ? parseFloat(s.difference) : 0),
+            0,
+          );
+          const cls =
+            sum === 0 ? 'text-green-700' : sum > 0 ? 'text-amber-700' : 'text-destructive';
+          return (
+            <span className={`font-medium ${cls}`}>
+              {sum > 0 ? '+' : ''}
+              {formatMoney(String(sum))}
+            </span>
+          );
+        },
         render: (s) => {
           const diffNum = s.difference ? parseFloat(s.difference) : null;
           if (diffNum === null) return '—';
@@ -109,6 +158,19 @@ export function SessionsTable({
       {
         key: 'status',
         header: 'Estado',
+        grouping: {
+          key: (s) => s.status,
+          label: (key) => (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                key === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {STATUS_LABEL[key] ?? key}
+            </span>
+          ),
+          sortValue: (key) => STATUS_LABEL[key] ?? key,
+        },
         render: (s) => (
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
@@ -245,6 +307,10 @@ export function SessionsTable({
         sortKey={table.sort}
         sortDir={table.sortDir}
         onSortChange={table.setSort}
+        groupBy={table.groupBy}
+        groupDir={table.groupDir}
+        onGroupByChange={table.setGroupBy}
+        onGroupDirChange={table.setGroupDir}
         isLoading={sessions.isLoading}
         isFetching={sessions.isFetching}
         errorMessage={sessions.isError ? getErrorMessage(sessions.error) : null}

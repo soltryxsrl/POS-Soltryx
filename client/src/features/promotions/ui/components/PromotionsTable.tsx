@@ -44,6 +44,11 @@ const STATUS_COLOR: Record<PromotionStatusFilter, string> = {
 
 const FILTER_KEYS = ['q', 'status', 'from', 'to'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más promociones que esto, se agrupan las primeras N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 function describe(p: Promotion): string {
   if (p.type === 'PRODUCT_PERCENT_OFF') return `${p.percentOff}% off`;
   if (p.type === 'PRODUCT_AMOUNT_OFF')
@@ -84,16 +89,24 @@ export function PromotionsTable({
     defaultFilters: { status: 'active' },
   });
 
-  const promotions = usePromotions({
-    q: table.filters.q || undefined,
-    status: (table.filters.status as PromotionStatusFilter) || undefined,
-    from: dateInputToIso(table.filters.from, 'start'),
-    to: dateInputToIso(table.filters.to, 'end'),
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request en
+  // 200). Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const promotions = usePromotions(
+    {
+      q: table.filters.q || undefined,
+      status: (table.filters.status as PromotionStatusFilter) || undefined,
+      from: dateInputToIso(table.filters.from, 'start'),
+      to: dateInputToIso(table.filters.to, 'end'),
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const del = useDeletePromotion();
 
@@ -115,6 +128,13 @@ export function PromotionsTable({
       {
         key: 'type',
         header: 'Tipo',
+        grouping: {
+          key: (p) => p.type,
+          label: (key) => (
+            <span className="text-xs">{TYPE_LABEL[key as PromotionType] ?? key}</span>
+          ),
+          sortValue: (key) => TYPE_LABEL[key as PromotionType] ?? key,
+        },
         render: (p) => <span className="text-xs">{TYPE_LABEL[p.type] ?? p.type}</span>,
       },
       {
@@ -145,6 +165,21 @@ export function PromotionsTable({
         key: 'status',
         header: 'Estado',
         align: 'center',
+        grouping: {
+          key: (p) => computeStatus(p),
+          label: (key) => {
+            const status = key as PromotionStatusFilter;
+            return (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[status]}`}
+              >
+                {STATUS_CHIPS.find((c) => c.value === status)?.label ?? status}
+              </span>
+            );
+          },
+          sortValue: (key) =>
+            STATUS_CHIPS.find((c) => c.value === (key as PromotionStatusFilter))?.label ?? key,
+        },
         render: (p) => {
           const status = computeStatus(p);
           return (
@@ -268,6 +303,10 @@ export function PromotionsTable({
         sortKey={uiSortKey}
         sortDir={table.sortDir}
         onSortChange={handleSortChange}
+        groupBy={table.groupBy}
+        groupDir={table.groupDir}
+        onGroupByChange={table.setGroupBy}
+        onGroupDirChange={table.setGroupDir}
         isLoading={promotions.isLoading}
         isFetching={promotions.isFetching}
         errorMessage={promotions.isError ? getErrorMessage(promotions.error) : null}

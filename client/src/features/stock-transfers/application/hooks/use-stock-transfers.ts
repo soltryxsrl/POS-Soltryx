@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { stockTransfersApiHttp } from '../../infrastructure/api/stock-transfers.api.http';
 import type { CreateStockTransferInput } from '../../domain/types';
 
@@ -10,11 +11,18 @@ export const stockTransfersKey = {
   list: (branchId: string | null) => ['stock-transfers', 'list', branchId] as const,
 };
 
-export function useStockTransfers() {
+// Vista normal: trae las primeras 100 (sin paginación en UI). Al agrupar
+// (`fetchAll`) trae el dataset completo hasta el tope, paginando por dentro.
+export function useStockTransfers(opts: { fetchAll?: boolean; cap?: number } = {}) {
   const branchId = useActiveBranchStore((s) => s.activeBranchId);
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: stockTransfersKey.list(branchId),
-    queryFn: () => stockTransfersApiHttp.list({ limit: 100 }),
+    queryKey: [...stockTransfersKey.list(branchId), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => stockTransfersApiHttp.list(p), {}, { cap })
+        : stockTransfersApiHttp.list({ limit: 100 }),
   });
 }
 

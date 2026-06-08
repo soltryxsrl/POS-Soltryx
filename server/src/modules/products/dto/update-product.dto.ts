@@ -44,7 +44,8 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(500)
   @ValidateIf((_, value) => value !== null && value !== '')
-  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+  // require_tld:false permite la URL del CDN propio en dev (http://localhost:9002/...).
+  @IsUrl({ require_protocol: true, require_tld: false, protocols: ['http', 'https'] })
   imageUrl?: string | null;
 
   @IsOptional()

@@ -54,7 +54,7 @@ import {
   type SaleRepository,
 } from '../../domain/ports/sale.repository.port';
 import { SaleTotalsCalculator } from '../../domain/services/sale-totals-calculator';
-import { compareMoney, toCents, fromCents } from '../../domain/services/money';
+import { compareMoney, toCents, fromCents, toTaxBp } from '../../domain/services/money';
 import { PaymentMethod } from '../../domain/value-objects/payment-method';
 
 /** SKU snapshot para líneas de "monto libre" (sin producto del catálogo). */
@@ -487,16 +487,57 @@ export class CreateSaleUseCase {
           }
         }
 
-        // En modo "ITBIS incluido", el monto gravado (neto) del comprobante es
-        // el bruto menos descuentos de línea y el ITBIS embebido. En modo
-        // tax-exclusive se mantiene el subtotal pre-impuesto.
-        const fiscalSubtotal = businessConfig.priceIncludesTax
-          ? fromCents(
-              toCents(computed.subtotal) -
-                toCents(computed.discountTotal) -
-                toCents(computed.taxTotal),
-            )
-          : computed.subtotal;
+        // COMPROBANTE FISCAL — representación correcta de descuentos para DGII:
+        // el descuento de orden (manual + promos) es post-ITBIS en la venta/recibo,
+        // pero en el comprobante debe reducir la BASE imponible y el ITBIS para que
+        // `subtotal + ITBIS = total` y el ITBIS quede sobre el neto real. Lo
+        // distribuimos (tax-inclusive) proporcional al total de cada línea; las
+        // líneas sin parte del descuento quedan idénticas a lo calculado (sin
+        // re-redondeo). Esto NO altera lo que paga el cliente ni el recibo.
+        const orderDiscC = toCents(computed.orderDiscount);
+        const lineTotalsC = computed.lines.map((l) => toCents(l.lineTotal));
+        const linesGrossTotalC = lineTotalsC.reduce((a, b) => a + b, 0);
+        const orderShares = new Array<number>(computed.lines.length).fill(0);
+        if (orderDiscC > 0 && linesGrossTotalC > 0) {
+          const fracs: Array<{ frac: number; i: number }> = [];
+          let assigned = 0;
+          computed.lines.forEach((_l, i) => {
+            const exact = (orderDiscC * lineTotalsC[i]!) / linesGrossTotalC;
+            const floor = Math.floor(exact);
+            orderShares[i] = floor;
+            assigned += floor;
+            fracs.push({ frac: exact - floor, i });
+          });
+          let remainder = orderDiscC - assigned;
+          fracs.sort((a, b) => b.frac - a.frac);
+          for (let k = 0; k < remainder; k++) orderShares[fracs[k % fracs.length]!.i]! += 1;
+          for (let i = 0; i < orderShares.length; i++) {
+            if (orderShares[i]! > lineTotalsC[i]!) orderShares[i] = lineTotalsC[i]!;
+          }
+        }
+        const fiscalItems = computed.lines.map((l, i) => {
+          const grossC = toCents(l.grossSubtotal);
+          if (orderShares[i] === 0) {
+            const baseC = toCents(l.taxableBase);
+            return {
+              baseC,
+              taxC: toCents(l.taxTotal),
+              totalC: lineTotalsC[i]!,
+              discountC: grossC - baseC,
+            };
+          }
+          const newTotalC = lineTotalsC[i]! - orderShares[i]!;
+          const taxBp = toTaxBp(l.taxRate);
+          const newBaseC = Math.round((newTotalC * 10000) / (10000 + taxBp));
+          return {
+            baseC: newBaseC,
+            taxC: newTotalC - newBaseC,
+            totalC: newTotalC,
+            discountC: grossC - newBaseC,
+          };
+        });
+        const fiscalSubtotalC = fiscalItems.reduce((a, it) => a + it.baseC, 0);
+        const fiscalTaxC = fiscalItems.reduce((a, it) => a + it.taxC, 0);
 
         const doc = await this.fiscalDocs.issueForSale(ctx, {
           docTypeCode: input.fiscalDocTypeCode,
@@ -504,20 +545,21 @@ export class CreateSaleUseCase {
           branchId: session.branchId,
           buyerName,
           buyerRnc,
-          subtotal: fiscalSubtotal,
-          taxTotal: computed.taxTotal,
+          subtotal: fromCents(fiscalSubtotalC),
+          taxTotal: fromCents(fiscalTaxC),
           total: computed.total,
           items: computed.lines.map((l, idx) => {
             const original = linesWithPromo[idx];
             if (!original) throw new Error('line index mismatch');
+            const it = fiscalItems[idx]!;
             return {
               description: original.name,
               quantity: l.quantity,
               unitPrice: l.unitPrice,
-              discount: l.discount,
+              discount: fromCents(it.discountC),
               taxRate: l.taxRate,
-              taxTotal: l.taxTotal,
-              total: l.lineTotal,
+              taxTotal: fromCents(it.taxC),
+              total: fromCents(it.totalC),
             };
           }),
         });

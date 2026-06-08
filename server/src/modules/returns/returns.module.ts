@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CashSessionOrmEntity } from '../cash-sessions/infrastructure/persistence/typeorm/cash-session.orm-entity';
 import { CustomerAccountModule } from '../customer-account/customer-account.module';
+import { FiscalModule } from '../fiscal/fiscal.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ProductKitComponentOrmEntity } from '../products/product-kit-component.orm-entity';
 import { ProductVariantOrmEntity } from '../products/product-variant.orm-entity';
@@ -31,6 +32,7 @@ import { SaleReturnOrmEntity } from './sale-return.orm-entity';
     ]),
     InventoryModule,
     CustomerAccountModule,
+    FiscalModule,
   ],
   controllers: [ReturnsController],
   providers: [

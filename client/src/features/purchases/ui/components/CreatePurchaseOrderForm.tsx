@@ -14,10 +14,15 @@ import { Input } from '@/shared/ui/controls/Input';
 import { Select } from '@/shared/ui/controls/Select';
 import { Textarea } from '@/shared/ui/controls/Textarea';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
-import { useFiscalDocTypes } from '@/features/fiscal/application/hooks/use-fiscal';
 import { useProducts } from '@/features/products/application/hooks/use-products';
 import { useSuppliers } from '@/features/suppliers/application/hooks/use-suppliers';
 import { useCreatePurchaseOrder } from '../../application/hooks/use-purchases';
+import {
+  EMPTY_FISCAL,
+  PurchaseFiscalFields,
+  validatePurchaseFiscal,
+  type PurchaseFiscalValue,
+} from './PurchaseFiscalFields';
 
 interface LineDraft {
   key: string;
@@ -40,13 +45,9 @@ export function CreatePurchaseOrderForm() {
   const [supplierId, setSupplierId] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [supplierInvoice, setSupplierInvoice] = useState('');
-  const [supplierFiscalDocTypeCode, setSupplierFiscalDocTypeCode] = useState('');
-  const [supplierNcf, setSupplierNcf] = useState('');
-  const [supplierInvoiceDate, setSupplierInvoiceDate] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [itbisRetenido, setItbisRetenido] = useState('');
-  const [isrRetenido, setIsrRetenido] = useState('');
-  const [isrRetentionType, setIsrRetentionType] = useState('');
+  const [fiscal, setFiscal] = useState<PurchaseFiscalValue>(EMPTY_FISCAL);
+  const patchFiscal = (patch: Partial<PurchaseFiscalValue>) =>
+    setFiscal((f) => ({ ...f, ...patch }));
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -107,22 +108,30 @@ export function CreatePurchaseOrderForm() {
         return;
       }
     }
+    const fiscalErr = validatePurchaseFiscal(
+      fiscal,
+      Math.round(parseFloat(totals.tax) * 100),
+    );
+    if (fiscalErr) {
+      setError(fiscalErr);
+      return;
+    }
     try {
       const po = await create.mutateAsync({
         supplierId,
         expectedDate: expectedDate || undefined,
         supplierInvoice: supplierInvoice.trim() || undefined,
-        ...(supplierFiscalDocTypeCode
+        ...(fiscal.supplierFiscalDocTypeCode
           ? {
-              supplierFiscalDocTypeCode,
-              supplierNcf: supplierNcf.trim() || undefined,
-              supplierInvoiceDate: supplierInvoiceDate || undefined,
-              itbisRetenido: itbisRetenido.trim() || undefined,
-              isrRetenido: isrRetenido.trim() || undefined,
-              isrRetentionType: isrRetentionType || undefined,
+              supplierFiscalDocTypeCode: fiscal.supplierFiscalDocTypeCode,
+              supplierNcf: fiscal.supplierNcf.trim() || undefined,
+              supplierInvoiceDate: fiscal.supplierInvoiceDate || undefined,
+              itbisRetenido: fiscal.itbisRetenido.trim() || undefined,
+              isrRetenido: fiscal.isrRetenido.trim() || undefined,
+              isrRetentionType: fiscal.isrRetentionType || undefined,
             }
           : {}),
-        paymentMethod,
+        paymentMethod: fiscal.paymentMethod,
         notes: notes.trim() || undefined,
         items: lines.map((l) => ({
           productId: l.productId,
@@ -173,101 +182,8 @@ export function CreatePurchaseOrderForm() {
           />
         </FormField>
 
-        <div className="sm:col-span-2 rounded-xl border border-dashed border-border bg-muted/20 p-3 space-y-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Datos fiscales DGII (para 606)
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <FormField
-              label="Tipo comprobante"
-              hint="Si dejas en blanco, esta compra no entra al 606."
-            >
-              <FiscalDocTypeSelect
-                value={supplierFiscalDocTypeCode}
-                onChange={setSupplierFiscalDocTypeCode}
-              />
-            </FormField>
-            <FormField
-              label="NCF del proveedor"
-              required={!!supplierFiscalDocTypeCode}
-            >
-              <Input
-                value={supplierNcf}
-                onChange={(e) => setSupplierNcf(e.target.value)}
-                maxLength={32}
-                placeholder={
-                  supplierFiscalDocTypeCode === 'E41'
-                    ? 'E410000000001'
-                    : supplierFiscalDocTypeCode?.startsWith('E')
-                      ? 'E310000000001'
-                      : 'B0100000001'
-                }
-                disabled={!supplierFiscalDocTypeCode}
-              />
-            </FormField>
-            <FormField
-              label="Fecha comprobante"
-              required={!!supplierFiscalDocTypeCode}
-            >
-              <Input
-                type="date"
-                value={supplierInvoiceDate}
-                onChange={(e) => setSupplierInvoiceDate(e.target.value)}
-                disabled={!supplierFiscalDocTypeCode}
-              />
-            </FormField>
-          </div>
-          <FormField label="Forma de pago" className="mt-3 sm:max-w-xs">
-            <Select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              <option value="CASH">Efectivo</option>
-              <option value="TRANSFER">Cheque / Transferencia / Depósito</option>
-              <option value="CARD">Tarjeta</option>
-              <option value="CREDIT">Compra a crédito</option>
-              <option value="OTHER">Otra</option>
-            </Select>
-          </FormField>
-          {supplierFiscalDocTypeCode && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <FormField
-                label="ITBIS retenido"
-                hint="Solo si eres agente de retención."
-              >
-                <Input
-                  inputMode="decimal"
-                  value={itbisRetenido}
-                  onChange={(e) => setItbisRetenido(e.target.value)}
-                  placeholder="0.00"
-                />
-              </FormField>
-              <FormField label="ISR retenido">
-                <Input
-                  inputMode="decimal"
-                  value={isrRetenido}
-                  onChange={(e) => setIsrRetenido(e.target.value)}
-                  placeholder="0.00"
-                />
-              </FormField>
-              <FormField label="Tipo retención ISR">
-                <Select
-                  value={isrRetentionType}
-                  onChange={(e) => setIsrRetentionType(e.target.value)}
-                >
-                  <option value="">No aplica</option>
-                  <option value="01">01 Alquileres</option>
-                  <option value="02">02 Honorarios por servicios</option>
-                  <option value="03">03 Otras rentas</option>
-                  <option value="04">04 Rentas presuntas</option>
-                  <option value="05">05 Intereses pagados a PJ</option>
-                  <option value="06">06 Intereses pagados a PF</option>
-                  <option value="07">07 Proveedores del Estado</option>
-                  <option value="08">08 Juegos telefónicos</option>
-                </Select>
-              </FormField>
-            </div>
-          )}
+        <div className="sm:col-span-2">
+          <PurchaseFiscalFields value={fiscal} onChange={patchFiscal} />
         </div>
 
         <FormField label="Notas" className="sm:col-span-2">
@@ -515,32 +431,5 @@ function ProductPicker({
         </div>
       </div>
     </MaintenanceShell>
-  );
-}
-
-/**
- * Select filtrado a tipos activos que aplican a compras (B01/B14/B11/B13 +
- * E31/E41/E43). Carga del endpoint /fiscal/doc-types y filtra client-side.
- */
-function FiscalDocTypeSelect({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const types = useFiscalDocTypes({ activeOnly: true });
-  const purchaseTypes = (types.data ?? []).filter(
-    (t) => t.appliesTo === 'PURCHASE' || t.appliesTo === 'BOTH' || t.code === 'B01' || t.code === 'B14' || t.code === 'E31',
-  );
-  return (
-    <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Sin comprobante fiscal</option>
-      {purchaseTypes.map((t) => (
-        <option key={t.code} value={t.code}>
-          {t.code} — {t.name}
-        </option>
-      ))}
-    </Select>
   );
 }

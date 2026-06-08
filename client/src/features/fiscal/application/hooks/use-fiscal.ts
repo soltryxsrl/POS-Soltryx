@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { fiscalApiHttp } from '../../infrastructure/api/fiscal.api.http';
 import type {
   CreateFiscalSequenceInput,
@@ -66,10 +67,19 @@ export function useRenewFiscalSequence() {
   });
 }
 
-export function useFiscalDocuments(params: ListFiscalDocumentsParams = {}) {
+export function useFiscalDocuments(
+  params: ListFiscalDocumentsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: fiscalKey.documents(params),
-    queryFn: () => fiscalApiHttp.listDocuments(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...fiscalKey.documents(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => fiscalApiHttp.listDocuments(p), params, { cap })
+        : fiscalApiHttp.listDocuments(params),
   });
 }
 

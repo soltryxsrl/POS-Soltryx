@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import { CancelPurchaseOrderRequestDto } from './dto/cancel-purchase-order.reque
 import { CreatePurchaseOrderRequestDto } from './dto/create-purchase-order.request-dto';
 import { ListPurchaseOrdersQuery } from './dto/list-purchase-orders.query';
 import { ReceivePurchaseOrderRequestDto } from './dto/receive-purchase-order.request-dto';
+import { UpdateFiscalDataRequestDto } from './dto/update-fiscal-data.request-dto';
 import { PurchasesService } from './purchases.service';
 
 @Controller('purchase-orders')
@@ -54,6 +56,17 @@ export class PurchasesController {
     @ActiveBranch() branchId: string,
   ) {
     return this.service.receive(id, dto, user.id, branchId);
+  }
+
+  @Patch(':id/fiscal')
+  @RequirePermissions('purchases.create')
+  updateFiscal(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateFiscalDataRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @ActiveBranch() branchId: string,
+  ) {
+    return this.service.updateFiscalData(id, dto, user.id, branchId);
   }
 
   @Post(':id/cancel')

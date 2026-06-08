@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { cashApiHttp } from '../../infrastructure/api/cash.api.http';
 import type {
   CloseCashSessionInput,
@@ -51,10 +52,19 @@ export function useSessionSummary(id: string | undefined) {
   });
 }
 
-export function useCashSessions(params: ListSessionsParams = {}) {
+export function useCashSessions(
+  params: ListSessionsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: cashKey.list(params),
-    queryFn: () => cashApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...cashKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => cashApiHttp.list(p), params, { cap })
+        : cashApiHttp.list(params),
   });
 }
 

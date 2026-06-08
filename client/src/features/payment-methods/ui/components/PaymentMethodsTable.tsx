@@ -34,6 +34,8 @@ export function PaymentMethodsTable({
     !!user && user.permissions.includes('payment-methods.manage');
   const methods = usePaymentMethods();
   const [editing, setEditing] = useState<PaymentMethodConfig | null>(null);
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
 
   const sort = useClientSort<PaymentMethodConfig>(methods.data, 'sortOrder', 'asc');
 
@@ -58,6 +60,15 @@ export function PaymentMethodsTable({
         key: 'code',
         header: 'Comportamiento',
         sortable: true,
+        grouping: {
+          key: (m) => m.code,
+          label: (key) => (
+            <span className="text-xs font-semibold">
+              {KIND_LABEL[key] ?? key}
+            </span>
+          ),
+          sortValue: (key) => KIND_LABEL[key] ?? key,
+        },
         render: (m) => (
           <span className="text-xs text-muted-foreground">
             {KIND_LABEL[m.code] ?? m.code}
@@ -99,6 +110,32 @@ export function PaymentMethodsTable({
         key: 'isActive',
         header: 'Activo',
         align: 'center',
+        grouping: {
+          key: (m) => (m.isActive ? 'active' : 'inactive'),
+          label: (key) => (
+            <span
+              className={
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ' +
+                (key === 'active'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  : 'bg-muted text-muted-foreground')
+              }
+            >
+              {key === 'active' ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Activo
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-3 w-3" />
+                  Inactivo
+                </>
+              )}
+            </span>
+          ),
+          sortValue: (key) => (key === 'active' ? 'Activo' : 'Inactivo'),
+        },
         render: (m) => (
           <span
             className={
@@ -155,6 +192,10 @@ export function PaymentMethodsTable({
         sortKey={sort.sortKey}
         sortDir={sort.sortDir}
         onSortChange={sort.onSortChange}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={methods.isLoading}
         isFetching={methods.isFetching}
         errorMessage={methods.isError ? getErrorMessage(methods.error) : null}

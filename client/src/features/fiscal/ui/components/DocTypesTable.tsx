@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -30,6 +30,8 @@ export function DocTypesTable({
 }) {
   const { user } = useAuth();
   const canManage = !!user && user.permissions.includes('fiscal.types.manage');
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
   const types = useFiscalDocTypes();
   const toggle = useToggleFiscalDocType();
 
@@ -60,6 +62,13 @@ export function DocTypesTable({
         key: 'appliesTo',
         header: 'Aplica a',
         sortable: true,
+        grouping: {
+          key: (t) => t.appliesTo,
+          label: (key) => (
+            <span className="text-xs">{APPLIES_LABEL[key] ?? key}</span>
+          ),
+          sortValue: (key) => APPLIES_LABEL[key] ?? key,
+        },
         render: (t) => (
           <span className="text-xs">{APPLIES_LABEL[t.appliesTo] ?? t.appliesTo}</span>
         ),
@@ -84,6 +93,22 @@ export function DocTypesTable({
         key: 'isActive',
         header: 'Activo',
         align: 'center',
+        grouping: {
+          key: (t) => (t.isActive ? 'active' : 'inactive'),
+          label: (key) =>
+            key === 'active' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                <CheckCircle2 className="h-3 w-3" />
+                Activo
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                <XCircle className="h-3 w-3" />
+                Inactivo
+              </span>
+            ),
+          sortValue: (key) => (key === 'active' ? 'Activo' : 'Inactivo'),
+        },
         render: (t) => (
           <button
             type="button"
@@ -130,6 +155,10 @@ export function DocTypesTable({
       sortKey={sort.sortKey}
       sortDir={sort.sortDir}
       onSortChange={sort.onSortChange}
+      groupBy={groupBy}
+      groupDir={groupDir}
+      onGroupByChange={setGroupBy}
+      onGroupDirChange={setGroupDir}
       isLoading={types.isLoading}
       isFetching={types.isFetching}
       errorMessage={types.isError ? getErrorMessage(types.error) : null}

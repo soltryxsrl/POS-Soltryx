@@ -47,7 +47,11 @@ export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Pro
       setError('El nombre comercial es obligatorio.');
       return;
     }
-    // Valida RNC con dígito verificador si se proveyó
+    if (!rnc.trim()) {
+      setError('El RNC del proveedor es obligatorio.');
+      return;
+    }
+    // Valida el dígito verificador del RNC
     const rncErr = validateRdIdentifier('RNC', rnc);
     if (rncErr) {
       setError(rncErr);
@@ -106,7 +110,11 @@ export function SupplierFormDialog({ supplier, readOnly, onClose, onSaved }: Pro
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="RNC" hint={`${rnc.replace(/\D/g, '').length}/9 dígitos`}>
+          <FormField
+            label="RNC"
+            required
+            hint={`${rnc.replace(/\D/g, '').length}/9 dígitos · ¿proveedor sin RNC? va en Impuestos → Compras informales`}
+          >
             <Input
               value={rnc}
               onChange={(e) => setRnc(e.target.value)}

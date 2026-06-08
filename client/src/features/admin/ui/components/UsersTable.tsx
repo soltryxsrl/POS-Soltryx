@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Can } from '@/features/auth/ui/components/Can';
+import { dayKey, formatDayLabel } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Fab } from '@/shared/ui/controls/Fab';
 import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
@@ -22,6 +23,10 @@ import type { AdminUser } from '../../domain/types';
 import { UserFormDialog } from './UserFormDialog';
 
 const FILTER_KEYS = ['q', 'isActive', 'roleId'] as const;
+
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más usuarios que esto, se agrupan los primeros N.
+const GROUP_FETCH_CAP = 2000;
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
@@ -46,15 +51,22 @@ export function UsersTable({
     defaultFilters: { isActive: 'true' },
   });
 
-  const users = useAdminUsers({
-    q: table.filters.q || undefined,
-    isActive: parseBool(table.filters.isActive),
-    roleId: table.filters.roleId || undefined,
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente. Sin agrupar, paginación normal.
+  const grouping = !!table.groupBy;
+  const users = useAdminUsers(
+    {
+      q: table.filters.q || undefined,
+      isActive: parseBool(table.filters.isActive),
+      roleId: table.filters.roleId || undefined,
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const remove = useRemoveAdminUser();
   const roles = useAdminRoles();
@@ -110,6 +122,21 @@ export function UsersTable({
       {
         key: 'isActive',
         header: 'Estado',
+        grouping: {
+          key: (u) => (u.isActive ? 'true' : 'false'),
+          label: (key) => (
+            <span
+              className={
+                key === 'true'
+                  ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                  : 'rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'
+              }
+            >
+              {key === 'true' ? 'Activo' : 'Inactivo'}
+            </span>
+          ),
+          sortValue: (key) => (key === 'true' ? 'Activo' : 'Inactivo'),
+        },
         render: (u) => (
           <span
             className={
@@ -125,6 +152,13 @@ export function UsersTable({
       {
         key: 'lastLoginAt',
         header: 'Último login',
+        grouping: {
+          // Nullable: usamos un centinela '' para los que nunca ingresaron.
+          key: (u) => (u.lastLoginAt ? dayKey(u.lastLoginAt) : ''),
+          label: (key) => (key ? formatDayLabel(key) : 'Nunca'),
+          // 'YYYY-MM-DD' ⇒ orden cronológico; el centinela vacío queda primero.
+          sortValue: (key) => key,
+        },
         render: (u) => (
           <span className="text-muted-foreground">{formatDate(u.lastLoginAt)}</span>
         ),
@@ -226,6 +260,10 @@ export function UsersTable({
         sortKey={table.sort}
         sortDir={table.sortDir}
         onSortChange={table.setSort}
+        groupBy={table.groupBy}
+        groupDir={table.groupDir}
+        onGroupByChange={table.setGroupBy}
+        onGroupDirChange={table.setGroupDir}
         isLoading={users.isLoading}
         isFetching={users.isFetching}
         errorMessage={users.isError ? getErrorMessage(users.error) : null}

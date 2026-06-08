@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
-import { formatDateTime, formatMoney } from '@/shared/lib/format';
+import { dayKey, formatDateTime, formatDayLabel, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
@@ -35,6 +35,11 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 const FILTER_KEYS = ['q', 'status', 'paymentMethod', 'userId', 'from', 'to'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más ventas que esto, se agrupan las primeras N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 export function SalesTable({
   fillHeight,
   title,
@@ -52,18 +57,26 @@ export function SalesTable({
     filterKeys: FILTER_KEYS,
   });
 
-  const sales = useSales({
-    q: table.filters.q || undefined,
-    status: (table.filters.status as Sale['status']) || undefined,
-    paymentMethod: (table.filters.paymentMethod as PaymentMethod) || undefined,
-    userId: table.filters.userId || undefined,
-    from: dateInputToIso(table.filters.from, 'start'),
-    to: dateInputToIso(table.filters.to, 'end'),
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request en
+  // 200). Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const sales = useSales(
+    {
+      q: table.filters.q || undefined,
+      status: (table.filters.status as Sale['status']) || undefined,
+      paymentMethod: (table.filters.paymentMethod as PaymentMethod) || undefined,
+      userId: table.filters.userId || undefined,
+      from: dateInputToIso(table.filters.from, 'start'),
+      to: dateInputToIso(table.filters.to, 'end'),
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const columns = useMemo<DataTableColumn<Sale>[]>(
     () => [
@@ -77,12 +90,21 @@ export function SalesTable({
         key: 'createdAt',
         header: 'Fecha',
         sortable: true,
+        grouping: {
+          key: (s) => dayKey(s.createdAt),
+          label: (key) => formatDayLabel(key),
+          sortValue: (key) => key, // 'YYYY-MM-DD' ⇒ orden cronológico
+        },
         render: (s) => <span className="text-xs">{formatDateTime(s.createdAt)}</span>,
       },
       {
         key: 'items',
         header: 'Items',
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, s) => acc + s.items.length, 0);
+          return <span className="font-medium">{sum}</span>;
+        },
         render: (s) => s.items.length,
       },
       {
@@ -90,11 +112,24 @@ export function SalesTable({
         header: 'Total',
         sortable: true,
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, s) => acc + Number(s.total), 0);
+          return <span className="font-medium">{formatMoney(sum)}</span>;
+        },
         render: (s) => <span className="font-medium">{formatMoney(s.total)}</span>,
       },
       {
         key: 'status',
         header: 'Estado',
+        grouping: {
+          key: (s) => s.status,
+          label: (key) => (
+            <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[key] ?? ''}`}>
+              {STATUS_LABEL[key] ?? key}
+            </span>
+          ),
+          sortValue: (key) => STATUS_LABEL[key] ?? key,
+        },
         render: (s) => (
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[s.status] ?? ''}`}
@@ -245,6 +280,10 @@ export function SalesTable({
       sortKey={table.sort}
       sortDir={table.sortDir}
       onSortChange={table.setSort}
+      groupBy={table.groupBy}
+      groupDir={table.groupDir}
+      onGroupByChange={table.setGroupBy}
+      onGroupDirChange={table.setGroupDir}
       isLoading={sales.isLoading}
       isFetching={sales.isFetching}
       errorMessage={sales.isError ? getErrorMessage(sales.error) : null}

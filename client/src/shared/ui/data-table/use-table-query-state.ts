@@ -10,6 +10,10 @@ export interface TableQueryState {
   sort?: string;
   sortDir?: SortDir;
   filters: Record<string, string>;
+  /** Columna por la que se agrupan las filas (`undefined` = sin agrupar). */
+  groupBy?: string;
+  /** Orden de los grupos. */
+  groupDir: SortDir;
 }
 
 export interface UseTableQueryStateOptions {
@@ -34,12 +38,14 @@ export interface UseTableQueryStateOptions {
 
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_FILTER_DEBOUNCE_MS = 300;
+const DEFAULT_GROUP_DIR: SortDir = 'asc';
 
 /**
- * Estado de paginación/sort/filtros sincronizado con la URL.
+ * Estado de paginación/sort/filtros/agrupación sincronizado con la URL.
  *
- * - `page`, `pageSize`, `sort`, `sortDir` y los filtros listados en `filterKeys`
- *   se persisten en query string para que refresh/back/links funcionen.
+ * - `page`, `pageSize`, `sort`, `sortDir`, los filtros listados en `filterKeys`
+ *   y `groupBy`/`groupDir` se persisten en query string para que refresh/back/
+ *   links funcionen.
  * - Cambios de filtro se debouncean para no disparar fetch por cada tecla.
  * - Cambiar un filtro o el pageSize resetea `page` a 1 automáticamente.
  */
@@ -62,6 +68,8 @@ export function useTableQueryState({
     const sizeRaw = Number(searchParams.get(key('pageSize')));
     const sort = searchParams.get(key('sort')) ?? defaultSort;
     const sortDirRaw = searchParams.get(key('sortDir')) as SortDir | null;
+    const groupBy = searchParams.get(key('groupBy')) ?? undefined;
+    const groupDirRaw = searchParams.get(key('groupDir')) as SortDir | null;
     const filters: Record<string, string> = {};
     for (const fk of filterKeys) {
       const v = searchParams.get(key(fk));
@@ -74,6 +82,8 @@ export function useTableQueryState({
       sort: sort ?? undefined,
       sortDir: sortDirRaw === 'asc' || sortDirRaw === 'desc' ? sortDirRaw : defaultSortDir,
       filters,
+      groupBy: groupBy || undefined,
+      groupDir: groupDirRaw === 'asc' || groupDirRaw === 'desc' ? groupDirRaw : DEFAULT_GROUP_DIR,
     };
   }, [searchParams, key, filterKeys, defaultPageSize, defaultSort, defaultSortDir]);
 
@@ -97,10 +107,10 @@ export function useTableQueryState({
       const merged: TableQueryState = {
         ...urlState,
         ...patch,
-        filters: {
-          ...urlState.filters,
-          ...(patch.filters ?? {}),
-        },
+        // `patch.filters` es el conjunto COMPLETO de filtros (viene del draft),
+        // así que REEMPLAZA los previos — no se mergea. Mergear rompía "Limpiar":
+        // `filters: {}` se fundía con los actuales y nunca los borraba.
+        filters: patch.filters ?? urlState.filters,
       };
 
       const set = (k: string, v: string | undefined) => {
@@ -118,6 +128,8 @@ export function useTableQueryState({
         'sortDir',
         merged.sortDir === defaultSortDir ? undefined : merged.sortDir,
       );
+      set('groupBy', merged.groupBy);
+      set('groupDir', merged.groupDir === DEFAULT_GROUP_DIR ? undefined : merged.groupDir);
       for (const fk of filterKeys) {
         set(fk, merged.filters[fk]);
       }
@@ -205,6 +217,18 @@ export function useTableQueryState({
     setFilterDraft({});
   }, []);
 
+  // Al cambiar la agrupación reseteamos `page` a 1: al agrupar el padre suele
+  // traer el dataset completo y la paginación de filas se oculta.
+  const setGroupBy = useCallback(
+    (groupBy: string | undefined) => writeToUrl({ groupBy, page: 1 }),
+    [writeToUrl],
+  );
+
+  const setGroupDir = useCallback(
+    (groupDir: SortDir) => writeToUrl({ groupDir }),
+    [writeToUrl],
+  );
+
   return {
     // Estado efectivo (lo que se envía al server)
     page: urlState.page,
@@ -212,6 +236,8 @@ export function useTableQueryState({
     sort: urlState.sort,
     sortDir: urlState.sortDir,
     filters: urlState.filters,
+    groupBy: urlState.groupBy,
+    groupDir: urlState.groupDir,
 
     // Estado del draft (para inputs controlados)
     filterDraft,
@@ -223,5 +249,7 @@ export function useTableQueryState({
     setFilter,
     setFilters,
     clearFilters,
+    setGroupBy,
+    setGroupDir,
   };
 }

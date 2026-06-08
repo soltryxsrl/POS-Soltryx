@@ -117,3 +117,58 @@ export async function http<T>(path: string, opts: HttpRequestOptions = {}): Prom
   if (!text) return null as T;
   return JSON.parse(text) as T;
 }
+
+/**
+ * Sube un archivo vía multipart/form-data. NO fija Content-Type (el navegador
+ * pone el boundary automáticamente). Reusa el bridge de auth (Bearer + sucursal
+ * activa) y hace un intento de auto-refresh en 401, igual que `http`.
+ */
+export async function uploadFile<T>(
+  path: string,
+  file: File,
+  fields?: Record<string, string>,
+): Promise<T> {
+  const form = new FormData();
+  form.append('file', file);
+  if (fields) {
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  }
+  const send = (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (auth) {
+      const branchId = auth.getBranchId();
+      if (branchId) headers['X-Branch-Id'] = branchId;
+    }
+    return fetch(buildUrl(path), {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: form,
+    });
+  };
+
+  let res = await send(auth ? auth.getAccessToken() : null);
+  if (res.status === 401 && auth) {
+    const newToken = await auth.refresh();
+    if (newToken) res = await send(newToken);
+    else auth.onAuthLost();
+  }
+  if (!res.ok) throw await parseError(res, path);
+  const text = await res.text();
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
+}
+
+/**
+ * Sube una imagen al CDN y devuelve su URL pública. `folder` agrupa por recurso.
+ */
+export async function uploadImage(
+  file: File,
+  folder: 'products' | 'business',
+): Promise<string> {
+  const { url } = await uploadFile<{ url: string }>('/uploads/image', file, {
+    folder,
+  });
+  return url;
+}

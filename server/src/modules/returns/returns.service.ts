@@ -33,6 +33,9 @@ import { SaleStatus } from '../sales/domain/value-objects/sale-status';
 import { SaleItemOrmEntity } from '../sales/infrastructure/persistence/typeorm/sale-item.orm-entity';
 import { PaymentOrmEntity } from '../sales/infrastructure/persistence/typeorm/payment.orm-entity';
 import { SaleOrmEntity } from '../sales/infrastructure/persistence/typeorm/sale.orm-entity';
+import { fromCents } from '../../common/money';
+import { FiscalDocumentOrmEntity } from '../fiscal/documents/fiscal-document.orm-entity';
+import { FiscalDocumentsService } from '../fiscal/documents/fiscal-documents.service';
 import type { CreateReturnRequestDto } from './dto/create-return.request-dto';
 import type { ListReturnsQuery } from './dto/list-returns.query';
 import { SaleReturnItemOrmEntity } from './sale-return-item.orm-entity';
@@ -97,6 +100,7 @@ export class ReturnsService {
     @InjectRepository(CashSessionOrmEntity)
     private readonly cashSessions: Repository<CashSessionOrmEntity>,
     private readonly accounts: CustomerAccountService,
+    private readonly fiscalDocs: FiscalDocumentsService,
     private readonly audit: AuditService,
   ) {}
 
@@ -200,6 +204,20 @@ export class ReturnsService {
     userId: string,
     branchId: string,
   ): Promise<SaleReturnResponse> {
+    // Idempotencia: si ya existe una devolución con esta clave, la devolvemos tal
+    // cual — evita duplicar reembolso, movimiento de stock y nota de crédito si el
+    // endpoint se reintenta (doble-click / retry de red).
+    if (dto.idempotencyKey) {
+      const existing = await this.returns.findOne({
+        where: { idempotencyKey: dto.idempotencyKey },
+        relations: { items: true },
+      });
+      if (existing) {
+        const prevSale = await this.sales.findOne({ where: { id: existing.saleId } });
+        return toResponse(existing, prevSale?.saleNumber ?? null);
+      }
+    }
+
     const sale = await this.sales.findOne({ where: { id: dto.saleId } });
     if (!sale) throw new NotFoundException(`Venta ${dto.saleId} no encontrada`);
     // Anti-IDOR: solo se devuelve de ventas de la sucursal activa.
@@ -314,6 +332,7 @@ export class ReturnsService {
         productSkuSnapshot: string;
         quantity: string;
         unitPrice: string;
+        discount: string;
         taxRate: string;
         taxTotal: string;
         total: string;
@@ -329,8 +348,16 @@ export class ReturnsService {
           );
         }
         const q = parseFloat(r.quantity);
+        const originalQty = parseFloat(item.quantity);
         const unitC = Math.round(parseFloat(item.unitPrice) * 100);
-        const lineSubC = Math.round(unitC * q);
+        const grossC = Math.round(unitC * q);
+        // Prorratea el descuento de la línea original por la fracción devuelta:
+        // se reembolsa lo que el cliente REALMENTE pagó (no el precio sin
+        // descuento), y el ITBIS se calcula sobre el neto, igual que en la venta.
+        const discountC = Math.round(parseFloat(item.discount ?? '0') * 100);
+        const proratedDiscountC =
+          originalQty > 0 ? Math.round((discountC * q) / originalQty) : 0;
+        const lineSubC = Math.max(0, grossC - proratedDiscountC);
         const taxBp = Math.round(parseFloat(item.taxRate) * 100);
         const lineTaxC = Math.round((lineSubC * taxBp) / (100 * 100));
         subC += lineSubC;
@@ -344,6 +371,7 @@ export class ReturnsService {
           productSkuSnapshot: item.productSkuSnapshot,
           quantity: r.quantity,
           unitPrice: item.unitPrice,
+          discount: fromCents(proratedDiscountC),
           taxRate: item.taxRate,
           taxTotal: fromCents(lineTaxC),
           total: fromCents(lineSubC + lineTaxC),
@@ -367,6 +395,7 @@ export class ReturnsService {
           total: fromCents(totalC),
           reason: dto.reason?.trim() || null,
           notes: dto.notes?.trim() || null,
+          idempotencyKey: dto.idempotencyKey ?? null,
         }),
       );
 
@@ -458,6 +487,41 @@ export class ReturnsService {
         });
       }
 
+      // NOTA DE CRÉDITO (fiscal): si la venta original tenía comprobante emitido,
+      // emitimos una NC por lo DEVUELTO (E34 e-CF / B04 NCF tradicional), ligada
+      // a la venta — igual que la anulación reversa con nota de crédito. La venta
+      // sigue COMPLETED y las devoluciones parciales acumulan NCs, así que NO se
+      // marca CANCELLED el comprobante original (la anulación sí, porque reversa
+      // el total). Va dentro de la transacción: si falla la emisión, la devolución
+      // se revierte completa (no queda una devolución sin su soporte fiscal).
+      if (sale.fiscalDocumentId) {
+        const invoice = await m.findOne(FiscalDocumentOrmEntity, {
+          where: { id: sale.fiscalDocumentId },
+        });
+        if (invoice && invoice.status === 'ISSUED') {
+          const creditNoteCode = invoice.docType.startsWith('E') ? 'E34' : 'B04';
+          await this.fiscalDocs.issueForSale(ctx, {
+            docTypeCode: creditNoteCode,
+            saleId: sale.id,
+            branchId: sale.branchId,
+            buyerName: invoice.buyerName,
+            buyerRnc: invoice.buyerRnc,
+            subtotal: fromCents(subC),
+            taxTotal: fromCents(taxC),
+            total: fromCents(totalC),
+            items: lineDrafts.map((l) => ({
+              description: l.productNameSnapshot,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              discount: l.discount,
+              taxRate: l.taxRate,
+              taxTotal: l.taxTotal,
+              total: l.total,
+            })),
+          });
+        }
+      }
+
       const refreshed = await m.findOne(SaleReturnOrmEntity, {
         where: { id: sr.id },
         relations: { items: true },
@@ -482,11 +546,6 @@ export class ReturnsService {
   }
 }
 
-function fromCents(c: number): string {
-  const sign = c < 0 ? '-' : '';
-  const abs = Math.abs(c);
-  return `${sign}${Math.trunc(abs / 100)}.${(abs % 100).toString().padStart(2, '0')}`;
-}
 
 function toResponse(
   r: SaleReturnOrmEntity,

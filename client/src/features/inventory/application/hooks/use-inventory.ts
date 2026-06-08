@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { inventoryApiHttp } from '../../infrastructure/api/inventory.api.http';
 import type { AdjustStockInput, ListStockMovementsParams } from '../../domain/types';
 import { productsKey } from '@/features/products/application/hooks/use-products';
@@ -13,11 +14,20 @@ export const movementsKey = {
     ['stock-movements', branchId, params] as const,
 };
 
-export function useStockMovements(params: ListStockMovementsParams = {}) {
+export function useStockMovements(
+  params: ListStockMovementsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
   const branchId = useActiveBranchStore((s) => s.activeBranchId);
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: movementsKey.list(branchId, params),
-    queryFn: () => inventoryApiHttp.listMovements(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...movementsKey.list(branchId, params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => inventoryApiHttp.listMovements(p), params, { cap })
+        : inventoryApiHttp.listMovements(params),
   });
 }
 

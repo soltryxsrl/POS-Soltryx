@@ -10,6 +10,11 @@ export interface DailySalesSummary {
   discountTotal: string;
   taxTotal: string;
   total: string;
+  /** Devoluciones del día: cantidad y monto reembolsado al cliente. */
+  returnsCount: number;
+  returnsTotal: string;
+  /** Ventas netas = total bruto − devoluciones. El "dinero real" del día. */
+  netTotal: string;
   byMethod: Array<{ method: string; count: number; total: string }>;
   byUser: Array<{ userId: string; username: string; fullName: string; salesCount: number; total: string }>;
 }
@@ -295,6 +300,19 @@ export class ReportsService {
       [date, branchId],
     );
 
+    // Devoluciones del día. Las ventas brutas NO restan lo devuelto al cliente,
+    // así que lo netamos aparte para mostrar el ingreso real. Mismo scope de
+    // sucursal y misma fecha local RD que el resto del resumen.
+    const [retRow]: Array<{ count: number; total: string }> = await this.ds.query(
+      `SELECT COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
+       FROM sale_returns
+       WHERE ($2::uuid IS NULL OR branch_id = $2)
+         AND (created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date`,
+      [date, branchId],
+    );
+    const returnsTotal = retRow?.total ?? '0.00';
+    const netTotal = (Number(agg?.total ?? 0) - Number(returnsTotal)).toFixed(2);
+
     return {
       date,
       salesCount: agg?.sales_count ? Number(agg.sales_count) : 0,
@@ -303,6 +321,9 @@ export class ReportsService {
       discountTotal: agg?.discount_total ?? '0.00',
       taxTotal: agg?.tax_total ?? '0.00',
       total: agg?.total ?? '0.00',
+      returnsCount: retRow?.count ? Number(retRow.count) : 0,
+      returnsTotal,
+      netTotal,
       byMethod: byMethod
         .map((r) => ({
           method: r.method,

@@ -34,6 +34,8 @@ export function CategoriesTable({
   const [delError, setDelError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string | undefined>('true');
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
 
   const all = useMemo(() => categories.data ?? [], [categories.data]);
   const nameById = useMemo(() => new Map(all.map((c) => [c.id, c.name])), [all]);
@@ -68,6 +70,12 @@ export function CategoriesTable({
       {
         key: 'parentId',
         header: 'Categoría padre',
+        grouping: {
+          key: (c) => c.parentId ?? '',
+          label: (key) => (key ? (nameById.get(key) ?? '—') : 'Sin categoría padre'),
+          sortValue: (key) =>
+            key ? (nameById.get(key) ?? '￿') : '￿', // sin padre al final
+        },
         render: (c) => (
           <span className="text-xs text-muted-foreground">
             {c.parentId ? (nameById.get(c.parentId) ?? '—') : '—'}
@@ -78,6 +86,20 @@ export function CategoriesTable({
         key: 'isActive',
         header: 'Estado',
         align: 'center',
+        grouping: {
+          key: (c) => (c.isActive ? 'true' : 'false'),
+          label: (key) =>
+            key === 'true' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                Activa
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                Inactiva
+              </span>
+            ),
+          sortValue: (key) => (key === 'true' ? 'Activa' : 'Inactiva'),
+        },
         render: (c) =>
           c.isActive ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
@@ -138,7 +160,13 @@ export function CategoriesTable({
         onChange={(e) => setQ(e.target.value)}
         className="w-80"
       />
-      <FilterPopover activeCount={activeCount} onClear={() => setStatus(undefined)}>
+      <FilterPopover
+        activeCount={activeCount}
+        onClear={() => {
+          setQ('');
+          setStatus(undefined);
+        }}
+      >
         <div>
           <div className="mb-1.5 text-xs font-medium text-foreground">Estado</div>
           <StatusFilter value={status} onChange={(v) => setStatus(v)} />
@@ -160,6 +188,10 @@ export function CategoriesTable({
         sortKey={sort.sortKey}
         sortDir={sort.sortDir}
         onSortChange={sort.onSortChange}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={categories.isLoading}
         isFetching={categories.isFetching}
         errorMessage={categories.isError ? getErrorMessage(categories.error) : null}

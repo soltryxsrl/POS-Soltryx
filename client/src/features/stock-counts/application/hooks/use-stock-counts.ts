@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { stockCountsApiHttp } from '../../infrastructure/api/stock-counts.api.http';
 
 export const stockCountsKey = {
@@ -9,11 +10,18 @@ export const stockCountsKey = {
   list: (branchId: string | null) => ['stock-counts', 'list', branchId] as const,
 };
 
-export function useStockCounts() {
+// Vista normal: trae los primeros 100 (sin paginación en UI). Al agrupar
+// (`fetchAll`) trae el dataset completo hasta el tope, paginando por dentro.
+export function useStockCounts(opts: { fetchAll?: boolean; cap?: number } = {}) {
   const branchId = useActiveBranchStore((s) => s.activeBranchId);
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: stockCountsKey.list(branchId),
-    queryFn: () => stockCountsApiHttp.list({ limit: 100 }),
+    queryKey: [...stockCountsKey.list(branchId), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => stockCountsApiHttp.list(p), {}, { cap })
+        : stockCountsApiHttp.list({ limit: 100 }),
   });
 }
 

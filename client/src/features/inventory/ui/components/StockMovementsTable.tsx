@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { formatDateTime, formatMoney, formatQuantity } from '@/shared/lib/format';
+import { dayKey, formatDateTime, formatDayLabel, formatMoney, formatQuantity } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
@@ -28,6 +28,11 @@ const TYPE_COLOR: Record<string, string> = {
 
 const FILTER_KEYS = ['type', 'from', 'to'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más movimientos que esto, se agrupan los primeros N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 const TYPE_CHIPS: Array<{ value: StockMovementType; label: string }> = [
   { value: StockMovementType.SALE, label: 'Venta' },
   { value: StockMovementType.PURCHASE, label: 'Compra' },
@@ -51,16 +56,24 @@ export function StockMovementsTable({
     filterKeys: FILTER_KEYS,
   });
 
-  const movements = useStockMovements({
-    productId,
-    type: (table.filters.type as StockMovementType) || undefined,
-    from: dateInputToIso(table.filters.from, 'start'),
-    to: dateInputToIso(table.filters.to, 'end'),
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request en
+  // 200). Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const movements = useStockMovements(
+    {
+      productId,
+      type: (table.filters.type as StockMovementType) || undefined,
+      from: dateInputToIso(table.filters.from, 'start'),
+      to: dateInputToIso(table.filters.to, 'end'),
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const columns = useMemo<DataTableColumn<StockMovement>[]>(() => {
     const base: DataTableColumn<StockMovement>[] = [
@@ -68,15 +81,35 @@ export function StockMovementsTable({
         key: 'createdAt',
         header: 'Fecha',
         sortable: true,
+        grouping: {
+          key: (m) => dayKey(m.createdAt),
+          label: (key) => formatDayLabel(key),
+          sortValue: (key) => key, // 'YYYY-MM-DD' ⇒ orden cronológico
+        },
         render: (m) => (
-          <span className="text-xs text-muted-foreground">{formatDateTime(m.createdAt)}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            {formatDateTime(m.createdAt)}
+          </span>
         ),
       },
       {
         key: 'type',
         header: 'Tipo',
+        grouping: {
+          key: (m) => m.type,
+          label: (key) => (
+            <span
+              className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${TYPE_COLOR[key] ?? ''}`}
+            >
+              {TYPE_LABEL[key] ?? key}
+            </span>
+          ),
+          sortValue: (key) => TYPE_LABEL[key] ?? key,
+        },
         render: (m) => (
-          <span className={`rounded-full px-2 py-0.5 text-xs ${TYPE_COLOR[m.type] ?? ''}`}>
+          <span
+            className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${TYPE_COLOR[m.type] ?? ''}`}
+          >
             {TYPE_LABEL[m.type] ?? m.type}
           </span>
         ),
@@ -86,11 +119,26 @@ export function StockMovementsTable({
         header: 'Cantidad',
         sortable: true,
         align: 'right',
-        render: (m) => {
-          const positive = !m.quantity.startsWith('-');
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, m) => acc + Number(m.quantity), 0);
+          const color =
+            sum > 0 ? 'text-green-700' : sum < 0 ? 'text-red-700' : 'text-muted-foreground';
           return (
-            <span className={`font-medium ${positive ? 'text-green-700' : 'text-red-700'}`}>
-              {positive && !m.quantity.startsWith('+') ? '+' : ''}
+            <span className={`font-medium ${color}`}>
+              {sum > 0 ? '+' : ''}
+              {formatQuantity(String(sum))}
+            </span>
+          );
+        },
+        render: (m) => {
+          // Signo/color desde el valor numérico (igual que el subtotal del
+          // grupo): >0 verde con '+', <0 rojo, 0 neutro sin signo.
+          const n = Number(m.quantity);
+          const color =
+            n > 0 ? 'text-green-700' : n < 0 ? 'text-red-700' : 'text-muted-foreground';
+          return (
+            <span className={`font-medium ${color}`}>
+              {n > 0 ? '+' : ''}
               {formatQuantity(m.quantity)}
             </span>
           );
@@ -123,6 +171,14 @@ export function StockMovementsTable({
         key: 'value',
         header: 'Importe',
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce(
+            (acc, m) =>
+              m.unitCost == null ? acc : acc + Math.abs(Number(m.quantity)) * Number(m.unitCost),
+            0,
+          );
+          return formatMoney(sum);
+        },
         render: (m) =>
           m.unitCost == null ? (
             <span className="text-muted-foreground">—</span>
@@ -154,12 +210,27 @@ export function StockMovementsTable({
     ];
     // En la vista global (sin productId) anteponemos la columna "Producto" para
     // saber a qué ítem corresponde cada movimiento. En el kardex por-producto se
-    // omite (sería redundante).
+    // omite (sería redundante) y por eso ahí tampoco se puede agrupar por producto.
     if (productId) return base;
     return [
       {
         key: 'product',
         header: 'Producto',
+        grouping: {
+          key: (m) => m.productId,
+          label: (_key, rows) => {
+            const m = rows[0];
+            return (
+              <span className="inline-flex items-center gap-1.5">
+                <span>{m.productName ?? '—'}</span>
+                {m.sku && (
+                  <span className="text-[11px] font-normal text-muted-foreground">{m.sku}</span>
+                )}
+              </span>
+            );
+          },
+          sortValue: (_key, rows) => rows[0].productName ?? '',
+        },
         render: (m) => (
           <div className="min-w-0">
             <div className="truncate font-medium">{m.productName ?? '—'}</div>
@@ -230,6 +301,10 @@ export function StockMovementsTable({
       sortKey={table.sort}
       sortDir={table.sortDir}
       onSortChange={table.setSort}
+      groupBy={table.groupBy}
+      groupDir={table.groupDir}
+      onGroupByChange={table.setGroupBy}
+      onGroupDirChange={table.setGroupDir}
       isLoading={movements.isLoading}
       isFetching={movements.isFetching}
       errorMessage={movements.isError ? getErrorMessage(movements.error) : null}

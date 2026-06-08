@@ -45,6 +45,24 @@ const envSchema = z.object({
   SUPERADMIN_EMAIL: z.string().optional(),
   SUPERADMIN_PASSWORD: z.string().optional(),
   SUPERADMIN_USERNAME: z.string().optional(),
+
+  // --- Almacenamiento de objetos (MinIO en dev; S3/R2/Spaces en prod) ---
+  // El módulo storage sube las imágenes aquí y guarda en BD la URL pública.
+  STORAGE_ENDPOINT: z.string().default('http://localhost:9000'),
+  STORAGE_REGION: z.string().default('us-east-1'),
+  STORAGE_ACCESS_KEY: z.string().default('minioadmin'),
+  STORAGE_SECRET_KEY: z.string().default('minioadmin123'),
+  STORAGE_BUCKET: z.string().default('t1et-media'),
+  // Base pública con la que se construye la URL final: `${BASE}/${key}`.
+  // En prod apunta al dominio del CDN/bucket público.
+  STORAGE_PUBLIC_BASE_URL: z.string().default('http://localhost:9000/t1et-media'),
+  // MinIO y otros requieren path-style (bucket en el path, no subdominio).
+  STORAGE_FORCE_PATH_STYLE: z
+    .union([z.boolean(), z.string()])
+    .transform((v) => (typeof v === 'string' ? v === 'true' : v))
+    .default(true),
+  // Tamaño máximo de subida en bytes (default 5 MB).
+  STORAGE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(5_242_880),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

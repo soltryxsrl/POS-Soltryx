@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { productsApiHttp } from '../../infrastructure/api/products.api.http';
 import type {
   BulkPriceUpdateInput,
@@ -26,11 +27,20 @@ export const productsKey = {
   variants: (id: string) => ['products', 'variants', id] as const,
 };
 
-export function useProducts(params: ListProductsParams = {}) {
+export function useProducts(
+  params: ListProductsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
   const branchId = useActiveBranchStore((s) => s.activeBranchId);
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: productsKey.list(branchId, params),
-    queryFn: () => productsApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...productsKey.list(branchId, params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => productsApiHttp.list(p), params, { cap })
+        : productsApiHttp.list(params),
   });
 }
 

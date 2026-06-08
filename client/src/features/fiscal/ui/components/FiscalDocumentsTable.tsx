@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
-import { formatMoney } from '@/shared/lib/format';
+import { dayKey, formatDayLabel, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
 import { Button } from '@/shared/ui/controls/Button';
@@ -109,6 +109,11 @@ function VoidButton({ doc }: { doc: FiscalDocumentListItem }) {
 
 const FILTER_KEYS = ['q', 'docType', 'status', 'from', 'to'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más comprobantes que esto, se agrupan los primeros N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 const STATUS_LABEL: Record<FiscalDocumentStatus, string> = {
   ISSUED: 'Emitido',
   PUBLISHED: 'Enviado a DGII',
@@ -146,15 +151,23 @@ export function FiscalDocumentsTable({
     filterKeys: FILTER_KEYS,
   });
   const docTypes = useFiscalDocTypes();
-  const docs = useFiscalDocuments({
-    q: table.filters.q || undefined,
-    docType: table.filters.docType || undefined,
-    status: (table.filters.status as FiscalDocumentStatus) || undefined,
-    from: table.filters.from || undefined,
-    to: table.filters.to || undefined,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente; los grupos se arman en el cliente.
+  // Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const docs = useFiscalDocuments(
+    {
+      q: table.filters.q || undefined,
+      docType: table.filters.docType || undefined,
+      status: (table.filters.status as FiscalDocumentStatus) || undefined,
+      from: table.filters.from || undefined,
+      to: table.filters.to || undefined,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const columns = useMemo<DataTableColumn<FiscalDocumentListItem>[]>(
     () => [
@@ -177,6 +190,11 @@ export function FiscalDocumentsTable({
       {
         key: 'docType',
         header: 'Tipo',
+        grouping: {
+          key: (d) => d.docType,
+          label: (key) => <span className="font-mono text-xs font-medium">{key}</span>,
+          sortValue: (key) => key,
+        },
         render: (d) => (
           <span className="font-mono text-xs font-medium">{d.docType}</span>
         ),
@@ -184,6 +202,11 @@ export function FiscalDocumentsTable({
       {
         key: 'issueDate',
         header: 'Emitido',
+        grouping: {
+          key: (d) => dayKey(d.issueDate),
+          label: (key) => formatDayLabel(key),
+          sortValue: (key) => key, // 'YYYY-MM-DD' ⇒ orden cronológico
+        },
         render: (d) => (
           <span className="text-xs text-muted-foreground">
             {formatIssueDate(d.issueDate)}
@@ -210,6 +233,12 @@ export function FiscalDocumentsTable({
         key: 'total',
         header: 'Total',
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, d) => acc + Number(d.total), 0);
+          return (
+            <span className="text-sm font-medium tabular-nums">{formatMoney(sum)}</span>
+          );
+        },
         render: (d) => (
           <span className="text-sm font-medium tabular-nums">
             {formatMoney(d.total)}
@@ -219,6 +248,19 @@ export function FiscalDocumentsTable({
       {
         key: 'status',
         header: 'Estado',
+        grouping: {
+          key: (d) => d.status,
+          label: (key) => (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                STATUS_CLASS[key as FiscalDocumentStatus]
+              }`}
+            >
+              {STATUS_LABEL[key as FiscalDocumentStatus]}
+            </span>
+          ),
+          sortValue: (key) => STATUS_LABEL[key as FiscalDocumentStatus] ?? key,
+        },
         render: (d) => (
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -318,6 +360,10 @@ export function FiscalDocumentsTable({
       sortKey={table.sort}
       sortDir={table.sortDir}
       onSortChange={table.setSort}
+      groupBy={table.groupBy}
+      groupDir={table.groupDir}
+      onGroupByChange={table.setGroupBy}
+      onGroupDirChange={table.setGroupDir}
       isLoading={docs.isLoading}
       isFetching={docs.isFetching}
       errorMessage={docs.isError ? getErrorMessage(docs.error) : null}

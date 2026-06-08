@@ -85,6 +85,17 @@ export interface ReceivePurchaseOrderInput {
   updateProductCost?: boolean;
 }
 
+/** Edición de solo los datos fiscales (comprobante 606) de una compra existente. */
+export interface UpdateFiscalDataInput {
+  supplierFiscalDocTypeCode?: string;
+  supplierNcf?: string;
+  supplierInvoiceDate?: string;
+  paymentMethod?: string;
+  itbisRetenido?: string;
+  isrRetenido?: string;
+  isrRetentionType?: string;
+}
+
 export interface ListPurchaseOrdersParams {
   q?: string;
   supplierId?: string;

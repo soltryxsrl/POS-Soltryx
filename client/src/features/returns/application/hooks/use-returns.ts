@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { productsKey } from '@/features/products/application/hooks/use-products';
 import { movementsKey } from '@/features/inventory/application/hooks/use-inventory';
 import { salesKey } from '@/features/sales/application/hooks/use-sales';
@@ -14,10 +15,19 @@ export const returnsKey = {
   returnable: (saleId: string) => ['returns', 'returnable', saleId] as const,
 };
 
-export function useReturns(params: ListReturnsParams = {}) {
+export function useReturns(
+  params: ListReturnsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: returnsKey.list(params),
-    queryFn: () => returnsApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...returnsKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => returnsApiHttp.list(p), params, { cap })
+        : returnsApiHttp.list(params),
   });
 }
 

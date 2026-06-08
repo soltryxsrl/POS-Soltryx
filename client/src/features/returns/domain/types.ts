@@ -57,6 +57,8 @@ export interface CreateReturnInput {
   reason?: string;
   notes?: string;
   items: Array<{ saleItemId: string; quantity: string }>;
+  /** Clave de idempotencia: evita duplicar la devolución si se reintenta el envío. */
+  idempotencyKey?: string;
 }
 
 export interface ListReturnsParams {

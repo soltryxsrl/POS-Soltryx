@@ -50,6 +50,11 @@ export class CreateReturnRequestDto {
   @MaxLength(1000)
   notes?: string;
 
+  /** Clave de idempotencia para no duplicar la devolución si se reintenta. */
+  @IsOptional()
+  @IsUUID()
+  idempotencyKey?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

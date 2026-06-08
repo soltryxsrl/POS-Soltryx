@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { suppliersApiHttp } from '../../infrastructure/api/suppliers.api.http';
 import type {
   CreateSupplierInput,
@@ -14,10 +15,19 @@ export const suppliersKey = {
   byId: (id: string) => ['suppliers', 'byId', id] as const,
 };
 
-export function useSuppliers(params: ListSuppliersParams = {}) {
+export function useSuppliers(
+  params: ListSuppliersParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: suppliersKey.list(params),
-    queryFn: () => suppliersApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...suppliersKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => suppliersApiHttp.list(p), params, { cap })
+        : suppliersApiHttp.list(params),
   });
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, Star, XCircle } from 'lucide-react';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { useAuth } from '@/features/auth/application/hooks/use-auth';
@@ -25,6 +25,8 @@ export function TaxTypesTable({
 } = {}) {
   const { user } = useAuth();
   const canManage = !!user && user.permissions.includes('tax-types.manage');
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
   const types = useTaxTypes();
   const toggle = useToggleTaxType();
   const setDefault = useSetDefaultTaxType();
@@ -37,6 +39,21 @@ export function TaxTypesTable({
         key: 'name',
         header: 'Tipo de ITBIS',
         sortable: true,
+        grouping: {
+          menuLabel: 'Exento',
+          key: (t) => (t.isExempt ? 'exempt' : 'taxed'),
+          label: (key) =>
+            key === 'exempt' ? (
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                Exento
+              </span>
+            ) : (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                Gravado
+              </span>
+            ),
+          sortValue: (key) => (key === 'exempt' ? 'Exento' : 'Gravado'),
+        },
         render: (t) => (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-medium">{t.name}</span>
@@ -95,6 +112,32 @@ export function TaxTypesTable({
         key: 'isActive',
         header: 'Activo',
         align: 'center',
+        grouping: {
+          key: (t) => (t.isActive ? 'active' : 'inactive'),
+          label: (key) => (
+            <span
+              className={
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+                (key === 'active'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  : 'bg-muted text-muted-foreground')
+              }
+            >
+              {key === 'active' ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Activo
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-3 w-3" />
+                  Inactivo
+                </>
+              )}
+            </span>
+          ),
+          sortValue: (key) => (key === 'active' ? 'Activo' : 'Inactivo'),
+        },
         render: (t) => (
           <button
             type="button"
@@ -141,6 +184,10 @@ export function TaxTypesTable({
       sortKey={sort.sortKey}
       sortDir={sort.sortDir}
       onSortChange={sort.onSortChange}
+      groupBy={groupBy}
+      groupDir={groupDir}
+      onGroupByChange={setGroupBy}
+      onGroupDirChange={setGroupDir}
       isLoading={types.isLoading}
       isFetching={types.isFetching}
       errorMessage={types.isError ? getErrorMessage(types.error) : null}

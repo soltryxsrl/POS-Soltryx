@@ -18,10 +18,11 @@ export class CreateSupplierDto {
   @MaxLength(180)
   legalName?: string;
 
-  @IsOptional()
+  // RNC obligatorio para el proveedor (necesario para el 606 de compras).
   @IsString()
+  @MinLength(1, { message: 'El RNC del proveedor es obligatorio' })
   @MaxLength(32)
-  rnc?: string;
+  rnc!: string;
 
   @IsOptional()
   @IsString()

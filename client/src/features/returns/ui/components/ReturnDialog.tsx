@@ -49,6 +49,9 @@ export function ReturnDialog({
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Clave estable por apertura del diálogo: si el envío se reintenta (doble-click
+  // / retry de red) el server reconoce la clave y no duplica la devolución.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const setQty = (saleItemId: string, q: string) =>
     setQtyByItem((s) => ({ ...s, [saleItemId]: q }));
@@ -106,6 +109,7 @@ export function ReturnDialog({
         reason: reason.trim() || undefined,
         notes: notes.trim() || undefined,
         items: lines,
+        idempotencyKey,
       });
       onClose();
     } catch (err) {

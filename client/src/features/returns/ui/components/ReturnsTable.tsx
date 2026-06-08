@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
-import { formatDateTime, formatMoney } from '@/shared/lib/format';
+import { dayKey, formatDateTime, formatDayLabel, formatMoney } from '@/shared/lib/format';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { FilterPopover } from '@/shared/ui/controls/FilterPopover';
 import { Input } from '@/shared/ui/controls/Input';
@@ -37,6 +37,11 @@ const FILTERABLE_METHODS: RefundMethod[] = ['CASH', 'CARD', 'TRANSFER', 'STORE_C
 
 const FILTER_KEYS = ['q', 'refundMethod', 'userId', 'from', 'to'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más devoluciones que esto, se agrupan las primeras N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 export function ReturnsTable({
   fillHeight,
   title,
@@ -53,17 +58,25 @@ export function ReturnsTable({
     filterKeys: FILTER_KEYS,
   });
 
-  const returns = useReturns({
-    q: table.filters.q || undefined,
-    refundMethod: (table.filters.refundMethod as RefundMethod) || undefined,
-    userId: table.filters.userId || undefined,
-    from: dateInputToIso(table.filters.from, 'start'),
-    to: dateInputToIso(table.filters.to, 'end'),
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request en
+  // 200). Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const returns = useReturns(
+    {
+      q: table.filters.q || undefined,
+      refundMethod: (table.filters.refundMethod as RefundMethod) || undefined,
+      userId: table.filters.userId || undefined,
+      from: dateInputToIso(table.filters.from, 'start'),
+      to: dateInputToIso(table.filters.to, 'end'),
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const columns = useMemo<DataTableColumn<SaleReturn>[]>(
     () => [
@@ -77,6 +90,11 @@ export function ReturnsTable({
         key: 'createdAt',
         header: 'Fecha',
         sortable: true,
+        grouping: {
+          key: (r) => dayKey(r.createdAt),
+          label: (key) => formatDayLabel(key),
+          sortValue: (key) => key, // 'YYYY-MM-DD' ⇒ orden cronológico
+        },
         render: (r) => <span className="text-xs">{formatDateTime(r.createdAt)}</span>,
       },
       {
@@ -105,11 +123,26 @@ export function ReturnsTable({
         header: 'Total',
         sortable: true,
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, r) => acc + Number(r.total), 0);
+          return formatMoney(sum);
+        },
         render: (r) => <span className="font-medium">{formatMoney(r.total)}</span>,
       },
       {
         key: 'refundMethod',
         header: 'Reembolso',
+        grouping: {
+          key: (r) => r.refundMethod,
+          label: (key) => (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${REFUND_COLOR[key as RefundMethod] ?? ''}`}
+            >
+              {REFUND_LABEL[key as RefundMethod] ?? key}
+            </span>
+          ),
+          sortValue: (key) => REFUND_LABEL[key as RefundMethod] ?? key,
+        },
         render: (r) => (
           <span className={`rounded-full px-2 py-0.5 text-xs ${REFUND_COLOR[r.refundMethod]}`}>
             {REFUND_LABEL[r.refundMethod] ?? r.refundMethod}
@@ -199,6 +232,10 @@ export function ReturnsTable({
       sortKey={table.sort}
       sortDir={table.sortDir}
       onSortChange={table.setSort}
+      groupBy={table.groupBy}
+      groupDir={table.groupDir}
+      onGroupByChange={table.setGroupBy}
+      onGroupDirChange={table.setGroupDir}
       isLoading={returns.isLoading}
       isFetching={returns.isFetching}
       errorMessage={returns.isError ? getErrorMessage(returns.error) : null}

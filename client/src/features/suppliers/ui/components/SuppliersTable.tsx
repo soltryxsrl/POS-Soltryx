@@ -16,6 +16,23 @@ import { SupplierFormDialog } from './SupplierFormDialog';
 
 const FILTER_KEYS = ['q', 'isActive'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más proveedores que esto, se agrupan los primeros N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
+function EstadoBadge({ active }: { active: boolean }) {
+  return active ? (
+    <span className="whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">
+      Activo
+    </span>
+  ) : (
+    <span className="whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+      Inactivo
+    </span>
+  );
+}
+
 export function SuppliersTable({
   fillHeight,
   title,
@@ -38,14 +55,22 @@ export function SuppliersTable({
     defaultFilters: { isActive: 'true' },
   });
 
-  const suppliers = useSuppliers({
-    q: table.filters.q || undefined,
-    isActive: (table.filters.isActive as 'true' | 'false') || undefined,
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente. Sin agrupar, paginación normal
+  // del servidor.
+  const grouping = !!table.groupBy;
+  const suppliers = useSuppliers(
+    {
+      q: table.filters.q || undefined,
+      isActive: (table.filters.isActive as 'true' | 'false') || undefined,
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
 
   const columns = useMemo<DataTableColumn<Supplier>[]>(
     () => [
@@ -66,6 +91,17 @@ export function SuppliersTable({
             )}
           </>
         ),
+      },
+      {
+        key: 'isActive',
+        header: 'Estado',
+        grouping: {
+          key: (s) => (s.isActive ? 'true' : 'false'),
+          label: (key) => <EstadoBadge active={key === 'true'} />,
+          // 'Activo' antes que 'Inactivo' en orden ascendente.
+          sortValue: (key) => (key === 'true' ? 'Activo' : 'Inactivo'),
+        },
+        render: (s) => <EstadoBadge active={s.isActive} />,
       },
       {
         key: 'rnc',
@@ -162,6 +198,10 @@ export function SuppliersTable({
         sortKey={table.sort}
         sortDir={table.sortDir}
         onSortChange={table.setSort}
+        groupBy={table.groupBy}
+        groupDir={table.groupDir}
+        onGroupByChange={table.setGroupBy}
+        onGroupDirChange={table.setGroupDir}
         isLoading={suppliers.isLoading}
         isFetching={suppliers.isFetching}
         errorMessage={suppliers.isError ? getErrorMessage(suppliers.error) : null}

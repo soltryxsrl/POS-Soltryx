@@ -6,10 +6,15 @@
  * componente ReceiptLetter). Inyectamos un stylesheet mínimo con las clases
  * Tailwind que el layout usa.
  */
-export function printReceiptLetter(receiptEl: Element | null) {
+export function printReceiptLetter(receiptEl: Element | null, title = 'Factura') {
   if (!receiptEl || typeof window === 'undefined') return;
 
   const html = receiptEl.outerHTML;
+  // El título termina en el <title> del documento (nombre por defecto del PDF al
+  // "Guardar como PDF"). Escapamos por si trae caracteres especiales.
+  const safeTitle = title.replace(/[<>&]/g, (c) =>
+    c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;',
+  );
 
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
@@ -38,7 +43,7 @@ export function printReceiptLetter(receiptEl: Element | null) {
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<title>Factura</title>
+<title>${safeTitle}</title>
 <style>
   @page { size: letter; margin: 14mm 12mm; }
   html, body {
@@ -160,9 +165,36 @@ export function printReceiptLetter(receiptEl: Element | null) {
     setTimeout(cleanup, 1000);
   };
 
+  // Espera a que el logo (ahora una URL del CDN, no un data-URI inline) cargue
+  // antes de imprimir; si no, el print() dispara antes de la descarga y el logo
+  // sale en blanco. Timeout de seguridad para no colgar si el CDN tarda/cae.
+  const printWhenReady = () => {
+    const pending = Array.from(doc.images ?? []).filter((img) => !img.complete);
+    if (pending.length === 0) {
+      setTimeout(triggerPrint, 50);
+      return;
+    }
+    let fired = false;
+    const go = () => {
+      if (fired) return;
+      fired = true;
+      setTimeout(triggerPrint, 50);
+    };
+    let remaining = pending.length;
+    const onOne = () => {
+      remaining -= 1;
+      if (remaining <= 0) go();
+    };
+    for (const img of pending) {
+      img.addEventListener('load', onOne, { once: true });
+      img.addEventListener('error', onOne, { once: true });
+    }
+    setTimeout(go, 3000);
+  };
+
   if (doc.readyState === 'complete') {
-    setTimeout(triggerPrint, 50);
+    printWhenReady();
   } else {
-    win.addEventListener('load', () => setTimeout(triggerPrint, 50), { once: true });
+    win.addEventListener('load', printWhenReady, { once: true });
   }
 }

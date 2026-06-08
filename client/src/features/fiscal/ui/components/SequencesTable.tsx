@@ -29,6 +29,8 @@ export function SequencesTable({
   const sequences = useFiscalSequences();
   const [showCreate, setShowCreate] = useState(false);
   const [renewing, setRenewing] = useState<FiscalSequence | null>(null);
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
 
   const sort = useClientSort<FiscalSequence>(sequences.data, 'docType', 'asc', (s, k) => {
     if (k === 'range') return Number(BigInt(s.rangeFrom));
@@ -42,6 +44,11 @@ export function SequencesTable({
         key: 'docType',
         header: 'Tipo',
         sortable: true,
+        grouping: {
+          key: (s) => s.docType,
+          label: (key) => <span className="font-mono text-xs font-medium">{key}</span>,
+          sortValue: (key) => key,
+        },
         render: (s) => <span className="font-mono text-xs font-medium">{s.docType}</span>,
       },
       {
@@ -73,6 +80,10 @@ export function SequencesTable({
         header: 'Restante',
         sortable: true,
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, s) => acc + s.remaining, 0);
+          return <span className="font-medium tabular-nums">{sum.toLocaleString()}</span>;
+        },
         render: (s) => {
           const total = Number(BigInt(s.rangeTo) - BigInt(s.rangeFrom) + 1n);
           const remainingPct = total > 0 ? (s.remaining / total) * 100 : 0;
@@ -123,6 +134,20 @@ export function SequencesTable({
       {
         key: 'status',
         header: 'Estado',
+        grouping: {
+          key: (s) => (s.isActive ? 'active' : 'historic'),
+          label: (key) =>
+            key === 'active' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                Activa
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                Histórica
+              </span>
+            ),
+          sortValue: (key) => (key === 'active' ? 'Activa' : 'Histórica'),
+        },
         render: (s) => {
           const total = Number(BigInt(s.rangeTo) - BigInt(s.rangeFrom) + 1n);
           const remainingPct = total > 0 ? (s.remaining / total) * 100 : 0;
@@ -191,6 +216,10 @@ export function SequencesTable({
         sortKey={sort.sortKey}
         sortDir={sort.sortDir}
         onSortChange={sort.onSortChange}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={sequences.isLoading}
         isFetching={sequences.isFetching}
         errorMessage={sequences.isError ? getErrorMessage(sequences.error) : null}

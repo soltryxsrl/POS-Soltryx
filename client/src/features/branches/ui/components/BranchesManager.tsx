@@ -74,6 +74,8 @@ function SucursalesTab() {
   const canManage = useHasPermission('branches.update');
   const isAdminOrManager = !!user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER');
   const [status, setStatus] = useState<'true' | 'false' | undefined>('true');
+  const [groupBy, setGroupBy] = useState<string | undefined>();
+  const [groupDir, setGroupDir] = useState<'asc' | 'desc'>('asc');
   const branches = useBranches({ limit: 100, isActive: status });
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
@@ -112,6 +114,21 @@ function SucursalesTab() {
       key: 'isActive',
       header: 'Activa',
       align: 'right',
+      grouping: {
+        key: (b) => (b.isActive ? 'true' : 'false'),
+        label: (key) => (
+          <span
+            className={
+              key === 'true'
+                ? 'inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : 'inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground'
+            }
+          >
+            {key === 'true' ? 'Activa' : 'Inactiva'}
+          </span>
+        ),
+        sortValue: (key) => (key === 'true' ? 'Activa' : 'Inactiva'),
+      },
       render: (b) => (
         <span
           className={
@@ -167,11 +184,15 @@ function SucursalesTab() {
       <DataTable<Branch>
         columns={columns}
         rows={items}
-        total={items.length}
+        total={branches.data?.total ?? items.length}
         rowKey={(b) => b.id}
         page={1}
         pageSize={Math.max(items.length, 25)}
         onPageChange={() => undefined}
+        groupBy={groupBy}
+        groupDir={groupDir}
+        onGroupByChange={setGroupBy}
+        onGroupDirChange={setGroupDir}
         isLoading={branches.isLoading}
         isFetching={branches.isFetching}
         errorMessage={branches.isError ? getErrorMessage(branches.error) : null}

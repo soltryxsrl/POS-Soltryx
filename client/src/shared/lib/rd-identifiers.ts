@@ -41,7 +41,8 @@ export function isValidCedula(raw: string): boolean {
 /**
  * Verifica el dígito verificador de un RNC (9 dígitos).
  * Algoritmo DGII: pesos 7,9,8,6,5,4,3,2 sobre los primeros 8 dígitos.
- * Verificador esperado = (11 - sum%11) %11; si sale 10 → 1, si sale 11 → 0.
+ * Según el resto `sum % 11`: 0 → verificador 2, 1 → 1, resto → 11 − resto.
+ * (El caso resto 0 → 2 es clave: RNC válidos como 101023122 tienen verificador 2.)
  */
 export function isValidRnc(raw: string): boolean {
   const digits = stripFormatting(raw);
@@ -51,9 +52,74 @@ export function isValidRnc(raw: string): boolean {
   for (let i = 0; i < 8; i++) {
     sum += parseInt(digits[i]!, 10) * weights[i]!;
   }
-  let expected = (11 - (sum % 11)) % 11;
-  if (expected === 10) expected = 1;
+  const mod = sum % 11;
+  const expected = mod === 0 ? 2 : mod === 1 ? 1 : 11 - mod;
   return expected === parseInt(digits[8]!, 10);
+}
+
+export type NcfStatus =
+  | { state: 'empty' }
+  | { state: 'incomplete'; typed: number; total: number; remaining: number }
+  | { state: 'invalid'; message: string }
+  | { state: 'ok' };
+
+/**
+ * Estado del NCF/e-CF MIENTRAS se escribe, para feedback progresivo (no "error
+ * de una vez"). Cuenta cuánto falta cuando lo tecleado va bien encaminado, y
+ * solo marca error real cuando ya no puede completarse: prefijo equivocado,
+ * caracteres que no son dígitos tras el tipo, o demasiado largo.
+ *   - NCF físico (tipos B): `B` + 10 dígitos (11 caracteres, ej. B0100000001).
+ *   - e-CF electrónico (tipos E): `E` + 12 dígitos (13 caracteres, ej. E310000000001).
+ * Si se conoce el código del tipo (B01/E41/…), el NCF debe empezar con él.
+ */
+export function ncfStatus(docTypeCode: string | undefined, ncf: string): NcfStatus {
+  const value = ncf.trim().toUpperCase();
+  if (!value) return { state: 'empty' };
+  const isE = docTypeCode ? docTypeCode.startsWith('E') : value.startsWith('E');
+  const total = isE ? 13 : 11;
+  const prefix = docTypeCode || (isE ? 'E' : 'B');
+
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i]!;
+    if (i < prefix.length) {
+      if (ch !== prefix[i]) {
+        return { state: 'invalid', message: `El NCF debe empezar con ${prefix}.` };
+      }
+    } else if (ch < '0' || ch > '9') {
+      return {
+        state: 'invalid',
+        message: isE
+          ? 'Tras el tipo van solo dígitos (e-CF: E + 12 dígitos).'
+          : 'Tras el tipo van solo dígitos (NCF: B + 10 dígitos).',
+      };
+    }
+  }
+  if (value.length > total) {
+    return {
+      state: 'invalid',
+      message: isE
+        ? 'e-CF demasiado largo: E + 12 dígitos (13 caracteres).'
+        : 'NCF demasiado largo: B + 10 dígitos (11 caracteres).',
+    };
+  }
+  if (value.length < total) {
+    return { state: 'incomplete', typed: value.length, total, remaining: total - value.length };
+  }
+  return { state: 'ok' };
+}
+
+/**
+ * Validación "dura" para el ENVÍO (un NCF incompleto cuenta como error). Para el
+ * feedback en vivo mientras se teclea, usar `ncfStatus`. Devuelve el mensaje de
+ * error, o `null` si es válido (o vacío — lo "requerido" se maneja aparte).
+ */
+export function ncfErrorFor(docTypeCode: string | undefined, ncf: string): string | null {
+  const s = ncfStatus(docTypeCode, ncf);
+  if (s.state === 'invalid') return s.message;
+  if (s.state === 'incomplete') {
+    return `NCF incompleto: faltan ${s.remaining} dígito(s) (${s.typed}/${s.total}).`;
+  }
+  return null;
 }
 
 /** Formato display para cédula: 003-1234567-8 */

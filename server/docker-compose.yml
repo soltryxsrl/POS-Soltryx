@@ -19,6 +19,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # Almacenamiento de objetos S3-compatible (actúa como CDN en local).
+  # En producción se reemplaza por S3/Cloudflare R2/DO Spaces — mismo SDK,
+  # solo cambian las STORAGE_* del .env (ver módulo storage / StoragePort).
+  minio:
+    image: minio/minio:latest
+    container_name: t1et_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"        # API S3
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # Consola web
+    volumes:
+      - t1et_minio_data:/data
+
 volumes:
   t1et_pg_data:
     name: t1et_pg_data
+  t1et_minio_data:
+    name: t1et_minio_data

@@ -2,9 +2,11 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { Upload } from 'lucide-react';
 import { useCategories } from '@/features/categories/application/hooks/use-categories';
 import { useTaxTypes } from '@/features/tax-types/application/hooks/use-tax-types';
 import { getErrorMessage } from '@/shared/lib/error-message';
+import { uploadImage } from '@/shared/lib/http-client';
 import { Button } from '@/shared/ui/controls/Button';
 import { FormField } from '@/shared/ui/controls/FormField';
 import { FormFooter } from '@/shared/ui/controls/FormFooter';
@@ -39,6 +41,7 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
   const [description, setDescription] = useState(product?.description ?? '');
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? '');
   const [imageBroken, setImageBroken] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
   const [costPrice, setCostPrice] = useState(product?.costPrice ?? '0.00');
   const [salePrice, setSalePrice] = useState(product?.salePrice ?? '0.00');
@@ -50,6 +53,25 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const [isKit, setIsKit] = useState(product?.isKit ?? false);
   const [soldByWeight, setSoldByWeight] = useState(product?.soldByWeight ?? false);
+
+  // Sube la imagen al CDN (MinIO/S3) y guarda la URL pública en el form. Sirve
+  // tanto para alta como para edición (no depende de que el producto ya exista).
+  const onImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite re-elegir el mismo archivo
+    if (!file) return;
+    setError(null);
+    setUploadingImage(true);
+    try {
+      const url = await uploadImage(file, 'products');
+      setImageUrl(url);
+      setImageBroken(false);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   // Inicializa el tipo de ITBIS cuando carga el catálogo: en edición legacy
   // (sin tipo) matchea por la tasa guardada; en alta usa el tipo por defecto.
@@ -254,21 +276,38 @@ export function ProductForm({ product, onSuccess, onCancel }: Props) {
 
         <div className="sm:col-span-2">
           <FormField
-            label="Imagen del producto (URL)"
-            hint="Pega una URL pública (Cloudinary, Imgur, CDN). Se mostrará en los tiles del POS."
+            label="Imagen del producto"
+            hint="Sube un archivo (se guarda en el CDN) o pega una URL pública. Se muestra en los tiles del POS."
           >
             <div className="flex items-start gap-3">
-              <Input
-                value={imageUrl}
-                onChange={(e) => {
-                  setImageUrl(e.target.value);
-                  setImageBroken(false);
-                }}
-                placeholder="https://..."
-                maxLength={500}
-                inputMode="url"
-                className="flex-1"
-              />
+              <div className="flex flex-1 flex-col gap-2">
+                <Input
+                  value={imageUrl}
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    setImageBroken(false);
+                  }}
+                  placeholder="https://..."
+                  maxLength={500}
+                  inputMode="url"
+                />
+                <label
+                  className={
+                    'inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium transition hover:border-brand-from/50 hover:bg-brand-tint ' +
+                    (uploadingImage ? 'pointer-events-none opacity-60' : '')
+                  }
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {uploadingImage ? 'Subiendo…' : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={onImageFile}
+                    disabled={uploadingImage}
+                  />
+                </label>
+              </div>
               {imageUrl.trim() && !imageBroken ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

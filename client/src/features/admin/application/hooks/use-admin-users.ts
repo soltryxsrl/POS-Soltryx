@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { adminApi } from '../../infrastructure/api/admin.api.http';
 import type {
   CreateAdminUserInput,
@@ -14,10 +15,19 @@ export const adminUsersKey = {
   byId: (id: string) => ['admin', 'users', 'byId', id] as const,
 };
 
-export function useAdminUsers(params: ListAdminUsersParams = {}) {
+export function useAdminUsers(
+  params: ListAdminUsersParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: adminUsersKey.list(params),
-    queryFn: () => adminApi.listUsers(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...adminUsersKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => adminApi.listUsers(p), params, { cap })
+        : adminApi.listUsers(params),
   });
 }
 

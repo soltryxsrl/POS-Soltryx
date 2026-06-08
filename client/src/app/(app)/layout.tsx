@@ -479,7 +479,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
           onToggle={toggleCollapsed}
           onOpenSettings={() => setSettingsOpen(true)}
         />
-        <main className="min-h-[calc(100vh-2.5rem)] flex-1 rounded-3xl border border-border bg-card px-8 py-8 shadow-xl shadow-brand-soft/40">
+        {/* `min-w-0`: sin esto, un ítem flex no baja de su ancho de contenido,
+            así que una tabla ancha estiraría el main y el scroll-X caería en la
+            página en vez de quedar dentro del contenedor de la tabla. */}
+        <main className="min-h-[calc(100vh-2.5rem)] min-w-0 flex-1 rounded-3xl border border-border bg-card px-8 py-8 shadow-xl shadow-brand-soft/40">
           {children}
         </main>
       </div>

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThanOrEqual, MoreThanOrEqual, Or, Repository } from 'typeorm';
+import { fromCents, toCents } from '../../common/money';
 import { ProductOrmEntity } from '../products/product.orm-entity';
 import {
   PromotionOrmEntity,
@@ -253,15 +254,6 @@ export class PromotionEvaluatorService {
   }
 }
 
-function toCents(s: string | number): number {
-  return Math.round(Number(s) * 100);
-}
-
-function fromCents(c: number): string {
-  const sign = c < 0 ? '-' : '';
-  const abs = Math.abs(c);
-  return `${sign}${Math.trunc(abs / 100)}.${(abs % 100).toString().padStart(2, '0')}`;
-}
 
 function addToMap(m: Map<string, string>, key: string, addC: number) {
   const cur = m.get(key) ?? '0.00';

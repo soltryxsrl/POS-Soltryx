@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { promotionsApiHttp } from '../../infrastructure/api/promotions.api.http';
 import type {
   CreatePromotionInput,
@@ -14,10 +15,19 @@ export const promotionsKey = {
   byId: (id: string) => ['promotions', 'byId', id] as const,
 };
 
-export function usePromotions(params: ListPromotionsParams = {}) {
+export function usePromotions(
+  params: ListPromotionsParams = {},
+  opts: { fetchAll?: boolean; cap?: number } = {},
+) {
+  const fetchAll = opts.fetchAll ?? false;
+  const cap = opts.cap ?? 2000;
   return useQuery({
-    queryKey: promotionsKey.list(params),
-    queryFn: () => promotionsApiHttp.list(params),
+    // El sufijo separa la caché de la vista paginada vs. la de "traer todo".
+    queryKey: [...promotionsKey.list(params), fetchAll ? `all:${cap}` : 'page'],
+    queryFn: () =>
+      fetchAll
+        ? fetchAllPaged((p) => promotionsApiHttp.list(p), params, { cap })
+        : promotionsApiHttp.list(params),
   });
 }
 

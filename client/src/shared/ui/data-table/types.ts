@@ -16,16 +16,30 @@ export interface DataTableColumn<T> {
   /** Clase opcional para la celda (no para el header). */
   cellClassName?: string;
   /**
-   * Etiqueta de grupo opcional. Columnas CONSECUTIVAS con la misma etiqueta se
-   * agrupan bajo una cabecera común, volviendo el header de dos filas: arriba el
-   * nombre del grupo (abarcando sus columnas con `colSpan`) y debajo cada
-   * columna. Las columnas sin `group` ocupan ambas filas (`rowSpan`). Entre
-   * grupos/columnas-sueltas se dibuja un divisor vertical sutil. Si NINGUNA
-   * columna define `group`, el header es de una sola fila (comportamiento previo
-   * intacto). Importante: para agruparse, las columnas deben ser adyacentes en
-   * el array `columns`.
+   * Marca la columna como AGRUPABLE (aparece en el control "Agrupar"). Define
+   * cómo sacar la clave de grupo de cada fila, cómo etiquetar el encabezado del
+   * grupo y, opcionalmente, por qué valor ordenar los grupos. Si ninguna columna
+   * define `grouping`, el control "Agrupar" no se muestra.
    */
-  group?: string;
+  grouping?: {
+    /** Clave estable: filas con la misma clave caen en el mismo grupo. */
+    key: (row: T) => string;
+    /** Etiqueta del encabezado del grupo (recibe la clave y las filas del grupo). */
+    label: (groupKey: string, rows: T[]) => ReactNode;
+    /** Valor por el que se ORDENAN los grupos. Default: la propia clave. */
+    sortValue?: (groupKey: string, rows: T[]) => string | number;
+    /**
+     * Nombre de la dimensión en el menú "Agrupar". Útil cuando se agrupa por un
+     * dato que vive dentro de una columna con otro encabezado (p. ej. agrupar
+     * por "Estado" desde la columna "Nombre"). Default: el `header` de la columna.
+     */
+    menuLabel?: ReactNode;
+  };
+  /**
+   * Subtotal de esta columna mostrado en el encabezado de cada grupo, alineado
+   * bajo su columna (p. ej. suma de Cantidad o de Importe).
+   */
+  aggregate?: (rows: T[]) => ReactNode;
 }
 
 export interface DataTableProps<T> {
@@ -65,4 +79,21 @@ export interface DataTableProps<T> {
    * fijos arriba/abajo. Opt-in: por defecto la tabla crece como siempre.
    */
   fillHeight?: boolean;
+
+  /**
+   * Columna (su `key`) por la que se agrupan las filas actualmente. `undefined`
+   * = sin agrupar. Solo aplica a columnas que definan `grouping`. Al agrupar, la
+   * tabla agrupa las filas que tiene cargadas (el padre decide traerlas todas) y
+   * oculta la paginación de filas.
+   */
+  groupBy?: string;
+  /** Orden de los grupos (por su `sortValue`). Default `'asc'`. */
+  groupDir?: SortDir;
+  /**
+   * Cambia la columna de agrupación (`undefined` = ninguna). Si no se pasa, el
+   * control "Agrupar" no se muestra (aunque haya columnas agrupables).
+   */
+  onGroupByChange?: (key: string | undefined) => void;
+  /** Cambia el orden de los grupos. */
+  onGroupDirChange?: (dir: SortDir) => void;
 }

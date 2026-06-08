@@ -126,12 +126,39 @@ export function printReceipt(receiptEl: Element | null) {
     setTimeout(cleanup, 1000);
   };
 
-  // El onload del iframe es el momento más confiable: el documento ya parseó
-  // el <style> y el body renderizó.
+  // Espera a que las imágenes (el logo del negocio, ahora una URL del CDN en
+  // vez de un data-URI inline) terminen de cargar ANTES de imprimir; si no, el
+  // print() dispara antes de que la imagen descargue y el logo sale en blanco.
+  // Con un timeout de seguridad para no colgar la impresión si el CDN tarda/cae.
+  const printWhenReady = () => {
+    const pending = Array.from(doc.images ?? []).filter((img) => !img.complete);
+    if (pending.length === 0) {
+      setTimeout(triggerPrint, 50);
+      return;
+    }
+    let fired = false;
+    const go = () => {
+      if (fired) return;
+      fired = true;
+      setTimeout(triggerPrint, 50);
+    };
+    let remaining = pending.length;
+    const onOne = () => {
+      remaining -= 1;
+      if (remaining <= 0) go();
+    };
+    for (const img of pending) {
+      img.addEventListener('load', onOne, { once: true });
+      img.addEventListener('error', onOne, { once: true });
+    }
+    setTimeout(go, 3000); // no bloquear la impresión por una imagen lenta/rota
+  };
+
+  // El onload del iframe garantiza que el documento parseó el <style> y el body
+  // renderizó; luego printWhenReady espera la descarga del logo.
   if (doc.readyState === 'complete') {
-    // pequeño tick para garantizar que el estilo se aplica
-    setTimeout(triggerPrint, 50);
+    printWhenReady();
   } else {
-    win.addEventListener('load', () => setTimeout(triggerPrint, 50), { once: true });
+    win.addEventListener('load', printWhenReady, { once: true });
   }
 }

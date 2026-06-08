@@ -11,6 +11,7 @@ import {
   type UnitOfWork,
   type TransactionContext,
 } from '../../common/persistence/unit-of-work.port';
+import { fromCents } from '../../common/money';
 import { CustomerOrmEntity } from '../customers/customer.orm-entity';
 import {
   AccountEntryType,
@@ -194,11 +195,6 @@ export class CustomerAccountService {
   }
 }
 
-function fromCents(c: number): string {
-  const sign = c < 0 ? '-' : '';
-  const abs = Math.abs(c);
-  return `${sign}${Math.trunc(abs / 100)}.${(abs % 100).toString().padStart(2, '0')}`;
-}
 
 function toEntryResponse(e: CustomerAccountEntryOrmEntity): AccountEntryResponse {
   return {

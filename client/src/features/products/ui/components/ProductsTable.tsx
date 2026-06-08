@@ -23,6 +23,11 @@ import { ProductFormDialog } from './ProductFormDialog';
 
 const FILTER_KEYS = ['q', 'categoryId', 'isActive', 'lowStock', 'type'] as const;
 
+// Al agrupar traemos el dataset completo (los grupos se arman en el cliente).
+// Tope de seguridad: si hay más productos que esto, se agrupan los primeros N
+// y el pie de tabla avisa que el resultado quedó truncado.
+const GROUP_FETCH_CAP = 2000;
+
 export function ProductsTable({
   fillHeight,
   title,
@@ -37,17 +42,25 @@ export function ProductsTable({
     defaultFilters: { isActive: 'true' },
   });
 
-  const products = useProducts({
-    q: table.filters.q || undefined,
-    categoryId: table.filters.categoryId || undefined,
-    isActive: parseBool(table.filters.isActive),
-    lowStock: parseBool(table.filters.lowStock),
-    type: (table.filters.type as ProductTypeFilter) || undefined,
-    sort: table.sort,
-    sortDir: table.sortDir,
-    limit: table.pageSize,
-    offset: (table.page - 1) * table.pageSize,
-  });
+  // Con agrupación activa traemos el dataset completo (hasta el tope), que el
+  // hook arma paginando del lado del cliente (el backend topa cada request en
+  // 200). Sin agrupar, paginación normal del servidor.
+  const grouping = !!table.groupBy;
+  const products = useProducts(
+    {
+      q: table.filters.q || undefined,
+      categoryId: table.filters.categoryId || undefined,
+      isActive: parseBool(table.filters.isActive),
+      lowStock: parseBool(table.filters.lowStock),
+      type: (table.filters.type as ProductTypeFilter) || undefined,
+      sort: table.sort,
+      sortDir: table.sortDir,
+      ...(grouping
+        ? {}
+        : { limit: table.pageSize, offset: (table.page - 1) * table.pageSize }),
+    },
+    { fetchAll: grouping, cap: GROUP_FETCH_CAP },
+  );
   const remove = useRemoveProduct();
   const canUpdate = useHasPermission('products.update');
 
@@ -119,6 +132,13 @@ export function ProductsTable({
       {
         key: 'category',
         header: 'Categoría',
+        grouping: {
+          key: (p) => p.categoryId ?? '__none__',
+          label: (key, rows) =>
+            key === '__none__' ? 'Sin categoría' : (rows[0].category?.name ?? '—'),
+          sortValue: (key, rows) =>
+            key === '__none__' ? '' : (rows[0].category?.name ?? ''),
+        },
         render: (p) => (
           <span className="text-muted-foreground">{p.category?.name ?? '—'}</span>
         ),
@@ -135,6 +155,10 @@ export function ProductsTable({
         header: 'Stock',
         sortable: true,
         align: 'right',
+        aggregate: (rows) => {
+          const sum = rows.reduce((acc, p) => acc + Number(p.stock), 0);
+          return <span className="font-medium">{formatQuantity(String(sum))}</span>;
+        },
         render: (p) => {
           // Umbral de alerta = punto de reorden si está definido (>0), si no el mínimo.
           const threshold =
@@ -151,6 +175,21 @@ export function ProductsTable({
       {
         key: 'isActive',
         header: 'Estado',
+        grouping: {
+          key: (p) => (p.isActive ? 'true' : 'false'),
+          label: (key) => (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                key === 'true'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {key === 'true' ? 'Activo' : 'Inactivo'}
+            </span>
+          ),
+          sortValue: (key) => (key === 'true' ? 'Activo' : 'Inactivo'),
+        },
         render: (p) => (
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
@@ -312,6 +351,10 @@ export function ProductsTable({
         sortKey={table.sort}
         sortDir={table.sortDir}
         onSortChange={table.setSort}
+        groupBy={table.groupBy}
+        groupDir={table.groupDir}
+        onGroupByChange={table.setGroupBy}
+        onGroupDirChange={table.setGroupDir}
         isLoading={products.isLoading}
         isFetching={products.isFetching}
         errorMessage={products.isError ? getErrorMessage(products.error) : null}
