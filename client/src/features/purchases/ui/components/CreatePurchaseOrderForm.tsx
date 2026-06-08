@@ -214,7 +214,8 @@ export function CreatePurchaseOrderForm() {
             Sin productos. Agrega el primero con el botón de arriba.
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">Producto</th>
@@ -288,6 +289,7 @@ export function CreatePurchaseOrderForm() {
               })}
             </tbody>
           </table>
+          </div>
         )}
 
         {lines.length > 0 && (

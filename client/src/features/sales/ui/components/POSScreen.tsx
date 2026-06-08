@@ -141,8 +141,8 @@ export function POSScreen() {
   const parkedCount = parked.data?.length ?? 0;
 
   return (
-    <div className="flex flex-col gap-3 lg:h-full">
-      <div className="grid gap-3 lg:min-h-0 lg:flex-1 lg:grid-rows-1 lg:grid-cols-[1fr_400px]">
+    <div className="flex flex-col gap-3 md:h-full">
+      <div className="grid gap-3 md:min-h-0 md:flex-1 md:grid-rows-1 md:grid-cols-[1fr_360px] lg:grid-cols-[1fr_400px]">
         <div className="flex min-h-0 flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
@@ -188,7 +188,7 @@ export function POSScreen() {
           <KeyboardHints />
         </div>
 
-        <div className="min-h-0 lg:h-full">
+        <div className="min-h-0 md:h-full">
           <Cart
             onCheckout={() => setShowPay(true)}
             onPark={cartHasItems ? () => setShowPark(true) : undefined}

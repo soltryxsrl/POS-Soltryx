@@ -9,9 +9,18 @@ import type {
 /**
  * Agrega 3 fuentes para el cuadre de caja:
  *   1) `payments` × `sales` de la sesión, group by method/status
- *      → cashSales (CASH, sale COMPLETED), nonCashSales (resto, sale COMPLETED),
- *        cashRefunds (CASH, sale CANCELLED).
+ *      → cashSales (CASH, sale COMPLETED/REFUNDED), nonCashSales (resto,
+ *        COMPLETED/REFUNDED), cashRefunds (CASH, sale CANCELLED).
  *   2) `cash_movements` group by type → paidIns, paidOuts.
+ *
+ * IMPORTANTE — devoluciones (REFUNDED) vs. anulaciones (CANCELLED):
+ *   - Una venta DEVUELTA por completo (REFUNDED) cuenta como COMPLETED aquí: su
+ *     efectivo SÍ entró al cajón en su momento. La SALIDA del dinero la modela el
+ *     PAID_OUT que inserta la devolución (método CASH), o el ledger del cliente
+ *     (STORE_CREDIT/ACCOUNT) cuando no hay efectivo. Restarla en cashRefunds
+ *     descontaría dos veces (PAID_OUT + cashRefunds) y la caja saldría corta.
+ *   - Una venta ANULADA (CANCELLED) NO inserta PAID_OUT: su reembolso en efectivo
+ *     se modela exclusivamente con cashRefunds. Por eso solo CANCELLED va ahí.
  *
  * Una sola pasada por tabla, joinable a futuro si añadimos más métodos
  * de devolución (notas de crédito, etc.).
@@ -37,7 +46,9 @@ export class CashPaymentTotalsAdapterTypeOrm implements CashPaymentTotalsPort {
     let nonCashSales = '0.00';
     for (const r of paymentRows) {
       const v = r.total ?? '0.00';
-      if (r.status === 'COMPLETED') {
+      // REFUNDED se trata como COMPLETED: el efectivo entró al cajón; la salida la
+      // registra el PAID_OUT de la devolución (ver nota del encabezado).
+      if (r.status === 'COMPLETED' || r.status === 'REFUNDED') {
         if (r.method === 'CASH') cashSales = sumStringDecimals(cashSales, v);
         else nonCashSales = sumStringDecimals(nonCashSales, v);
       } else if (r.status === 'CANCELLED' && r.method === 'CASH') {

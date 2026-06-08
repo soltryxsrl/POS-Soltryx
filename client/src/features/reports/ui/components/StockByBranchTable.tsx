@@ -117,12 +117,12 @@ export function StockByBranchTable() {
     <div className="rounded-lg border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
         <h3 className="text-sm font-medium">Existencia por sucursal</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             placeholder="Buscar por nombre o SKU..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-56 text-xs"
+            className="h-8 w-full text-xs sm:w-56"
           />
           <span className="text-xs text-muted-foreground">Exportar:</span>
           <button

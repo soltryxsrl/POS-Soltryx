@@ -465,27 +465,99 @@ function PosShell({ children }: { children: ReactNode }) {
 function DashboardShell({ children }: { children: ReactNode }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // En móvil/tablet el sidebar es un drawer off-canvas: se cierra al cambiar de
+  // ruta (navegación) para no quedar tapando el contenido recién cargado.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  // Escape cierra el drawer (paridad de UX con los diálogos del sistema).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-tint via-background to-brand-soft">
       {/* Indicador global de sincronización offline (también monta el motor de
           drenado de la cola mientras se navega fuera del POS). */}
-      <div className="pointer-events-none fixed right-6 top-6 z-40">
+      <div className="pointer-events-none fixed right-4 top-4 z-20 lg:right-6 lg:top-6">
         <OfflineSyncBadge />
       </div>
-      <div className="flex gap-5 p-5">
-        <Sidebar
-          collapsed={collapsed}
-          onToggle={toggleCollapsed}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
+
+      {/* Barra superior SOLO en móvil/tablet (< lg): hamburguesa + marca +
+          selector de sucursal. En desktop se oculta (el sidebar fijo ya las trae). */}
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 shadow-sm backdrop-blur lg:hidden">
+        <Link href="/" className="flex-shrink-0" title="Ir al inicio">
+          <BrandLogo />
+        </Link>
+        <BranchSwitcher className="ml-1 min-w-0" />
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Abrir menú"
+          className="ml-auto flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </header>
+
+      <div className="flex p-3 sm:p-4 lg:gap-5 lg:p-5">
+        {/* Sidebar fijo (docked): SOLO en desktop (lg+). En pantallas menores se
+            sustituye por el drawer de abajo. */}
+        <div className="hidden lg:block">
+          <Sidebar
+            collapsed={collapsed}
+            onToggle={toggleCollapsed}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        </div>
         {/* `min-w-0`: sin esto, un ítem flex no baja de su ancho de contenido,
             así que una tabla ancha estiraría el main y el scroll-X caería en la
-            página en vez de quedar dentro del contenedor de la tabla. */}
-        <main className="min-h-[calc(100vh-2.5rem)] min-w-0 flex-1 rounded-3xl border border-border bg-card px-8 py-8 shadow-xl shadow-brand-soft/40">
+            página en vez de quedar dentro del contenedor de la tabla. Padding y
+            radio se reducen en móvil para ganar área útil. */}
+        <main className="min-h-[calc(100vh-7rem)] min-w-0 flex-1 rounded-2xl border border-border bg-card px-4 py-5 shadow-xl shadow-brand-soft/40 sm:px-6 sm:py-6 lg:min-h-[calc(100vh-2.5rem)] lg:rounded-3xl lg:px-8 lg:py-8">
           {children}
         </main>
       </div>
+
+      {/* Drawer off-canvas (< lg): reutiliza el mismo Sidebar en variante drawer,
+          igual que el POS. Backdrop + click en enlace + Escape lo cierran. */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end lg:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuOpen(false)}
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+          />
+          <div
+            className="relative z-10 h-full animate-in fade-in slide-in-from-right duration-200"
+            onClickCapture={(e) => {
+              if ((e.target as HTMLElement).closest('a[href]')) setMenuOpen(false);
+            }}
+          >
+            <Sidebar
+              collapsed={false}
+              onToggle={() => {}}
+              onOpenSettings={() => {
+                setMenuOpen(false);
+                setSettingsOpen(true);
+              }}
+              variant="drawer"
+              side="right"
+            />
+          </div>
+        </div>
+      )}
+
       <VisualSettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -512,11 +584,14 @@ function Sidebar({
   onToggle,
   onOpenSettings,
   variant = 'docked',
+  side = 'left',
 }: {
   collapsed: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
   variant?: 'docked' | 'drawer';
+  /** Lado del que entra el drawer (define el borde visible). Solo aplica a 'drawer'. */
+  side?: 'left' | 'right';
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -533,7 +608,7 @@ function Sidebar({
       className={cn(
         'flex shrink-0 flex-col bg-card shadow-xl shadow-brand-soft/40',
         isDrawer
-          ? 'h-full w-64 border-r border-border'
+          ? cn('h-full w-64 border-border', side === 'right' ? 'border-l' : 'border-r')
           : cn(
               'sticky top-5 h-[calc(100vh-2.5rem)] rounded-3xl border border-border transition-[width] duration-200',
               collapsed ? 'w-[76px]' : 'w-60',

@@ -115,10 +115,14 @@ export class GetSessionReportUseCase {
     let discountTotal = '0.00';
     for (const r of salesAgg) {
       const c = parseInt(r.count, 10);
-      if (r.status === 'COMPLETED') {
-        salesCount = c;
-        taxTotal = r.tax;
-        discountTotal = r.discount;
+      // REFUNDED (venta devuelta por completo) cuenta como venta del turno, igual
+      // que una devolución PARCIAL —que deja la venta COMPLETED— para que conteo e
+      // ITBIS sean consistentes con cashSales. Acumulamos porque pueden coexistir
+      // filas COMPLETED y REFUNDED (GROUP BY status).
+      if (r.status === 'COMPLETED' || r.status === 'REFUNDED') {
+        salesCount += c;
+        taxTotal = addMoney(taxTotal, r.tax);
+        discountTotal = addMoney(discountTotal, r.discount);
       } else if (r.status === 'CANCELLED') {
         salesCancelled = c;
       }
@@ -133,7 +137,7 @@ export class GetSessionReportUseCase {
          JOIN sales s ON s.id = p.sale_id
          WHERE s.cash_session_id = $1
            AND p.status = 'COMPLETED'
-           AND s.status = 'COMPLETED'
+           AND s.status IN ('COMPLETED', 'REFUNDED')
          GROUP BY p.method
          ORDER BY p.method`,
         [sessionId],
@@ -151,7 +155,8 @@ export class GetSessionReportUseCase {
       };
     });
 
-    // Items vendidos agregados por producto (solo ventas COMPLETED del turno).
+    // Items vendidos agregados por producto (ventas COMPLETED/REFUNDED del turno;
+    // las devueltas cuentan igual que las parciales, ver nota de salesAgg).
     // Si la venta fue una variante, mostramos "producto · variante" como nombre.
     const itemsAgg: Array<{ name: string; sku: string; quantity: string; total: string }> =
       await this.ds.query(
@@ -165,7 +170,7 @@ export class GetSessionReportUseCase {
          FROM sale_items si
          JOIN sales s ON s.id = si.sale_id
          WHERE s.cash_session_id = $1
-           AND s.status = 'COMPLETED'
+           AND s.status IN ('COMPLETED', 'REFUNDED')
          GROUP BY name, si.product_sku_snapshot
          ORDER BY SUM(si.total) DESC`,
         [sessionId],

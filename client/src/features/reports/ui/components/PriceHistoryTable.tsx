@@ -139,7 +139,7 @@ export function PriceHistoryTable({ from, to, branchId }: Props) {
 
   return (
     <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
         <h3 className="text-sm font-medium">Historial de cambios de precio</h3>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Exportar:</span>

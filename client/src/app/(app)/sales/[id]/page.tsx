@@ -25,6 +25,19 @@ import { FormFooter } from '@/shared/ui/controls/FormFooter';
 import { Input } from '@/shared/ui/controls/Input';
 import { MaintenanceShell } from '@/shared/ui/maintenance-shell/MaintenanceShell';
 
+// Mismos rótulos/colores que SalesTable, para que el estado se lea igual en el
+// listado y en el detalle. REFUNDED = "Devuelta" (la venta se devolvió completa).
+const STATUS_LABEL: Record<string, string> = {
+  COMPLETED: 'Completada',
+  CANCELLED: 'Cancelada',
+  REFUNDED: 'Devuelta',
+};
+const STATUS_COLOR: Record<string, string> = {
+  COMPLETED: 'bg-green-100 text-green-800',
+  CANCELLED: 'bg-muted text-muted-foreground',
+  REFUNDED: 'bg-amber-100 text-amber-800',
+};
+
 export default function SaleDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -105,7 +118,7 @@ export default function SaleDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
             href="/sales"
@@ -113,11 +126,18 @@ export default function SaleDetailPage() {
           >
             ← Ventas
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-            Venta {s.saleNumber}
-          </h1>
+          <div className="mt-2 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Venta {s.saleNumber}
+            </h1>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[s.status] ?? ''}`}
+            >
+              {STATUS_LABEL[s.status] ?? s.status}
+            </span>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => downloadReceiptPdf(s, methodNames)}

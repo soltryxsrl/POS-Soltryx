@@ -116,7 +116,8 @@ export default function PurchaseOrderDetailPage() {
         <div className="border-b px-4 py-2.5">
           <h3 className="text-sm font-semibold">Líneas</h3>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b text-left text-xs text-muted-foreground">
             <tr>
               <th className="px-4 py-2">Producto</th>
@@ -179,6 +180,7 @@ export default function PurchaseOrderDetailPage() {
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
 
       {o.notes && (

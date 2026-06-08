@@ -15,8 +15,11 @@ const SKU_PREFIX = 'E2E-REFUND-ARQUEO-';
  * IMPORTANTE sobre los totales del arqueo (cash-payment-totals.adapter):
  *   - `paidOuts`     = SUMA de TODOS los cash_movements PAID_OUT de la sesión.
  *   - `cashRefunds`  = pagos CASH de ventas CANCELADAS (NO devoluciones).
- *   - Una devolución mantiene la venta COMPLETED e inserta un PAID_OUT, por lo
- *     que afecta `paidOuts`/`expectedAmount` pero NO `cashRefunds`.
+ *   - Una devolución inserta un PAID_OUT (afecta `paidOuts`/`expectedAmount`)
+ *     pero NUNCA toca `cashRefunds` (esa columna sólo cuenta ventas CANCELLED).
+ *     Una devolución PARCIAL deja la venta COMPLETED; una TOTAL la pasa a
+ *     REFUNDED ("Devuelta") — en ningún caso es CANCELLED, así que `cashRefunds`
+ *     no se mueve.
  *
  * La sesión de caja la comparte toda la suite (ensureCashSessionOpen reutiliza
  * la sesión abierta), así que estos totales NO son absolutos: medimos DELTAS
@@ -220,5 +223,85 @@ test.describe.serial('Devolución en efectivo y arqueo de caja', () => {
     // En esa fila: badge de reembolso "Efectivo" (REFUND_LABEL.CASH) y el total.
     await expect(row.getByText(/^Efectivo$/)).toBeVisible();
     await expect(row.getByText(/118[.,]00/)).toBeVisible();
+  });
+
+  test('devolver la unidad restante deja la venta en estado "Devuelta"', async ({
+    page,
+  }) => {
+    // Precondición: tras la devolución parcial del primer test queda 1 unidad
+    // por devolver (2 vendidas − 1 devuelta).
+    const returnable = await api<Array<{ saleItemId: string; remaining: string }>>(
+      `/sales/${saleId}/returnable-items`,
+    );
+    expect(returnable.length).toBe(1);
+    expect(parseFloat(returnable[0].remaining)).toBe(1);
+
+    // Snapshot del arqueo ANTES de la devolución total. La venta pasará de
+    // COMPLETED a REFUNDED; el arqueo NO debe descuadrarse: el efectivo de la
+    // venta sigue contando en cashSales (entró al cajón) y solo el PAID_OUT nuevo
+    // (118.00) reduce el esperado. Si REFUNDED se cayera de cashSales, el esperado
+    // bajaría 236.00 (venta) + 118.00 (PAID_OUT) = 354.00 → regresión detectada.
+    const before = await api<SessionReport>(
+      `/cash-sessions/${cashSessionId}/report`,
+    );
+
+    // La venta sigue COMPLETED (la devolución previa fue parcial) → el botón
+    // "Devolución" aún se ofrece en el detalle.
+    await page.goto(`/sales/${saleId}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: /^Venta /i })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.getByRole('button', { name: /^Devolución$/i }).click();
+    const dialog = page.getByRole('dialog', { name: /^Devolución sobre /i });
+    await expect(dialog).toBeVisible({ timeout: 8_000 });
+
+    // Devolver la última unidad (cantidad restante = 1) → devolución TOTAL.
+    const qtyInput = dialog.locator('input[type="number"]').first();
+    await qtyInput.fill('1');
+    await expect(dialog.getByText(/118[.,]00/)).toBeVisible();
+    await dialog.getByRole('button', { name: /^Efectivo$/ }).click();
+    await dialog.getByRole('button', { name: /^Confirmar devolución$/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+
+    // === VERIFICACIÓN ===
+    // La venta queda COMPLETAMENTE devuelta → estado REFUNDED ("Devuelta").
+    const sale = await api<{ status: string }>(`/sales/${saleId}`);
+    expect(sale.status).toBe('REFUNDED');
+
+    // No deben quedar unidades devolvibles.
+    const remainingAfter = await api<Array<{ remaining: string }>>(
+      `/sales/${saleId}/returnable-items`,
+    );
+    const totalRemaining = remainingAfter.reduce(
+      (acc, r) => acc + parseFloat(r.remaining),
+      0,
+    );
+    expect(totalRemaining).toBe(0);
+
+    // ARQUEO: el esperado baja EXACTAMENTE 118.00 (el PAID_OUT de esta devolución),
+    // no 354.00. Es decir, pasar la venta a REFUNDED no la saca de cashSales.
+    const afterReport = await api<SessionReport>(
+      `/cash-sessions/${cashSessionId}/report`,
+    );
+    const expectedDelta =
+      toCents(afterReport.expectedAmount) - toCents(before.expectedAmount);
+    expect(expectedDelta).toBe(-11800);
+    // cashRefunds sólo cuenta ventas CANCELLED; una devolución total (REFUNDED)
+    // tampoco la mueve.
+    expect(toCents(afterReport.cashRefunds)).toBe(toCents(before.cashRefunds));
+
+    // En el detalle: el distintivo "Devuelta" es visible y ya NO se ofrecen las
+    // acciones "Devolución" ni "Anular venta" (solo aplican a ventas COMPLETED).
+    await page.goto(`/sales/${saleId}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(/^Devuelta$/)).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole('button', { name: /^Devolución$/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /^Anular venta$/i }),
+    ).toHaveCount(0);
   });
 });

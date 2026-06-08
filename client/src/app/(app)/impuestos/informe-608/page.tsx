@@ -9,6 +9,7 @@ import { Input } from '@/shared/ui/controls/Input';
 import { Switch } from '@/shared/ui/controls/Switch';
 import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import { useMultiBranch } from '@/features/plan/application/hooks/use-plan';
 import { useFiscal608 } from '@/features/fiscal/application/hooks/use-fiscal';
 import { fiscalApiHttp } from '@/features/fiscal/infrastructure/api/fiscal.api.http';
 
@@ -30,7 +31,10 @@ export default function Informe608Page() {
   const [to, setTo] = useState(localDateISO());
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const canConsolidate = useHasPermission('branches.switch');
+  // Consolidar (todas las sucursales) requiere el permiso Y multi-sucursal
+  // habilitado; sin multi-sucursal el switch no aparece. Ambos hooks sin condición.
+  const multiBranch = useMultiBranch();
+  const canConsolidate = useHasPermission('branches.switch') && multiBranch;
   const [allBranches, setAllBranches] = useState(false);
   const branchId = canConsolidate && allBranches ? 'all' : undefined;
 

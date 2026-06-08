@@ -227,7 +227,7 @@ export class ReportsService {
               COALESCE(SUM(tax_total), 0)::text AS tax_total,
               COALESCE(SUM(total), 0)::text AS total
        FROM sales
-       WHERE status = 'COMPLETED'
+       WHERE status IN ('COMPLETED', 'REFUNDED')
          AND ($2::uuid IS NULL OR branch_id = $2)
          AND (created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date`,
       [date, branchId],
@@ -249,7 +249,7 @@ export class ReportsService {
                 COALESCE(SUM(p.amount), 0)::text AS total
          FROM payments p
          JOIN sales s ON s.id = p.sale_id
-         WHERE s.status = 'COMPLETED'
+         WHERE s.status IN ('COMPLETED', 'REFUNDED')
            AND ($2::uuid IS NULL OR s.branch_id = $2)
            AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
            AND p.status = 'COMPLETED'
@@ -268,7 +268,7 @@ export class ReportsService {
          SELECT s.total, SUM(p.amount) AS paid
          FROM sales s
          JOIN payments p ON p.sale_id = s.id
-         WHERE s.status = 'COMPLETED'
+         WHERE s.status IN ('COMPLETED', 'REFUNDED')
            AND ($2::uuid IS NULL OR s.branch_id = $2)
            AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
            AND p.status = 'COMPLETED'
@@ -292,7 +292,7 @@ export class ReportsService {
               COALESCE(SUM(s.total), 0)::text AS total
        FROM sales s
        JOIN users u ON u.id = s.user_id
-       WHERE s.status = 'COMPLETED'
+       WHERE s.status IN ('COMPLETED', 'REFUNDED')
          AND ($2::uuid IS NULL OR s.branch_id = $2)
          AND (s.created_at AT TIME ZONE 'America/Santo_Domingo')::date = $1::date
        GROUP BY s.user_id, u.username, u.full_name
@@ -303,6 +303,13 @@ export class ReportsService {
     // Devoluciones del día. Las ventas brutas NO restan lo devuelto al cliente,
     // así que lo netamos aparte para mostrar el ingreso real. Mismo scope de
     // sucursal y misma fecha local RD que el resto del resumen.
+    //
+    // IMPORTANTE: el bruto incluye COMPLETED Y REFUNDED (venta devuelta por
+    // completo). Si REFUNDED se excluyera del bruto, una devolución TOTAL se
+    // restaría dos veces (cae del bruto + sigue contando aquí) y el neto saldría
+    // negativo. Al mantenerla en el bruto, esta resta es la ÚNICA y correcta —
+    // igual que una devolución parcial, cuya venta sigue COMPLETED. Coincide con
+    // la convención del arqueo (cashSales/get-session-report cuentan COMPLETED+REFUNDED).
     const [retRow]: Array<{ count: number; total: string }> = await this.ds.query(
       `SELECT COUNT(*)::int AS count, COALESCE(SUM(total), 0)::text AS total
        FROM sale_returns

@@ -489,11 +489,12 @@ export class ReturnsService {
 
       // NOTA DE CRÉDITO (fiscal): si la venta original tenía comprobante emitido,
       // emitimos una NC por lo DEVUELTO (E34 e-CF / B04 NCF tradicional), ligada
-      // a la venta — igual que la anulación reversa con nota de crédito. La venta
-      // sigue COMPLETED y las devoluciones parciales acumulan NCs, así que NO se
-      // marca CANCELLED el comprobante original (la anulación sí, porque reversa
-      // el total). Va dentro de la transacción: si falla la emisión, la devolución
-      // se revierte completa (no queda una devolución sin su soporte fiscal).
+      // a la venta — igual que la anulación reversa con nota de crédito. Las
+      // devoluciones (parciales o totales) acumulan NCs y el comprobante original
+      // NUNCA se marca CANCELLED (la anulación sí, porque reversa el total): aquí
+      // la NC es la que reversa lo devuelto. Va dentro de la transacción: si falla
+      // la emisión, la devolución se revierte completa (no queda una devolución
+      // sin su soporte fiscal).
       if (sale.fiscalDocumentId) {
         const invoice = await m.findOne(FiscalDocumentOrmEntity, {
           where: { id: sale.fiscalDocumentId },
@@ -522,6 +523,39 @@ export class ReturnsService {
         }
       }
 
+      // ¿La venta quedó COMPLETAMENTE devuelta? (todas las líneas devueltas en su
+      // totalidad). De ser así deja de ser una venta efectiva → pasa a REFUNDED
+      // ("Devuelta"): sale del "total vendido"/ranking del dashboard, coherente
+      // con que la mercancía volvió al inventario y el efectivo salió de caja.
+      // El 606/607 (DGII) NO se afecta —la NC ya neutraliza la factura— ni el
+      // arqueo, que lee movimientos de caja. Las devoluciones PARCIALES dejan la
+      // venta en COMPLETED. Las líneas de monto libre (productId null) no son
+      // devolubles, así que una venta que las tenga nunca se marca como devuelta.
+      const addedByItem = new Map<string, number>();
+      for (const r of dto.items) {
+        addedByItem.set(
+          r.saleItemId,
+          (addedByItem.get(r.saleItemId) ?? 0) + parseFloat(r.quantity),
+        );
+      }
+      const fullyReturned =
+        returnable.length > 0 &&
+        returnable.every((info) => {
+          const ordered = parseFloat(info.saleItem.quantity);
+          const returnedSoFar =
+            info.alreadyReturned + (addedByItem.get(info.saleItem.id) ?? 0);
+          // Comparación en milésimas: evita el ruido de punto flotante (las
+          // cantidades se manejan con 3 decimales).
+          return Math.round((ordered - returnedSoFar) * 1000) <= 0;
+        });
+      if (fullyReturned) {
+        await m.update(
+          SaleOrmEntity,
+          { id: sale.id },
+          { status: SaleStatus.REFUNDED },
+        );
+      }
+
       const refreshed = await m.findOne(SaleReturnOrmEntity, {
         where: { id: sr.id },
         relations: { items: true },
@@ -538,6 +572,7 @@ export class ReturnsService {
           total: fromCents(totalC),
           refundMethod: dto.refundMethod,
           itemsCount: dto.items.length,
+          saleFullyReturned: fullyReturned,
         },
       });
 

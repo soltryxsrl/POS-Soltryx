@@ -66,7 +66,7 @@ export function FilterPopover({ activeCount = 0, onClear, label = 'Filtros', chi
         <div
           role="dialog"
           aria-label={label}
-          className="absolute right-0 z-30 mt-2 w-80 rounded-xl border border-border bg-card p-3 shadow-xl"
+          className="absolute right-0 z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-xl"
         >
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

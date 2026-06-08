@@ -590,8 +590,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
             </div>
             <div
               ref={receiptContainerRef}
-              className="mx-auto max-h-[420px] overflow-y-auto rounded-lg bg-white shadow-inner"
-              style={{ width: '300px' }}
+              className="mx-auto max-h-[420px] w-full max-w-[300px] overflow-y-auto rounded-lg bg-white shadow-inner"
             >
               {successSale.data ? (
                 <Receipt sale={successSale.data} />
@@ -806,7 +805,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
                 )}
               </FormField>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 <FormField label="Monto" required>
                   <div className="flex gap-2">
                     <Input

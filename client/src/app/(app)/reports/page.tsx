@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useHasPermission } from '@/features/auth/application/hooks/use-auth';
+import { useMultiBranch } from '@/features/plan/application/hooks/use-plan';
 import { SectionHeader } from '@/shared/ui/layout/SectionHeader';
 
 interface ReportItem {
@@ -60,7 +61,10 @@ const GROUPS: Array<{ group: string; items: ReportItem[] }> = [
 ];
 
 export default function ReportsIndexPage() {
-  const canSwitch = useHasPermission('branches.switch');
+  // El reporte "Existencia por sucursal" es consolidado/comparativo: sin
+  // multi-sucursal no aplica, así que la tarjeta se oculta (no solo por permiso).
+  const multiBranch = useMultiBranch();
+  const canSwitch = useHasPermission('branches.switch') && multiBranch;
   const visible = (it: ReportItem) => !it.requires || (it.requires === 'branches.switch' && canSwitch);
 
   return (
