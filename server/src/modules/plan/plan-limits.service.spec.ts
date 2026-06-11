@@ -29,13 +29,21 @@ function makeService(
 
 describe('PlanLimitsService', () => {
   it('plan ilimitado (null) nunca bloquea, aunque haya muchos', async () => {
-    const s = makeService({ maxUsers: null, maxBranches: null }, 100, 100);
+    const s = makeService(
+      { maxUsers: null, maxBranches: null, multiBranchEnabled: true },
+      100,
+      100,
+    );
     await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
     await expect(s.assertCanCreateBranch()).resolves.toBeUndefined();
   });
 
   it('permite crear cuando se está por debajo del tope', async () => {
-    const s = makeService({ maxUsers: 5, maxBranches: 10 }, 4, 9);
+    const s = makeService(
+      { maxUsers: 5, maxBranches: 10, multiBranchEnabled: true },
+      4,
+      9,
+    );
     await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
     await expect(s.assertCanCreateBranch()).resolves.toBeUndefined();
   });
@@ -46,12 +54,20 @@ describe('PlanLimitsService', () => {
   });
 
   it('bloquea sucursales al alcanzar el tope', async () => {
-    const s = makeService({ maxUsers: null, maxBranches: 10 }, 0, 10);
+    const s = makeService(
+      { maxUsers: null, maxBranches: 10, multiBranchEnabled: true },
+      0,
+      10,
+    );
     await expect(s.assertCanCreateBranch()).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('getUsage devuelve límites + uso actual', async () => {
-    const s = makeService({ maxUsers: 5, maxBranches: 10 }, 3, 7);
+    const s = makeService(
+      { maxUsers: 5, maxBranches: 10, multiBranchEnabled: true },
+      3,
+      7,
+    );
     await expect(s.getUsage()).resolves.toEqual({
       maxUsers: 5,
       maxBranches: 10,
@@ -61,14 +77,16 @@ describe('PlanLimitsService', () => {
     });
   });
 
-  it('sin fila de plan_limits → ilimitado y multi-sucursal ON', async () => {
+  it('sin fila de plan_limits → ilimitado pero multi-sucursal OFF (default)', async () => {
     const s = makeService(null, 50, 50);
     await expect(s.getLimits()).resolves.toEqual({
       maxUsers: null,
       maxBranches: null,
-      multiBranchEnabled: true,
+      multiBranchEnabled: false,
     });
+    // Usuarios sí se pueden crear (ilimitado); sucursales NO (multi-sucursal OFF).
     await expect(s.assertCanCreateUser()).resolves.toBeUndefined();
+    await expect(s.assertCanCreateBranch()).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('multi-sucursal OFF → no se puede crear sucursal (aunque haya cupo)', async () => {

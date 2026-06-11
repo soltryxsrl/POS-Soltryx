@@ -20,13 +20,14 @@ export function usePlan() {
 }
 
 /**
- * ¿Está habilitada la función multi-sucursal? Default `true` mientras carga
- * (para no ocultar UI por un parpadeo). Lo usan el nav, el selector de sucursal
+ * ¿Está habilitada la función multi-sucursal? Default `false` mientras carga
+ * (multi-sucursal viene OFF por defecto, así que no mostramos UI de sucursales
+ * hasta confirmar que está encendida). Lo usan el nav, el selector de sucursal
  * y el toggle consolidado de reportes.
  */
 export function useMultiBranch(): boolean {
   const plan = usePlan();
-  return plan.data?.multiBranchEnabled ?? true;
+  return plan.data?.multiBranchEnabled ?? false;
 }
 
 /** Upsell del plan (super-admin). Requiere el secreto; refresca el plan al éxito. */

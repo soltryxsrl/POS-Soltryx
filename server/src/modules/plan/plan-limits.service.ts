@@ -44,7 +44,8 @@ export class PlanLimitsService {
     return {
       maxUsers: row?.maxUsers ?? null,
       maxBranches: row?.maxBranches ?? null,
-      multiBranchEnabled: row?.multiBranchEnabled ?? true,
+      // Default OFF: sin fila (o flag nulo), la instancia opera mono-sucursal.
+      multiBranchEnabled: row?.multiBranchEnabled ?? false,
     };
   }
 
@@ -100,7 +101,7 @@ export class PlanLimitsService {
         id: SINGLETON_ID,
         maxUsers: null,
         maxBranches: null,
-        multiBranchEnabled: true,
+        multiBranchEnabled: false,
       });
     }
     if (patch.maxUsers !== undefined) row.maxUsers = patch.maxUsers;
