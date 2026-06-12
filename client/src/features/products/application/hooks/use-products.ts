@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActiveBranchStore } from '@/features/branches/application/stores/active-branch.store';
 import { fetchAllPaged } from '@/shared/lib/fetch-all-paged';
 import { productsApiHttp } from '../../infrastructure/api/products.api.http';
@@ -29,7 +29,7 @@ export const productsKey = {
 
 export function useProducts(
   params: ListProductsParams = {},
-  opts: { fetchAll?: boolean; cap?: number } = {},
+  opts: { fetchAll?: boolean; cap?: number; keepPrevious?: boolean } = {},
 ) {
   const branchId = useActiveBranchStore((s) => s.activeBranchId);
   const fetchAll = opts.fetchAll ?? false;
@@ -41,6 +41,9 @@ export function useProducts(
       fetchAll
         ? fetchAllPaged((p) => productsApiHttp.list(p), params, { cap })
         : productsApiHttp.list(params),
+    // En búsquedas tecleadas (POS) mantiene los resultados anteriores mientras
+    // llega la página nueva: evita el flash de "vacío" en cada tecla.
+    placeholderData: opts.keepPrevious ? keepPreviousData : undefined,
   });
 }
 

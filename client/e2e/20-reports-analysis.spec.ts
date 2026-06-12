@@ -1,5 +1,10 @@
 import { expect, test } from './fixtures';
-import { ensureCashSessionOpen, purgeProductsBySkuPrefix } from './helpers/api';
+import {
+  disableMultiBranch,
+  enableMultiBranch,
+  ensureCashSessionOpen,
+  purgeProductsBySkuPrefix,
+} from './helpers/api';
 
 /**
  * Reportes — Análisis de datos. Tras la reestructuración, /reports es un ÍNDICE
@@ -24,10 +29,13 @@ test.describe.serial('Reportes — Análisis de datos', () => {
   test.beforeAll(async () => {
     await purgeProductsBySkuPrefix(SKU_PREFIX);
     await ensureCashSessionOpen();
+    // El toggle "consolidado · sucursales" solo se renderiza con multi-sucursal ON.
+    await enableMultiBranch();
   });
 
   test.afterAll(async () => {
     await purgeProductsBySkuPrefix(SKU_PREFIX);
+    await disableMultiBranch();
   });
 
   test('el índice de reportes lista las tarjetas de cada reporte', async ({ page }) => {

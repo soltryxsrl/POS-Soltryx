@@ -45,12 +45,18 @@ export function useOfflineSalesSync() {
           await removePendingSale(rec.id);
           synced += 1;
         } catch (e) {
-          if (e instanceof HttpClientError) {
+          const status = e instanceof HttpClientError ? e.status : 0;
+          const isPermanent =
+            status >= 400 && status < 500 && status !== 401 && status !== 429;
+          if (isPermanent) {
             // Falla permanente (sesión cerrada, stock insuficiente, validación):
             // se marca con conflicto y se sigue con las demás.
-            await markPendingFailed(rec, e.message);
+            await markPendingFailed(rec, e instanceof Error ? e.message : String(e));
           } else {
-            // Falla de red → seguimos sin conexión; reintentar luego.
+            // Transitorio: falla de red, 5xx (deploy/reinicio de Render), 429 o
+            // 401 (refresh en curso). La venta YA se cobró al cliente — se queda
+            // en cola y se reintenta en el próximo ciclo; jamás se entierra como
+            // conflicto por un blip del servidor.
             break;
           }
         }

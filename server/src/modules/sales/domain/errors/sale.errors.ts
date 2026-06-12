@@ -78,6 +78,16 @@ export class SaleNotCancellableError extends Error {
   }
 }
 
+export class SaleHasReturnsError extends Error {
+  readonly code = 'SALE_HAS_RETURNS';
+  constructor(saleId: string) {
+    super(
+      `La venta ${saleId} tiene devoluciones registradas y no se puede anular: el stock y la nota de crédito de lo devuelto ya se emitieron. Devuelve los ítems restantes con otra devolución.`,
+    );
+    this.name = 'SaleHasReturnsError';
+  }
+}
+
 export class CustomerRequiredForAccountError extends Error {
   readonly code = 'CUSTOMER_REQUIRED_FOR_ACCOUNT';
   constructor() {

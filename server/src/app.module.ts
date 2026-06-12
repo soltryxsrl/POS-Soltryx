@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { typeOrmAsyncConfig } from './config/typeorm.config';
 import { validateEnv } from './config/env.validation';
@@ -42,6 +43,11 @@ import { PersistenceModule } from './common/persistence/persistence.module';
       validate: validateEnv,
     }),
     TypeOrmModule.forRootAsync(typeOrmAsyncConfig),
+    // Storage del rate limit (en memoria). El guard NO es global: solo los
+    // endpoints públicos de auth lo usan (@UseGuards(ThrottlerGuard) + @Throttle)
+    // para frenar fuerza bruta sin limitar el tráfico normal del POS. El límite
+    // por IP funciona en Render porque main.ts ya configura trust proxy.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     PersistenceModule,
     AuditModule, // @Global — exporta AuditService a todos los demás módulos
     BranchContextModule, // @Global — resuelve la sucursal activa por request

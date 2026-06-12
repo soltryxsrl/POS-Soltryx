@@ -1,5 +1,11 @@
 import { expect, test } from './fixtures';
-import { api, purgeProductsBySkuPrefix } from './helpers/api';
+import {
+  api,
+  disableMultiBranch,
+  enableMultiBranch,
+  ensureSecondBranch,
+  purgeProductsBySkuPrefix,
+} from './helpers/api';
 
 /**
  * BUG fix: cambiar de sucursal en el selector del nav debe actualizar la data en
@@ -16,6 +22,11 @@ const OTHER_BRANCH = 'Sucursal 2';
 
 test.describe.serial('Cambio de sucursal en el nav', () => {
   test.beforeAll(async () => {
+    // El switcher de sucursal solo se renderiza con multi-sucursal ON y ≥2
+    // sucursales; ambos vienen OFF/ausentes por defecto, así que los preparamos.
+    await enableMultiBranch();
+    await ensureSecondBranch(OTHER_BRANCH);
+
     await purgeProductsBySkuPrefix(SKU_PREFIX);
     // Sin header X-Branch-Id → el producto se crea en la sucursal HOME del admin.
     await api('/products', {
@@ -26,6 +37,7 @@ test.describe.serial('Cambio de sucursal en el nav', () => {
 
   test.afterAll(async () => {
     await purgeProductsBySkuPrefix(SKU_PREFIX);
+    await disableMultiBranch();
   });
 
   test('cambiar de sucursal actualiza la lista de productos', async ({ page }) => {

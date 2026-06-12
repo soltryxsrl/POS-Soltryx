@@ -38,6 +38,7 @@ import {
   ProductNotForSaleError,
   SaleHasNoItemsError,
   SaleHasNoPaymentsError,
+  SaleHasReturnsError,
   SaleNotCancellableError,
   SaleNotFoundError,
 } from '../../domain/errors/sale.errors';
@@ -185,6 +186,7 @@ export class SalesController {
       if (e instanceof DiscountOverrideInvalidError) throw new UnauthorizedException(e.message);
       if (e instanceof InsufficientStockError) throw new ConflictException(e.message);
       if (e instanceof SaleNotCancellableError) throw new ConflictException(e.message);
+      if (e instanceof SaleHasReturnsError) throw new ConflictException(e.message);
       throw e;
     }
   }

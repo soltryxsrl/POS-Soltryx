@@ -22,13 +22,34 @@ const SCAN_THRESHOLD_MS = 25;
 
 export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
   const [q, setQ] = useState('');
+  // El query usa la versión debounceada (~250ms): el tecleo humano no dispara
+  // una request por tecla. Enter hace "flush" inmediato (ver onKeyDown).
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [scanFlash, setScanFlash] = useState(false);
-  const products = useProducts({
-    q: q || undefined,
-    categoryId: categoryId ?? undefined,
-    isActive: true,
-    limit: 18,
-  });
+  /** Texto buscado con Enter cuyo resultado no encontró producto. */
+  const [notFound, setNotFound] = useState<string | null>(null);
+  /**
+   * Enter con el query aún en vuelo: guardamos el texto y auto-agregamos el
+   * primer resultado cuando el fetch resuelva. Un scanner teclea el código
+   * completo + Enter en <200ms — sin esto, el Enter caía en una lista stale
+   * (o vacía) y el escaneo fallaba al primer intento.
+   */
+  const [pendingPickQ, setPendingPickQ] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(q), 250);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const products = useProducts(
+    {
+      q: debouncedQ || undefined,
+      categoryId: categoryId ?? undefined,
+      isActive: true,
+      limit: 18,
+    },
+    { keepPrevious: true },
+  );
 
   const items = products.data?.items ?? [];
 
@@ -47,9 +68,14 @@ export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
     }
     lastKeyTsRef.current = now;
 
-    if (e.key === 'Enter' && items.length > 0 && items[0]) {
-      onPick(items[0]);
-      setQ('');
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!q.trim()) return;
+      setNotFound(null);
+      // Flush del debounce: que el query del texto COMPLETO salga ya, y al
+      // resolver se agrega el primer resultado (efecto de abajo).
+      setDebouncedQ(q);
+      setPendingPickQ(q);
       // Si veníamos en racha rápida, considéralo un escaneo y haz feedback visual.
       if (fastStreakRef.current >= 3) {
         setScanFlash(true);
@@ -59,9 +85,30 @@ export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
     }
   };
 
+  // Resuelve el Enter pendiente cuando el fetch del texto buscado termina.
+  useEffect(() => {
+    if (pendingPickQ === null) return;
+    if (debouncedQ !== pendingPickQ) return; // el flush aún no aplicó
+    if (products.isFetching || !products.data) return;
+    const first = products.data.items[0];
+    setPendingPickQ(null);
+    if (first) {
+      onPick(first);
+      setQ('');
+      setDebouncedQ('');
+    } else {
+      setNotFound(pendingPickQ);
+      setQ('');
+      setDebouncedQ('');
+    }
+  }, [pendingPickQ, debouncedQ, products.isFetching, products.data, onPick]);
+
   // Si seleccionas una categoría, vuelve al inicio del scroll.
   useEffect(() => {
     setQ('');
+    setDebouncedQ('');
+    setPendingPickQ(null);
+    setNotFound(null);
   }, [categoryId]);
 
   return (
@@ -85,7 +132,10 @@ export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
             ref={inputRef}
             autoFocus
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              if (notFound) setNotFound(null);
+            }}
             onKeyDown={onKeyDown}
             placeholder="Busca por nombre, SKU o escanea un código de barras..."
             className="flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground/70"
@@ -94,6 +144,13 @@ export function ProductSearch({ onPick, categoryId, inputRef }: Props) {
             /
           </kbd>
         </div>
+        {notFound && (
+          <p className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+            No se encontró ningún producto para “{notFound}”. Verifica el código o
+            búscalo por nombre.
+          </p>
+        )}
       </div>
 
       {/* Grid de productos */}

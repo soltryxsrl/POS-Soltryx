@@ -1,6 +1,12 @@
 
 import { expect, test } from './fixtures';
-import { api, purgeProductsBySkuPrefix } from './helpers/api';
+import {
+  api,
+  disableMultiBranch,
+  enableMultiBranch,
+  ensureSecondBranch,
+  purgeProductsBySkuPrefix,
+} from './helpers/api';
 
 const SKU_PREFIX = 'E2E-TRANSFER-';
 
@@ -29,6 +35,12 @@ test.describe.serial('Transferencias de stock', () => {
   let hasDestBranch = false;
 
   test.beforeAll(async () => {
+    // La ruta /transferencias está gateada por multi-sucursal (RouteGuard):
+    // sin habilitarla, da "Acceso denegado". La habilitamos + 2ª sucursal para
+    // ejercitar de verdad el flujo (incluida la rama hasDestBranch).
+    await enableMultiBranch();
+    await ensureSecondBranch();
+
     // Sucursal HOME del usuario autenticado = la "activa" del form.
     const me = await api<{ user: { branchId: string | null } }>('/auth/me');
     homeBranchId = me.user.branchId ?? '';
@@ -60,6 +72,7 @@ test.describe.serial('Transferencias de stock', () => {
 
   test.afterAll(async () => {
     await purgeProductsBySkuPrefix(SKU_PREFIX);
+    await disableMultiBranch();
   });
 
   test('listar transferencias en página /transferencias y verificar interfaz cargada', async ({

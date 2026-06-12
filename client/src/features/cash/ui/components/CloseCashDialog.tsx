@@ -98,14 +98,20 @@ export function CloseCashDialog({ sessionId, onClose, onClosed }: Props) {
   const diff = !isNaN(counted) ? counted - expectedNum : null;
 
   return (
-    <MaintenanceShell open onClose={onClose} title="Cerrar caja" size="lg">
+    <MaintenanceShell
+      open
+      onClose={onClose}
+      title="Cerrar caja"
+      size="lg"
+      disableClose={closeMut.isPending}
+    >
       {summary.data && (
         <dl className="space-y-1 rounded-xl border border-border bg-muted/40 p-4 text-sm">
           <SummaryRow label="Monto inicial" value={formatMoney(summary.data.openingAmount)} />
           <SummaryRow label="Ventas efectivo" value={`+${formatMoney(summary.data.cashSales)}`} />
           <SummaryRow label="Devoluciones" value={`-${formatMoney(summary.data.cashRefunds)}`} />
-          <SummaryRow label="Pay-ins" value={`+${formatMoney(summary.data.paidIns)}`} />
-          <SummaryRow label="Pay-outs" value={`-${formatMoney(summary.data.paidOuts)}`} />
+          <SummaryRow label="Entradas de efectivo" value={`+${formatMoney(summary.data.paidIns)}`} />
+          <SummaryRow label="Salidas de efectivo" value={`-${formatMoney(summary.data.paidOuts)}`} />
           <SummaryRow
             label="Efectivo esperado"
             value={formatMoney(summary.data.expectedAmount)}

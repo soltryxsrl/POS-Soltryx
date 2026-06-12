@@ -12,6 +12,7 @@ import {
 } from '../../../inventory/domain/ports/stock-movement-recorder.port';
 import type { Sale } from '../../domain/entities/sale.entity';
 import {
+  SaleHasReturnsError,
   SaleNotCancellableError,
   SaleNotFoundError,
 } from '../../domain/errors/sale.errors';
@@ -56,6 +57,29 @@ export class CancelSaleUseCase {
     }
 
     return this.uow.run(async (ctx) => {
+      // Lock pesimista + recheck del status: serializa contra devoluciones de
+      // la misma venta (toman el mismo FOR UPDATE) y contra otra anulación
+      // concurrente. Sin esto, el status leído arriba puede quedar stale.
+      const lockedRows: Array<{ status: string }> = await ctx.manager.query(
+        `SELECT status FROM sales WHERE id = $1 FOR UPDATE`,
+        [sale.id],
+      );
+      if (lockedRows[0]?.status !== SaleStatus.COMPLETED) {
+        throw new SaleNotCancellableError(sale.id, lockedRows[0]?.status ?? 'desconocido');
+      }
+
+      // Una venta con devoluciones (parciales) NO se puede anular: la
+      // devolución ya restauró stock y emitió NC por lo devuelto — anular
+      // reversaría ese resto DOS veces. El flujo correcto es devolver lo
+      // que falta con otra devolución.
+      const returnsRows: Array<{ exists: boolean }> = await ctx.manager.query(
+        `SELECT EXISTS (SELECT 1 FROM sale_returns WHERE sale_id = $1) AS exists`,
+        [sale.id],
+      );
+      if (returnsRows[0]?.exists) {
+        throw new SaleHasReturnsError(sale.id);
+      }
+
       const items = await this.saleRepo.findItemsForCancellation(ctx, sale.id);
       // Para líneas SIN snapshot histórico de receta (ventas viejas), caemos al
       // snapshot ACTUAL del producto. Las ventas nuevas tienen kitComponentsSnapshot.
@@ -134,37 +158,47 @@ export class CancelSaleUseCase {
       // reverse. E3X → E34 (e-CF), B0X → B04 (tradicional). Esto es lo que se
       // envía a DGII para anular el comprobante original; el sistema externo
       // (provider) la recoge al detectarla en fiscal_documents.
-      if (sale.fiscalDocument && sale.fiscalDocument.status === 'ISSUED') {
-        const isElectronic = sale.fiscalDocument.docType.startsWith('E');
-        const creditNoteCode = isElectronic ? 'E34' : 'B04';
-        await this.fiscalDocs.issueForSale(ctx, {
-          docTypeCode: creditNoteCode,
-          saleId: sale.id,
-          branchId: sale.branchId,
-          buyerName: sale.fiscalDocument.buyerName,
-          buyerRnc: sale.fiscalDocument.buyerRnc,
-          subtotal: sale.subtotal,
-          taxTotal: sale.taxTotal,
-          total: sale.total,
-          items: items.map((it) => ({
-            description: it.variantNameSnapshot
-              ? `${it.productNameSnapshot} · ${it.variantNameSnapshot}`
-              : it.productNameSnapshot,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            discount: it.discount,
-            taxRate: it.taxRate,
-            taxTotal: it.taxTotal,
-            total: it.total,
-          })),
+      if (sale.fiscalDocumentId && sale.fiscalDocument?.status === 'ISSUED') {
+        // La NC debe reversar EXACTAMENTE lo facturado: base/ITBIS/total salen
+        // del comprobante original (que ya trae la base corregida por descuento
+        // de orden y modo ITBIS-incluido), NO de la venta — sale.subtotal es el
+        // bruto antes de descuentos y en modo tax-inclusive incluye el ITBIS.
+        const invoice = await ctx.manager.findOne(FiscalDocumentOrmEntity, {
+          where: { id: sale.fiscalDocumentId },
+          relations: { items: true },
         });
-        // El factura original queda como CANCELLED para que DGII (vía provider)
-        // pueda relacionar la nota de crédito con su NCF original.
-        await ctx.manager.update(
-          FiscalDocumentOrmEntity,
-          { id: sale.fiscalDocument.id },
-          { status: 'CANCELLED' },
-        );
+        if (invoice && invoice.status === 'ISSUED') {
+          const isElectronic = invoice.docType.startsWith('E');
+          const creditNoteCode = isElectronic ? 'E34' : 'B04';
+          await this.fiscalDocs.issueForSale(ctx, {
+            docTypeCode: creditNoteCode,
+            saleId: sale.id,
+            branchId: sale.branchId,
+            buyerName: invoice.buyerName,
+            buyerRnc: invoice.buyerRnc,
+            subtotal: invoice.subtotal,
+            taxTotal: invoice.taxTotal,
+            total: invoice.total,
+            items: [...(invoice.items ?? [])]
+              .sort((a, b) => a.sequence - b.sequence)
+              .map((it) => ({
+                description: it.description,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                discount: it.discount,
+                taxRate: it.taxRate,
+                taxTotal: it.taxTotal,
+                total: it.total,
+              })),
+          });
+          // El factura original queda como CANCELLED para que DGII (vía provider)
+          // pueda relacionar la nota de crédito con su NCF original.
+          await ctx.manager.update(
+            FiscalDocumentOrmEntity,
+            { id: invoice.id },
+            { status: 'CANCELLED' },
+          );
+        }
       }
 
       // Audit: fire-and-forget; falla no rompe la cancelación.

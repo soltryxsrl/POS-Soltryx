@@ -134,6 +134,7 @@ export function ReturnDialog({
       onClose={onClose}
       title={`Devolución sobre ${saleNumber}`}
       size="lg"
+      disableClose={create.isPending}
     >
       <form onSubmit={onSubmit} className="space-y-5">
         <p className="text-sm text-muted-foreground">

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { resolveSort } from '../../common/dto/pagination-sort.query';
 import { assertSameBranch } from '../../common/branch/branch-scope.util';
 import {
@@ -38,6 +38,7 @@ import { FiscalDocumentOrmEntity } from '../fiscal/documents/fiscal-document.orm
 import { FiscalDocumentsService } from '../fiscal/documents/fiscal-documents.service';
 import type { CreateReturnRequestDto } from './dto/create-return.request-dto';
 import type { ListReturnsQuery } from './dto/list-returns.query';
+import { computeReturnLineAmounts } from './return-refund-math';
 import { SaleReturnItemOrmEntity } from './sale-return-item.orm-entity';
 import {
   RefundMethod,
@@ -177,10 +178,24 @@ export class ReturnsService {
     return toResponse(row, sale?.saleNumber ?? null);
   }
 
-  async getReturnableItems(saleId: string): Promise<ReturnableSaleItem[]> {
-    const items = await this.saleItems.find({ where: { saleId } });
+  /**
+   * Con `manager` corre dentro de la transacción del caller: imprescindible al
+   * validar cantidades bajo el lock de la venta (ver `create`), para que el
+   * acumulado devuelto no quede stale frente a una devolución concurrente.
+   */
+  async getReturnableItems(
+    saleId: string,
+    manager?: EntityManager,
+  ): Promise<ReturnableSaleItem[]> {
+    const saleItemsRepo = manager
+      ? manager.getRepository(SaleItemOrmEntity)
+      : this.saleItems;
+    const returnItemsRepo = manager
+      ? manager.getRepository(SaleReturnItemOrmEntity)
+      : this.returnItems;
+    const items = await saleItemsRepo.find({ where: { saleId } });
     if (items.length === 0) return [];
-    const returnAgg = await this.returnItems
+    const returnAgg = await returnItemsRepo
       .createQueryBuilder('ri')
       .select('ri.sale_item_id', 'saleItemId')
       .addSelect('COALESCE(SUM(ri.quantity), 0)', 'alreadyReturned')
@@ -274,28 +289,44 @@ export class ReturnsService {
       }
     }
 
-    const returnable = await this.getReturnableItems(sale.id);
-    const byItemId = new Map(returnable.map((r) => [r.saleItem.id, r]));
-
-    // Validar líneas: pertenecen a esta venta + cantidad ≤ remaining
-    for (const r of dto.items) {
-      const info = byItemId.get(r.saleItemId);
-      if (!info) {
-        throw new BadRequestException(`Ítem ${r.saleItemId} no pertenece a la venta ${sale.saleNumber}`);
-      }
-      const q = parseFloat(r.quantity);
-      if (q <= 0) {
-        throw new BadRequestException(`Cantidad inválida para ${info.saleItem.productNameSnapshot}`);
-      }
-      if (q > info.remaining + 0.0001) {
-        throw new BadRequestException(
-          `${info.saleItem.productNameSnapshot}: solo quedan ${info.remaining.toFixed(3)} por devolver`,
-        );
-      }
-    }
-
     return this.uow.run(async (ctx) => {
       const m = ctx.manager;
+
+      // Lock pesimista sobre la venta: serializa devoluciones concurrentes de
+      // la misma venta (y contra la anulación, que toma el mismo lock). El
+      // status y el acumulado devuelto se validan DESPUÉS del lock — si se
+      // validaran antes de la transacción, dos devoluciones simultáneas verían
+      // el mismo "remaining" y la línea se devolvería dos veces.
+      const lockedRows: Array<{ status: string }> = await m.query(
+        `SELECT status FROM sales WHERE id = $1 FOR UPDATE`,
+        [sale.id],
+      );
+      const lockedStatus = lockedRows[0]?.status;
+      if (lockedStatus !== SaleStatus.COMPLETED) {
+        throw new ConflictException(
+          `Solo se puede devolver de ventas en estado COMPLETED (actual: ${lockedStatus ?? 'desconocido'})`,
+        );
+      }
+
+      const returnable = await this.getReturnableItems(sale.id, m);
+      const byItemId = new Map(returnable.map((r) => [r.saleItem.id, r]));
+
+      // Validar líneas: pertenecen a esta venta + cantidad ≤ remaining
+      for (const r of dto.items) {
+        const info = byItemId.get(r.saleItemId);
+        if (!info) {
+          throw new BadRequestException(`Ítem ${r.saleItemId} no pertenece a la venta ${sale.saleNumber}`);
+        }
+        const q = parseFloat(r.quantity);
+        if (q <= 0) {
+          throw new BadRequestException(`Cantidad inválida para ${info.saleItem.productNameSnapshot}`);
+        }
+        if (q > info.remaining + 0.0001) {
+          throw new BadRequestException(
+            `${info.saleItem.productNameSnapshot}: solo quedan ${info.remaining.toFixed(3)} por devolver`,
+          );
+        }
+      }
 
       // Sale_number de devolución desde sequence (concurrent-safe)
       const seqRows = await m.query<{ nextval: string }[]>(
@@ -339,6 +370,18 @@ export class ReturnsService {
         absLineForStock: string;
       }> = [];
 
+      // El reembolso replica la matemática de la VENTA (sale-totals-calculator +
+      // bloque fiscal de create-sale): en modo ITBIS-incluido el precio mostrado
+      // ES el total de línea (el impuesto se back-calcula, no se suma encima), y
+      // el descuento de orden (post-impuesto) se prorratea por el peso de la
+      // fracción devuelta sobre el total de líneas — así se devuelve lo que el
+      // cliente realmente pagó y la NC cuadra con la factura original.
+      const orderDiscC = Math.round(parseFloat(sale.orderDiscount ?? '0') * 100);
+      const saleLinesTotalC = returnable.reduce(
+        (acc, info) => acc + Math.round(parseFloat(info.saleItem.total) * 100),
+        0,
+      );
+
       for (const r of dto.items) {
         const info = byItemId.get(r.saleItemId)!;
         const item = info.saleItem;
@@ -347,21 +390,18 @@ export class ReturnsService {
             `No se pueden devolver ítems de monto libre (${item.productNameSnapshot})`,
           );
         }
-        const q = parseFloat(r.quantity);
-        const originalQty = parseFloat(item.quantity);
-        const unitC = Math.round(parseFloat(item.unitPrice) * 100);
-        const grossC = Math.round(unitC * q);
-        // Prorratea el descuento de la línea original por la fracción devuelta:
-        // se reembolsa lo que el cliente REALMENTE pagó (no el precio sin
-        // descuento), y el ITBIS se calcula sobre el neto, igual que en la venta.
-        const discountC = Math.round(parseFloat(item.discount ?? '0') * 100);
-        const proratedDiscountC =
-          originalQty > 0 ? Math.round((discountC * q) / originalQty) : 0;
-        const lineSubC = Math.max(0, grossC - proratedDiscountC);
-        const taxBp = Math.round(parseFloat(item.taxRate) * 100);
-        const lineTaxC = Math.round((lineSubC * taxBp) / (100 * 100));
-        subC += lineSubC;
-        taxC += lineTaxC;
+        const amounts = computeReturnLineAmounts({
+          unitPrice: item.unitPrice,
+          quantityReturned: parseFloat(r.quantity),
+          originalQuantity: parseFloat(item.quantity),
+          lineDiscount: item.discount ?? '0',
+          taxRate: item.taxRate,
+          priceIncludesTax: sale.priceIncludesTax,
+          orderDiscountCents: orderDiscC,
+          saleLinesTotalCents: saleLinesTotalC,
+        });
+        subC += amounts.baseCents;
+        taxC += amounts.taxCents;
         lineDrafts.push({
           saleItemId: item.id,
           productId: item.productId,
@@ -371,10 +411,12 @@ export class ReturnsService {
           productSkuSnapshot: item.productSkuSnapshot,
           quantity: r.quantity,
           unitPrice: item.unitPrice,
-          discount: fromCents(proratedDiscountC),
+          // Para el comprobante (NC): descuento = bruto − base, igual que los
+          // fiscal_document_items de la venta.
+          discount: fromCents(Math.max(0, amounts.grossCents - amounts.baseCents)),
           taxRate: item.taxRate,
-          taxTotal: fromCents(lineTaxC),
-          total: fromCents(lineSubC + lineTaxC),
+          taxTotal: fromCents(amounts.taxCents),
+          total: fromCents(amounts.refundCents),
           absLineForStock: r.quantity,
         });
       }

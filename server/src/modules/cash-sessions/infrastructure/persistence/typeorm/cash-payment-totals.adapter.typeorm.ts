@@ -56,6 +56,41 @@ export class CashPaymentTotalsAdapterTypeOrm implements CashPaymentTotalsPort {
       }
     }
 
+    // payments.amount es lo TENDIDO por el cliente, no lo cobrado: en efectivo
+    // incluye el vuelto que salió del cajón al instante. Sin netearlo, cada
+    // venta con cambio infla el efectivo esperado y el cierre marca un faltante
+    // fantasma (mismo root cause que el donut de métodos de pago en reportes).
+    // Solo el efectivo da vuelto, así que el sobrante (paid − total) se resta:
+    //   - COMPLETED/REFUNDED → del efectivo de ventas (cashSales)
+    //   - CANCELLED → del reembolso (cashRefunds): al anular se devuelve el
+    //     total de la venta, no lo tendido.
+    const changeRows: Array<{ status: string; change: string | null }> =
+      await this.ds.query(
+        `SELECT status, COALESCE(SUM(GREATEST(0, paid - total)), 0)::text AS change
+         FROM (
+           SELECT s.id, s.status::text AS status, s.total, SUM(p.amount) AS paid
+           FROM sales s
+           JOIN payments p ON p.sale_id = s.id
+           WHERE s.cash_session_id = $1
+             AND p.status = 'COMPLETED'
+           GROUP BY s.id, s.status, s.total
+         ) t
+         GROUP BY status`,
+        [sessionId],
+      );
+    let salesChange = '0.00';
+    let cancelledChange = '0.00';
+    for (const r of changeRows) {
+      const v = r.change ?? '0.00';
+      if (r.status === 'COMPLETED' || r.status === 'REFUNDED') {
+        salesChange = sumStringDecimals(salesChange, v);
+      } else if (r.status === 'CANCELLED') {
+        cancelledChange = sumStringDecimals(cancelledChange, v);
+      }
+    }
+    cashSales = subtractStringDecimals(cashSales, salesChange);
+    cashRefunds = subtractStringDecimals(cashRefunds, cancelledChange);
+
     const movementRows: Array<{ type: string; total: string | null }> = await this.ds.query(
       `SELECT type::text AS type, COALESCE(SUM(amount), 0)::text AS total
        FROM cash_movements
@@ -76,9 +111,20 @@ export class CashPaymentTotalsAdapterTypeOrm implements CashPaymentTotalsPort {
 }
 
 function sumStringDecimals(a: string, b: string): string {
-  const factor = 100;
-  const sum = Math.round(parseFloat(a) * factor) + Math.round(parseFloat(b) * factor);
-  const whole = Math.trunc(sum / factor);
-  const frac = Math.abs(sum % factor).toString().padStart(2, '0');
+  return centsToString(toCentsInt(a) + toCentsInt(b));
+}
+
+/** Resta clampada a 0: el vuelto nunca puede exceder lo tendido. */
+function subtractStringDecimals(a: string, b: string): string {
+  return centsToString(Math.max(0, toCentsInt(a) - toCentsInt(b)));
+}
+
+function toCentsInt(v: string): number {
+  return Math.round(parseFloat(v) * 100);
+}
+
+function centsToString(cents: number): string {
+  const whole = Math.trunc(cents / 100);
+  const frac = Math.abs(cents % 100).toString().padStart(2, '0');
   return `${whole}.${frac}`;
 }

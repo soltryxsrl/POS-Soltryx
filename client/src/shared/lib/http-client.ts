@@ -45,6 +45,23 @@ export function configureHttpAuth(bridge: AuthBridge): void {
   auth = bridge;
 }
 
+let refreshInFlight: Promise<string | null> | null = null;
+
+/**
+ * Single-flight: varios 401 simultáneos comparten UNA llamada a /auth/refresh.
+ * El refresh token es single-use (el server lo rota en cada refresh): si cada
+ * request disparara el suyo, el segundo llegaría con la cookie ya revocada y
+ * cerraría la sesión del cajero en pleno turno.
+ */
+function refreshOnce(): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = auth!.refresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 function buildUrl(path: string, searchParams?: HttpRequestOptions['searchParams']): string {
   const base = env.apiUrl.replace(/\/$/, '');
   const url = new URL(`${base}/api${path.startsWith('/') ? path : `/${path}`}`);
@@ -100,7 +117,7 @@ export async function http<T>(path: string, opts: HttpRequestOptions = {}): Prom
 
   // Intento de auto-refresh si recibimos 401, hay bridge configurado, y no se pidió saltarlo.
   if (res.status === 401 && auth && !opts.skipAuth && !opts.skipAuthRetry) {
-    const newToken = await auth.refresh();
+    const newToken = await refreshOnce();
     if (newToken) {
       res = await doFetch(path, { ...opts, skipAuthRetry: true }, newToken);
     } else {
@@ -150,7 +167,7 @@ export async function uploadFile<T>(
 
   let res = await send(auth ? auth.getAccessToken() : null);
   if (res.status === 401 && auth) {
-    const newToken = await auth.refresh();
+    const newToken = await refreshOnce();
     if (newToken) res = await send(newToken);
     else auth.onAuthLost();
   }

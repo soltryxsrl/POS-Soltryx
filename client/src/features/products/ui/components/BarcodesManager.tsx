@@ -7,6 +7,7 @@ import { http } from '@/shared/lib/http-client';
 import { getErrorMessage } from '@/shared/lib/error-message';
 import { Button } from '@/shared/ui/controls/Button';
 import { Input } from '@/shared/ui/controls/Input';
+import { ConfirmDialog } from '@/shared/ui/feedback/ConfirmDialog';
 import { productsKey } from '@/features/products/application/hooks/use-products';
 
 interface ProductBarcode {
@@ -62,6 +63,19 @@ export function BarcodesManager({ productId }: Props) {
   const [newBarcode, setNewBarcode] = useState('');
   const [makePrimary, setMakePrimary] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ProductBarcode | null>(null);
+  const [delError, setDelError] = useState<string | null>(null);
+
+  const onConfirmDelete = async () => {
+    if (!toDelete) return;
+    setDelError(null);
+    try {
+      await remove.mutateAsync(toDelete.id);
+      setToDelete(null);
+    } catch (err) {
+      setDelError(getErrorMessage(err));
+    }
+  };
 
   const onAdd = async (e: FormEvent) => {
     e.preventDefault();
@@ -125,7 +139,10 @@ export function BarcodesManager({ productId }: Props) {
               )}
               <button
                 type="button"
-                onClick={() => remove.mutate(b.id)}
+                onClick={() => {
+                  setDelError(null);
+                  setToDelete(b);
+                }}
                 disabled={remove.isPending}
                 className="rounded-md p-1 text-destructive hover:bg-destructive/10"
                 title="Eliminar"
@@ -165,6 +182,24 @@ export function BarcodesManager({ productId }: Props) {
           </p>
         )}
       </form>
+
+      {toDelete && (
+        <ConfirmDialog
+          title="Eliminar código de barras"
+          message={
+            <>
+              ¿Eliminar el código <code className="font-mono">{toDelete.barcode}</code>?
+              Los escaneos con este código dejarán de encontrar el producto.
+            </>
+          }
+          confirmLabel="Eliminar"
+          destructive
+          pending={remove.isPending}
+          error={delError}
+          onConfirm={() => void onConfirmDelete()}
+          onClose={() => setToDelete(null)}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,9 @@
  * Cliente API mínimo para los tests E2E. Permite cleanup rápido entre tests
  * sin tener que navegar la UI cada vez.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 const BASE = 'http://localhost:3001/api';
 let cachedToken: string | null = null;
 
@@ -154,6 +157,84 @@ export async function purgeMyParkedCarts(): Promise<void> {
     }
   } catch {
     // sin sesión o sin endpoint — nada que limpiar
+  }
+}
+
+/**
+ * Secreto super-admin para PATCH /plan. Lo toma de env (E2E_SUPERADMIN_SECRET o
+ * SUPERADMIN_SECRET) o, en su defecto, lo lee de server/.env — el mismo que usa
+ * la API local. Así los specs multi-sucursal son autocontenidos sin exportar
+ * nada a mano. La gestión del plan se protege por este secreto (no por rol), ver
+ * PlanController.
+ */
+let cachedSecret: string | null = null;
+function getSuperadminSecret(): string {
+  if (cachedSecret) return cachedSecret;
+  const fromEnv = process.env.E2E_SUPERADMIN_SECRET ?? process.env.SUPERADMIN_SECRET;
+  if (fromEnv) return (cachedSecret = fromEnv);
+  // client/e2e/helpers → ../../../server/.env
+  const envPath = join(__dirname, '..', '..', '..', 'server', '.env');
+  let raw: string;
+  try {
+    raw = readFileSync(envPath, 'utf8');
+  } catch {
+    throw new Error(
+      `No pude leer SUPERADMIN_SECRET (ni env ni ${envPath}). Necesario para habilitar multi-sucursal en e2e.`,
+    );
+  }
+  const line = raw.split(/\r?\n/).find((l) => l.startsWith('SUPERADMIN_SECRET='));
+  const value = line?.slice('SUPERADMIN_SECRET='.length).trim().replace(/^["']|["']$/g, '');
+  if (!value) throw new Error('SUPERADMIN_SECRET vacío en server/.env');
+  return (cachedSecret = value);
+}
+
+/**
+ * Habilita multi-sucursal en el plan (PATCH /plan con el secreto super-admin) y
+ * deja branches ilimitadas. Necesario para los specs que ejercitan features
+ * multi-sucursal: desde el commit que la dejó OFF por defecto, la ruta queda
+ * gateada y el switcher/toggle no se renderiza.
+ */
+export async function enableMultiBranch(): Promise<void> {
+  const res = await authFetch('/plan', {
+    method: 'PATCH',
+    headers: { 'x-superadmin-secret': getSuperadminSecret() },
+    body: JSON.stringify({ multiBranchEnabled: true, maxBranches: null }),
+  });
+  if (!res.ok) {
+    throw new Error(`enableMultiBranch falló: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Revierte multi-sucursal a OFF (el default de producción). */
+export async function disableMultiBranch(): Promise<void> {
+  try {
+    await authFetch('/plan', {
+      method: 'PATCH',
+      headers: { 'x-superadmin-secret': getSuperadminSecret() },
+      body: JSON.stringify({ multiBranchEnabled: false }),
+    });
+  } catch {
+    // best-effort: si falla, el siguiente spec que necesite OFF lo reajusta
+  }
+}
+
+/**
+ * Garantiza una 2ª sucursal activa con el nombre dado (default "Sucursal 2"),
+ * idempotente. Requiere multi-sucursal habilitado (assertCanCreateBranch). Útil
+ * para transferencias y cambio de sucursal.
+ */
+export async function ensureSecondBranch(name = 'Sucursal 2'): Promise<void> {
+  const branches = await api<{ items: Array<{ id: string; name: string }> }>(
+    '/branches?isActive=true&limit=100',
+  );
+  if (branches.items.some((b) => b.name === name)) return;
+  const res = await authFetch('/branches', {
+    method: 'POST',
+    body: JSON.stringify({ code: 'SUC2', name, isActive: true }),
+  });
+  // 409 = el código ya existe (creada por una corrida previa) — aceptable.
+  if (!res.ok && res.status !== 409) {
+    throw new Error(`ensureSecondBranch falló: ${res.status} ${await res.text()}`);
   }
 }
 

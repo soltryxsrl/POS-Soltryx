@@ -81,6 +81,13 @@ export async function removePendingSale(id: string): Promise<void> {
 
 export async function markPendingFailed(rec: PendingSale, reason: string): Promise<void> {
   await tx('readwrite', (s) => s.put({ ...rec, failedReason: reason }));
+  notifyChanged();
+}
+
+/** Devuelve una venta con conflicto a la cola de pendientes (reintento manual). */
+export async function retryPendingSale(rec: PendingSale): Promise<void> {
+  await tx('readwrite', (s) => s.put({ ...rec, failedReason: null }));
+  notifyChanged();
 }
 
 export async function countPendingSales(): Promise<number> {

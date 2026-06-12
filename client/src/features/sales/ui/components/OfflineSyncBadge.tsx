@@ -1,18 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import { useOfflineSalesSync } from '../../application/hooks/use-offline-sales';
+import { OfflineConflictsDialog } from './OfflineConflictsDialog';
 
 /**
  * Indicador (en el header) de ventas guardadas offline. Monta el motor de
  * sincronización (`useOfflineSalesSync`) que drena la cola al reconectar, y
- * muestra cuántas ventas esperan sincronizar o quedaron con conflicto.
+ * muestra cuántas ventas esperan sincronizar o quedaron con conflicto. El chip
+ * de conflictos abre un diálogo para ver el motivo, reintentar o descartar.
  * No renderiza nada cuando no hay pendientes ni conflictos.
  */
 export function OfflineSyncBadge() {
   const { pending, failed } = useOfflineSalesSync();
-  if (pending === 0 && failed === 0) return null;
+  const [showConflicts, setShowConflicts] = useState(false);
+  if (pending === 0 && failed === 0 && !showConflicts) return null;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -30,17 +34,22 @@ export function OfflineSyncBadge() {
         </span>
       )}
       {failed > 0 && (
-        <span
-          title={`${failed} venta(s) no se pudieron sincronizar (sesión cerrada, stock u otra validación). Requieren revisión.`}
+        <button
+          type="button"
+          onClick={() => setShowConflicts(true)}
+          title={`${failed} venta(s) no se pudieron sincronizar. Toca para revisarlas.`}
           className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-            'border-red-300 bg-red-50 text-red-700',
-            'dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300',
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition',
+            'border-red-300 bg-red-50 text-red-700 hover:bg-red-100',
+            'dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50',
           )}
         >
           <TriangleAlert className="h-3 w-3" />
           {failed} con conflicto
-        </span>
+        </button>
+      )}
+      {showConflicts && (
+        <OfflineConflictsDialog onClose={() => setShowConflicts(false)} />
       )}
     </div>
   );

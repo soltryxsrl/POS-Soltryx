@@ -168,6 +168,8 @@ test.describe.serial('Informe 606 — captura compra fiscal y generación', () =
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string };
-    expect(body.message).toMatch(/supplierNcf/i);
+    // El server valida la obligatoriedad del NCF del proveedor cuando se indica
+    // un tipo de comprobante; el mensaje es para el usuario final (español).
+    expect(body.message).toMatch(/NCF del proveedor es obligatorio/i);
   });
 });

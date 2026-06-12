@@ -35,7 +35,7 @@ export function ConfirmDialog({
   onClose,
 }: Props) {
   return (
-    <MaintenanceShell open onClose={onClose} title={title} size="sm">
+    <MaintenanceShell open onClose={onClose} title={title} size="sm" disableClose={pending}>
       <div className="space-y-4">
         <div className="text-sm text-muted-foreground">{message}</div>
         {error && (

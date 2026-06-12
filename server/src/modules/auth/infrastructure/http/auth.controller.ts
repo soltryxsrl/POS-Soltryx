@@ -11,8 +11,11 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
+import { AuthThrottlerGuard } from './auth-throttler.guard';
 import type { Request, Response } from 'express';
 import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case';
 import { LoginUseCase } from '../../application/use-cases/login.use-case';
@@ -51,6 +54,10 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  // Freno a fuerza bruta/credential stuffing: 10 intentos/min por IP. bcrypt
+  // encarece cada intento pero no los limita; esto sí.
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async login(
     @Body() body: LoginRequestDto,
     @Req() req: Request,
@@ -79,6 +86,10 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  // Más holgado que login: el POS refresca cada ~15 min por pestaña, pero un
+  // atacante no debería poder enumerar refresh tokens sin freno.
+  @UseGuards(AuthThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('No refresh token');
@@ -149,7 +160,10 @@ export class AuthController {
     res.cookie(REFRESH_COOKIE, token, {
       httpOnly: true,
       secure: this.config.get('COOKIE_SECURE', { infer: true }),
-      sameSite: 'lax',
+      // En prod (Vercel → Render) el front llama a la API cross-site con
+      // credentials:'include': la cookie DEBE ser SameSite=None (+ Secure) o el
+      // navegador no la envía y el refresh muere. render.yaml la setea a 'none'.
+      sameSite: this.config.get('COOKIE_SAMESITE', { infer: true }),
       domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
       path: '/api/auth',
       expires: expiresAt,
@@ -160,7 +174,7 @@ export class AuthController {
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       secure: this.config.get('COOKIE_SECURE', { infer: true }),
-      sameSite: 'lax',
+      sameSite: this.config.get('COOKIE_SAMESITE', { infer: true }),
       domain: this.config.get('COOKIE_DOMAIN', { infer: true }),
       path: '/api/auth',
     });

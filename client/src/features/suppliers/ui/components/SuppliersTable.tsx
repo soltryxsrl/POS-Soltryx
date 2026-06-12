@@ -236,10 +236,14 @@ export function SuppliersTable({
           confirmLabel="Eliminar"
           destructive
           pending={del.isPending}
+          error={del.isError ? getErrorMessage(del.error) : null}
           onConfirm={() =>
             del.mutate(deleting.id, { onSuccess: () => setDeleting(null) })
           }
-          onClose={() => setDeleting(null)}
+          onClose={() => {
+            del.reset();
+            setDeleting(null);
+          }}
         />
       )}
 

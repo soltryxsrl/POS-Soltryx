@@ -640,6 +640,7 @@ export function PaymentModal({ cashSessionId, onClose }: Props) {
       title="Cobrar venta"
       size="xl"
       forceMode="drawer"
+      disableClose={createSale.isPending}
     >
       <div className="rounded-2xl border border-border bg-gradient-to-br from-brand-tint via-card to-brand-soft p-4">
         <div className="flex items-baseline justify-between">
